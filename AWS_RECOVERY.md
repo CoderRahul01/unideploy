@@ -1,6 +1,12 @@
-# 📦 AWS Infrastructure Recovery Guide
+# 📦 AWS Infrastructure# AWS Recovery & Archive
 
-This project originally used a heavy-duty architecture based on **AWS EKS (Kubernetes)**, **ECR**, and **EC2 Nodes**.
+This document outlines the legacy AWS infrastructure that has been archived.
+The new architecture uses a single EC2 instance (`brain` + `gateway`) and E2B.
+
+Legacy code is in `legacy_aws_infrastructure/`.
+Original `backend` is now `brain`.
+Original `backend-node` is now `gateway`.
+Original `frontend` is now `web`.
 We successfully pivoted to a lightweight "Sandbox" architecture (Fly.io + Vectors) in **January 2026**.
 
 If you ever need to restore the "Enterprise" scale AWS setup, follow this guide.

@@ -49,7 +49,7 @@ fi
 
 # 4. Setup Backend Environment (Python)
 echo "🐍 Setting up Python Backend..."
-cd /home/ubuntu/unideploy/backend
+cd /home/ubuntu/unideploy/brain
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -57,7 +57,7 @@ pip install gunicorn uvicorn
 
 # 5. Setup Node Gateway
 echo "🟢 Setting up Node Gateway..."
-cd /home/ubuntu/unideploy/backend-node
+cd /home/ubuntu/unideploy/gateway
 npm install
 npm install -g pm2
 
@@ -68,7 +68,7 @@ server {
     listen 80;
     server_name _; 
 
-    # Frontend (Next.js) - Assuming we build static or run it on 3000
+    # Web (Next.js) - Assuming we build static or run it on 3000
     location / {
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
@@ -77,7 +77,7 @@ server {
         proxy_set_header Host \$host;
     }
 
-    # Python Backend API
+    # Brain API (Python)
     location /api/ {
         proxy_pass http://localhost:8000;
         proxy_http_version 1.1;
@@ -102,8 +102,8 @@ sudo systemctl restart nginx
 # 7. Start Services (PM2)
 echo "🔥 Starting Services..."
 # We use PM2 to manage both Node and Python processes
-pm2 start "uvicorn main:app --host 0.0.0.0 --port 8000" --name "unideploy-backend" --namespace "python"
-pm2 start "npm start" --name "unideploy-gateway" --cwd "/home/ubuntu/unideploy/backend-node"
+pm2 start "uvicorn main:app --host 0.0.0.0 --port 8000" --name "unideploy-brain" --namespace "python"
+pm2 start "npm start" --name "unideploy-gateway" --cwd "/home/ubuntu/unideploy/gateway"
 
 # Save PM2 list
 pm2 save

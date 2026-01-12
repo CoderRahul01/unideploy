@@ -26,11 +26,14 @@ UniDeploy is a high-performance orchestration platform that abstracts away the c
 
 ### 1. Local Development
 ```bash
-# Backend
-cd backend && uvicorn main:app --reload
+# Brain (Python Backend)
+cd brain && uvicorn main:app --reload
 
-# Frontend
-cd frontend && npm run dev
+# Gateway (Node.js)
+cd gateway && npm run dev
+
+# Web (Frontend)
+cd web && npm run dev
 ```
 
 ## 🚢 AWS Deployment Guide

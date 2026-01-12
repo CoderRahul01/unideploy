@@ -36,7 +36,7 @@ dist/
 Thumbs.db
 
 # UniDeploy Specific
-legacy_infrastructure/
 *.pem
 setup_ec2_prod.sh # Don't commit if containing secrets (though mostly safe)
 temp_analysis/
+temp/
