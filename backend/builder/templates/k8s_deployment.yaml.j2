@@ -1,0 +1,162 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{project_name}}
+spec:
+  replicas: {{replicas or 1}}
+  selector:
+    matchLabels:
+      app: {{project_name}}
+  template:
+    metadata:
+      labels:
+        app: {{project_name}}
+  ## Phase 3: System Hardening (Production Ready)
+
+This phase transformed UniDeploy from a "best-effort" platform to a bounded, verifiable, and idempotent system.
+
+### 1. Single Source of Truth (State Authority)
+- **K8s Authority**: The system now queries Kubernetes directly to determine if a project is `RUNNING`. Database drift is automatically corrected by the `StateAuthority` layer.
+- **UI Consistency**: The dashboard now reflects reality, even if the backend process or database was previously out of sync.
+
+### 2. Transactional Mutations & Rollback
+- **Two-Phase Start/Stop**: Scaling actions now follow a strict `Validate -> Lock -> Mutate DB -> Call K8s -> Verify -> Commit` pattern.
+- **Auto-Rollback**: If Kubernetes fails to scale a project, the database state automatically rolls back to its previous value, preventing "stuck" states.
+
+### 3. Distributed Concurrency Control (Advisory Locks)
+- **Per-Project Locking**: A locking mechanism ensures that only one mutation (Wake/Stop/Deploy) can happen per project at a time.
+- **Race Condition Prevention**: Rapidly clicking "Wake" or refreshing the page will no longer trigger duplicate pods or quota violations.
+
+### 4. Centralized System Guard & Hard Invariants
+- **Platform Kill Switch**: The `SystemGuard` now centrally enforces:
+    - **Global Pod Cap** (40 pods)
+    - **Concurrent Build Limit** (5 builds)
+    - **Daily Runtime Quota** (60 mins)
+    - **Per-User Quota** (1 app)
+- **Hard Assertions**: Critical invariants are encoded as assertions. If the system ever enters an illegal state (e.g., a user having 2 running apps), it will fail loudly and visibly in the logs rather than failing silently.
+
+---
+
+## Final Verification: "Chaos Mode" Results
+- **Pod Kill Test**: Manually deleted a pod; State Authority detected the change and reconciled the DB status to `SLEEPING` within seconds.
+- **Race Condition Test**: Spammed the `/start` API with 10 concurrent requests; only 1 succeeded, the rest were rejected with a `409 Conflict`.
+- **Limit Bypass Test**: Attempted to manually bypass the 60-min limit; System Guard blocked the operation at the functional layer.
+
+**UniDeploy is now fully hardened and ready for production-level survival.**
+
+---
+
+## Phase 3: System Hardening (Production Ready)
+
+This phase transformed UniDeploy from a "best-effort" platform to a bounded, verifiable, and idempotent system.
+
+### 1. Single Source of Truth (State Authority)
+- **K8s Authority**: The system now queries Kubernetes directly to determine if a project is `RUNNING`. Database drift is automatically corrected by the `StateAuthority` layer.
+- **UI Consistency**: The dashboard now reflects reality, even if the backend process or database was previously out of sync.
+
+### 2. Transactional Mutations & Rollback
+- **Two-Phase Start/Stop**: Scaling actions now follow a strict `Validate -> Lock -> Mutate DB -> Call K8s -> Verify -> Commit` pattern.
+- **Auto-Rollback**: If Kubernetes fails to scale a project, the database state automatically rolls back to its previous value, preventing "stuck" states.
+
+### 3. Distributed Concurrency Control (Advisory Locks)
+- **Per-Project Locking**: A locking mechanism ensures that only one mutation (Wake/Stop/Deploy) can happen per project at a time.
+- **Race Condition Prevention**: Rapidly clicking "Wake" or refreshing the page will no longer trigger duplicate pods or quota violations.
+
+### 4. Centralized System Guard & Hard Invariants
+- **Platform Kill Switch**: The `SystemGuard` now centrally enforces:
+    - **Global Pod Cap** (40 pods)
+    - **Concurrent Build Limit** (5 builds)
+    - **Daily Runtime Quota** (60 mins)
+    - **Per-User Quota** (1 app)
+- **Hard Assertions**: Critical invariants are encoded as assertions. If the system ever enters an illegal state (e.g., a user having 2 running apps), it will fail loudly and visibly in the logs rather than failing silently.
+
+---
+
+## Final Verification: "Chaos Mode" Results
+- **Pod Kill Test**: Manually deleted a pod; State Authority detected the change and reconciled the DB status to `SLEEPING` within seconds.
+- **Race Condition Test**: Spammed the `/start` API with 10 concurrent requests; only 1 succeeded, the rest were rejected with a `409 Conflict`.
+- **Limit Bypass Test**: Attempted to manually bypass the 60-min limit; System Guard blocked the operation at the functional layer.
+
+**UniDeploy is now fully hardened and ready for production-level survival.**
+
+---
+
+## Phase 3: System Hardening (Production Ready)
+
+This phase transformed UniDeploy from a "best-effort" platform to a bounded, verifiable, and idempotent system.
+
+### 1. Single Source of Truth (State Authority)
+- **K8s Authority**: The system now queries Kubernetes directly to determine if a project is `RUNNING`. Database drift is automatically corrected by the `StateAuthority` layer.
+- **UI Consistency**: The dashboard now reflects reality, even if the backend process or database was previously out of sync.
+
+### 2. Transactional Mutations & Rollback
+- **Two-Phase Start/Stop**: Scaling actions now follow a strict `Validate -> Lock -> Mutate DB -> Call K8s -> Verify -> Commit` pattern.
+- **Auto-Rollback**: If Kubernetes fails to scale a project, the database state automatically rolls back to its previous value, preventing "stuck" states.
+
+### 3. Distributed Concurrency Control (Advisory Locks)
+- **Per-Project Locking**: A locking mechanism ensures that only one mutation (Wake/Stop/Deploy) can happen per project at a time.
+- **Race Condition Prevention**: Rapidly clicking "Wake" or refreshing the page will no longer trigger duplicate pods or quota violations.
+
+### 4. Centralized System Guard & Hard Invariants
+- **Platform Kill Switch**: The `SystemGuard` now centrally enforces:
+    - **Global Pod Cap** (40 pods)
+    - **Concurrent Build Limit** (5 builds)
+    - **Daily Runtime Quota** (60 mins)
+    - **Per-User Quota** (1 app)
+- **Hard Assertions**: Critical invariants are encoded as assertions. If the system ever enters an illegal state (e.g., a user having 2 running apps), it will fail loudly and visibly in the logs rather than failing silently.
+
+---
+
+## Final Verification: "Chaos Mode" Results
+- **Pod Kill Test**: Manually deleted a pod; State Authority detected the change and reconciled the DB status to `SLEEPING` within seconds.
+- **Race Condition Test**: Spammed the `/start` API with 10 concurrent requests; only 1 succeeded, the rest were rejected with a `409 Conflict`.
+- **Limit Bypass Test**: Attempted to manually bypass the 60-min limit; System Guard blocked the operation at the functional layer.
+
+**UniDeploy is now fully hardened and ready for production-level survival.**
+
+---
+
+## Phase 4: Frontend Alignment (The "Courtroom" Display)
+
+The frontend has been completely refactored to treat the backend as the absolute source of truth.
+
+### 1. Zero-Optimism UI
+- **Reflected Reality**: Removed all local `setState` guesses. The UI only updates when the backend confirms a state change.
+- **Smart Polling**: Polling is now dynamic. It accelerates during `WAKING` or `CREATED` states (3s) and slows down when idle (8s), reducing battery and API usage.
+
+### 2. Mutation & Race Protection
+- **Global Lock**: Clicking "Wake" or "Stop" now locks the entire project item. This prevents double-clicks, duplicate API calls, and race conditions.
+- **Async Verification**: After every successful action, the frontend performs an immediate "Sync Check" to ensure the local display matches the backend's new reality.
+
+### 3. Professional Error Transparency
+- **HTTP Error Mapping**: Standardized backend errors (403, 409, 429, 503) are now mapped to human-readable explanations:
+    - `403` -> "Daily runtime limit reached"
+    - `503` -> "Platform capacity reached"
+    - `409` -> "Action already in progress"
+- **Red Limit Visuals**: If a project hits its 60-minute limit, the UI turns red and displays a "Limit Hit" badge, proactively explaining why the app scaled down.
+
+### 4. Cold Start UX
+- **WAKING as First-Class State**: Users now see a dedicated spinner and "Waking" status, reducing the anxiety commonly associated with cold starts.
+- **Networking Invariants**: If the backend says a project is `RUNNING` but hasn't allocated an IP yet, the UI detects this "Broken Status" and shows "Allocating Networking..." instead of a dead link.
+
+---
+
+## Final Verification Summary
+- **Spam Test**: Repeatedly clicked "Wake" on a sleeping project; only 1 API call was made, and the button remained disabled until the app woke up.
+- **Sync Test**: Manually killed a K8s pod; the frontend detected the change within seconds and updated the state to `SLEEPING` automatically.
+- **Error Test**: Simulated a 403 error; the frontend correctly displayed "Quota reached: Daily runtime exceeded" in a distinct red banner.
+
+**UniDeploy is now technically robust, visually transparent, and ready for production abuse.**
+    spec:
+      containers:
+      - name: {{project_name}}
+        image: {{image_name}}
+        ports:
+        - containerPort: {{port or 80}}
+        resources:
+          limits:
+            cpu: "{{cpu_limit or '500m'}}"
+            memory: "{{mem_limit or '512Mi'}}"
+          requests:
+            cpu: "{{cpu_request or '100m'}}"
+            memory: "{{mem_request or '256Mi'}}"
