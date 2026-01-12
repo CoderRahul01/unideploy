@@ -19,3 +19,5 @@ pinecone>=3.0.0
 requests>=2.31.0
 groq>=0.4.0
 requests
+docker
+requests

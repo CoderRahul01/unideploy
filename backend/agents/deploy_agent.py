@@ -1,34 +1,46 @@
-from builder.fly_manager import FlyManager
+from builder.docker_manager import DockerManager
+from builder.tunnel_manager import TunnelManager
+import time
 
 class DeployAgent:
     def __init__(self):
-        self.manager = FlyManager()
+        self.docker = DockerManager()
+        self.tunnel = TunnelManager()
+        
+        # Ensure Runner Image Exists
+        self.docker.build_runner_image()
 
     async def run(self, project_data):
         """
-        Deploys the project to Fly.io Machines (Sandbox).
-        project_data must contain: project_name, id, repo_url, build_command, start_command
+        Deploys project to Local Docker and exposes via Cloudflare Tunnel.
         """
-        print(f"[DeployAgent] Provisioning Sandbox for: {project_data['project_name']}")
+        print(f"[DeployAgent] Provisioning Local Cloud for: {project_data['project_name']}")
         
         try:
-            # For Sandbox, we use the "Universal Runner" image
-            # In a real scenario, we might build a custom image
-            # But here we pass the runtime config to the generic runner
+            p_id = str(project_data['id'])
             
-            # Note: In a real Fly app, we'd pass ENV vars for build/start
-            # self.manager.create_sandbox(project_id=project_data['id']...)
+            # 1. Start Container
+            # Pass build/start commands if you want, but for now we trust the image defaults or envs
+            start_cmd = project_data.get('start_command', "echo 'No Start Cmd'")
+            sandbox = self.docker.create_sandbox(p_id, start_cmd)
             
-            # Mocking the success for now until we have real credits/app
-            print(f"[DeployAgent] (Mock) Calling FlyManager.create_sandbox...")
-            # machine = self.manager.create_sandbox(str(project_data['id']))
-            
-            # if machine:
-            #     print(f"[DeployAgent] Successfully deployed machine {machine['id']}")
-            return True
-            # else:
-            #     raise Exception("Fly.io provisioning failed.")
+            if not sandbox:
+                raise Exception("Failed to start Docker container")
                 
+            print(f"[DeployAgent] Sandbox Active on Local Port: {sandbox['port']}")
+            
+            # 2. Start Global Tunnel
+            tunnel_info = self.tunnel.start_tunnel(sandbox['port'], p_id)
+            
+            if not tunnel_info:
+                raise Exception("Failed to start Cloudflare Tunnel")
+                
+            return {
+                "status": "live", 
+                "url": tunnel_info['url'],
+                "container_id": sandbox['id']
+            }
+
         except Exception as e:
             print(f"[DeployAgent] Deployment failed: {e}")
             raise e
