@@ -30,6 +30,9 @@ class Project(Base):
     last_deployed = Column(DateTime, default=datetime.datetime.utcnow)
     project_type = Column(String)
     port = Column(Integer)
+    git_url = Column(String)  # Added for recovery
+    tier = Column(String, default="SEED")
+    env_vars = Column(JSON)  # Added for secrets/env vars
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="projects")
     deployments = relationship("Deployment", back_populates="project")
@@ -42,6 +45,7 @@ class Deployment(Base):
     status = Column(String)  # queued, building, deploying, live, failed
     image_tag = Column(String)
     domain = Column(String)
+    sandbox_id = Column(String)  # Added to track live sandboxes
     logs = Column(JSON)  # Store build/deploy logs
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     project = relationship("Project", back_populates="deployments")

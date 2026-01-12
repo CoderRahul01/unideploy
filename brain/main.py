@@ -7,10 +7,12 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
     Depends,
+    Request,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 import os
+import asyncio
 import shutil
 import uuid
 from typing import List
@@ -19,6 +21,9 @@ from agents.build_agent import BuildAgent
 from agents.deploy_agent import DeployAgent
 from agents.notify_agent import NotifyAgent
 from agents.analyzer_agent import AnalyzerAgent
+from agents.memory_agent import MemoryAgent
+from agents.autofix_agent import AutoFixAgent
+from agents.patch_agent import PatchAgent
 from database import get_db, engine
 import models
 import schemas
@@ -28,12 +33,38 @@ from dotenv import load_dotenv
 import firebase_admin
 from firebase_admin import auth, credentials
 
+import time
+from metrics import (
+    metrics_app,
+    HTTP_REQUEST_DURATION,
+    DEPLOYMENT_DURATION,
+    track_deployment,
+    SANDBOXES_ACTIVE,
+)
+
 load_dotenv()
 
 # Create tables if they don't exist
 models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="UniDeploy API - Production Core")
+app = FastAPI(title="UniDeploy Brain")
+
+# Mount Prometheus metrics
+app.mount("/metrics", metrics_app)
+
+@app.middleware("http")
+async def add_process_time_header(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    
+    # Skip metrics for /metrics itself to avoid noise
+    if request.url.path != "/metrics":
+        endpoint = request.url.path
+        method = request.method
+        HTTP_REQUEST_DURATION.labels(method=method, endpoint=endpoint).observe(process_time)
+        
+    return response
 
 # Firebase Setup
 FIREBASE_CERT_PATH = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
@@ -66,6 +97,18 @@ build_agent = BuildAgent(registry_url=AWS_REGISTRY)
 deploy_agent = DeployAgent()
 notify_agent = NotifyAgent()
 analyzer_agent = AnalyzerAgent()
+from agents.maintenance_agent import MaintenanceAgent
+
+memory_agent = MemoryAgent()
+autofix_agent = AutoFixAgent()
+patch_agent = PatchAgent()
+maintenance_agent = MaintenanceAgent()
+
+@app.on_event("startup")
+async def startup_event():
+    # Start maintenance tasks in the background
+    asyncio.create_task(maintenance_agent.run_forever())
+    print("[Core] Startup complete. Maintenance worker initiated.")
 
 app.add_middleware(
     CORSMiddleware,
@@ -143,9 +186,17 @@ async def run_deployment_pipeline(
             .filter(models.Project.id == db_deploy.project_id)
             .first()
         )
-        StateMachine.validate_transition(project.status, "BUILT")
-        project.status = "BUILT"
-        db.commit()
+        
+        # 1.5 Index for Dual Memory (Pinecone)
+        if project:
+            try:
+                await notify_agent.broadcast_status(
+                    str(deployment_id),
+                    {"status": "indexing", "message": "Indexing codebase for Auto-Fix support..."}
+                )
+                memory_agent.index_project(project.id, project_path)
+            except Exception as e:
+                print(f"[Pipeline] Indexing failed: {e}")
 
         # 2. Deploy Phase
         await notify_agent.broadcast_status(
@@ -156,32 +207,47 @@ async def run_deployment_pipeline(
             },
         )
         project_data = {
-            "project_name": project_name,
+            "id": project.id,
+            "project_name": project.name,
             "image_name": image_tag,
-            "port": 80,
-            "domain": f"{project_name}.unideploy.io",
+            "repo_url": repo_url,
+            "port": project.port or 80,
+            "tier": project.tier or "SEED",
+            "env_vars": project.env_vars or {},
         }
-        await deploy_agent.run(project_data)
+        
+        # Track deployment duration and active sandboxes
+        with DEPLOYMENT_DURATION.labels(tier=project.tier).time():
+            SANDBOXES_ACTIVE.inc()
+            try:
+                deployment_res = await deploy_agent.run(project_data)
+                track_deployment("success", project.tier)
+                
+                # 3. Success
+                if deployment_res and deployment_res["status"] == "live":
+                    db_deploy.status = "live"
+                    db_deploy.sandbox_id = deployment_res["sandbox_id"]
+                    db_deploy.domain = deployment_res["url"]
+                    
+                    # Update project state
+                    StateMachine.validate_transition(project.status, "RUNNING")
+                    project.status = "RUNNING"
+                    project.last_active_at = datetime.utcnow()
+                    db.commit()
+                    log_intent(project.id, 1, "DEPLOY", "SUCCESS")
 
-        # 3. Success
-        db_deploy.status = "live"
-        db_deploy.domain = project_data["domain"]
-
-        # Update project state
-        StateMachine.validate_transition(project.status, "RUNNING")
-        project.status = "RUNNING"
-        project.last_active_at = datetime.utcnow()
-        db.commit()
-        log_intent(project.id, 1, "DEPLOY", "SUCCESS")
-
-        await notify_agent.broadcast_status(
-            str(deployment_id),
-            {
-                "status": "live",
-                "domain": project_data["domain"],
-                "message": "Deployment is live!",
-            },
-        )
+                    await notify_agent.broadcast_status(
+                        str(deployment_id),
+                        {
+                            "status": "live",
+                            "domain": deployment_res["url"],
+                            "message": "Deployment is live!",
+                        },
+                    )
+            except Exception as e:
+                track_deployment("failed", project.tier)
+                SANDBOXES_ACTIVE.dec()
+                raise e
 
     except Exception as e:
         print(f"[Core] Pipeline failed for {deployment_id}: {e}")
@@ -192,11 +258,29 @@ async def run_deployment_pipeline(
         )
         if db_deploy:
             db_deploy.status = "failed"
-            db_deploy.logs = {"error": str(e)}
+            db_deploy.error_message = str(e) # Added error_message field
             db.commit()
-        await notify_agent.broadcast_status(
-            str(deployment_id), {"status": "failed", "error": str(e)}
-        )
+        
+        # 4. Auto-Fix Intelligence
+        try:
+            print(f"[Pipeline] Build failed. Triggering Auto-Fix for project {db_deploy.project_id}...")
+            # We use the exception message as the 'error_log' for now.
+            # In a real scenario, we'd fetch the actual captured shell output.
+            fix_result = await autofix_agent.analyze_and_fix(db_deploy.project_id, str(e))
+            
+            await notify_agent.broadcast_status(
+                str(deployment_id),
+                {
+                    "status": "failed",
+                    "message": f"Deployment failed: {str(e)}",
+                    "autofix": fix_result
+                }
+            )
+        except Exception as af_error:
+            print(f"[Pipeline] Auto-Fix failed: {af_error}")
+            await notify_agent.broadcast_status(
+                str(deployment_id), {"status": "failed", "message": f"Deployment failed: {str(e)}"}
+            )
     finally:
         db.close()
 
@@ -212,13 +296,16 @@ async def websocket_endpoint(websocket: WebSocket, deployment_id: str):
 
 
 @app.post("/projects", response_model=schemas.Project)
-async def create_project(project: schemas.ProjectCreate, db: Session = Depends(get_db)):
+async def create_project(project_data: schemas.ProjectCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
     db_project = models.Project(
-        name=project.name, 
-        owner_id=1,
-        project_type=project.project_type,
-        port=project.port
-    )  # Hardcoded owner for now
+        name=project_data.name, 
+        owner_id=user["id"],
+        project_type=project_data.project_type,
+        port=project_data.port,
+        git_url=project_data.git_url,
+        tier=project_data.tier,
+        env_vars=project_data.env_vars,
+    )
     db.add(db_project)
     db.commit()
     db.refresh(db_project)
@@ -470,6 +557,24 @@ async def get_system_config():
     }
 
 
+@app.get("/health")
+async def health_check(db: Session = Depends(get_db)):
+    project_count = db.query(models.Project).count()
+    deployment_count = db.query(models.Deployment).count()
+    
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": "1.0.0",
+        "stats": {
+            "projects": project_count,
+            "total_deployments": deployment_count,
+            "engine": "E2B Firecracker",
+            "region": os.getenv("AWS_REGION", "us-east-1"),
+        }
+    }
+
+
 @app.post("/deploy/{project_id}/git")
 async def deploy_git(
     project_id: int,
@@ -508,4 +613,60 @@ async def deploy_git(
     )
 
     return {"deployment_id": db_deploy.id, "status": "queued"}
+
+
+@app.post("/deployments/{deployment_id}/apply-fix")
+async def apply_fix(deployment_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """
+    Applies the AI-suggested fix to the project codebase and triggers a redeploy.
+    """
+    db_deploy = db.query(models.Deployment).filter(models.Deployment.id == deployment_id).first()
+    if not db_deploy:
+        raise HTTPException(status_code=404, detail="Deployment not found")
+
+    project = db_deploy.project
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    print(f"[Self-Healing] Applying fix for project {project.id}...")
+    
+    # 1. Get the suggestion
+    error_log = db_deploy.error_message or "Unknown error"
+    fix_result = await autofix_agent.analyze_and_fix(project.id, error_log)
+    
+    if not fix_result or not fix_result.get("suggestion"):
+        raise HTTPException(status_code=400, detail="Could not generate a fix to apply")
+
+    # 2. Apply the patch 
+    work_dir = os.path.join(os.getcwd(), f"temp_build_{project.id}")
+    focus_file = fix_result.get("focus_file", "unknown")
+    abs_path = os.path.join(work_dir, focus_file if focus_file != "unknown" else "index.js")
+    
+    if os.path.exists(abs_path):
+        with open(abs_path, "r") as f:
+            original = f.read()
+        
+        patched = await patch_agent.apply_fix(focus_file, fix_result["suggestion"], original)
+        if patched:
+            with open(abs_path, "w") as f:
+                f.write(patched)
+            print(f"[Self-Healing] Patch applied to {abs_path}")
+            
+            # 3. Store Wisdom in SuperMemory
+            memory_agent.store_wisdom(f"Successfully applied fix for error: {error_log}. Fixed file: {focus_file}", project.id)
+            
+            # 4. Trigger Redeploy
+            background_tasks.add_task(
+                run_deployment_pipeline, 
+                deployment_id, 
+                db, 
+                project.id, 
+                work_dir, 
+                project.name, 
+                project.git_url
+            )
+            
+            return {"status": "success", "message": f"Fix applied to {focus_file}. Redeploying...", "patched_file": focus_file}
+
+    raise HTTPException(status_code=500, detail="Failed to locate file to patch or patch generation failed")
 

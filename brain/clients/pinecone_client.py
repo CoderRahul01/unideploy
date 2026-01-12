@@ -29,6 +29,26 @@ class PineconeClient:
         else:
             print("[Pinecone] Warning: API Key missing or library not installed.")
 
+    def generate_embedding(self, text: str):
+        """
+        Generates an embedding using Pinecone Inference.
+        """
+        if not self.client:
+            return None
+        try:
+            # Using Pinecone's inference API for embeddings
+            # Common model: "multilingual-e5-large" (1024 dims)
+            model = "multilingual-e5-large"
+            embeddings = self.client.inference.embed(
+                model=model,
+                inputs=[text],
+                parameters={"input_type": "passage"}
+            )
+            return embeddings[0].values
+        except Exception as e:
+            print(f"[Pinecone] Embedding failed: {e}")
+            return None
+
     def upsert_vectors(self, vectors):
         """
         vectors: list of (id, embedding, metadata) tuples
@@ -36,16 +56,21 @@ class PineconeClient:
         if not self.index:
             return
         try:
-            self.index.upsert(vectors=vectors)
+            # Format vectors for pinecone client
+            formatted = [
+                {"id": v[0], "values": v[1], "metadata": v[2]}
+                for v in vectors
+            ]
+            self.index.upsert(vectors=formatted)
             print(f"[Pinecone] Upserted {len(vectors)} vectors.")
         except Exception as e:
             print(f"[Pinecone] Upsert failed: {e}")
 
     def query_similar(self, vector, top_k=5):
-        if not self.index:
-            return []
+        if not self.index or vector is None:
+            return None
         try:
             return self.index.query(vector=vector, top_k=top_k, include_metadata=True)
         except Exception as e:
             print(f"[Pinecone] Query failed: {e}")
-            return []
+            return None

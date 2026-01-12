@@ -17,12 +17,14 @@ import { loginWithGoogle, loginWithGithub, logout, auth } from "@/lib/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
 import CreateProject from "@/components/CreateProject";
 import DeploymentStatus from "@/components/DeploymentStatus";
+import PulseDashboard from "@/components/PulseDashboard";
 import { projectsApi, Project } from "@/lib/api";
 
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [activeTab, setActiveTab] = useState<"deployments" | "analytics">("deployments");
   const [activeDeployment, setActiveDeployment] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [isMutating, setIsMutating] = useState(false);
@@ -145,10 +147,18 @@ export default function Dashboard() {
           <NavItem
             icon={<Globe className="w-4 h-4" />}
             label="Deployments"
-            active={!activeDeployment}
-            onClick={() => setActiveDeployment(null)}
+            active={activeTab === "deployments"}
+            onClick={() => {
+              setActiveTab("deployments");
+              setActiveDeployment(null);
+            }}
           />
-          <NavItem icon={<BarChart3 className="w-4 h-4" />} label="Analytics" />
+          <NavItem
+            icon={<BarChart3 className="w-4 h-4" />}
+            label="Analytics"
+            active={activeTab === "analytics"}
+            onClick={() => setActiveTab("analytics")}
+          />
           <NavItem icon={<Settings className="w-4 h-4" />} label="Settings" />
         </nav>
 
@@ -188,7 +198,7 @@ export default function Dashboard() {
       <main className="pl-64 min-h-screen">
         <header className="h-16 border-b border-white/5 flex items-center justify-between px-8 sticky top-0 bg-black/20 backdrop-blur-md z-40">
           <h1 className="text-sm font-medium text-white/60">
-            Overview / {activeDeployment ? "Deployment Detail" : "Deployments"}
+            Overview / {activeDeployment ? "Deployment Detail" : activeTab === "deployments" ? "Deployments" : "Analytics"}
           </h1>
           <button
             onClick={() => setShowCreate(true)}
@@ -222,7 +232,9 @@ export default function Dashboard() {
             </div>
           )}
 
-          {activeDeployment ? (
+          {activeTab === "analytics" ? (
+            <PulseDashboard />
+          ) : activeDeployment ? (
             <div className="space-y-8">
               <button
                 onClick={() => setActiveDeployment(null)}
@@ -248,15 +260,16 @@ export default function Dashboard() {
               <h2 className="text-xl font-semibold mb-6">Recent Deployments</h2>
               <div className="space-y-4">
                 {projects.map((p) => (
-                  <DeploymentItem
-                    key={p.id}
-                    project={p}
-                    isGlobalLocked={isMutating || sysConfig.read_only}
-                    onUpdate={fetchProjects}
-                    onMutationStart={() => setIsMutating(true)}
-                    onMutationEnd={() => setIsMutating(false)}
-                    onError={setError}
-                  />
+                  <div key={p.id} onClick={() => setActiveDeployment(p.id.toString())} className="cursor-pointer">
+                    <DeploymentItem
+                      project={p}
+                      isGlobalLocked={isMutating || sysConfig.read_only}
+                      onUpdate={fetchProjects}
+                      onMutationStart={() => setIsMutating(true)}
+                      onMutationEnd={() => setIsMutating(false)}
+                      onError={setError}
+                    />
+                  </div>
                 ))}
                 {projects.length === 0 && (
                   <div className="py-20 text-center border border-dashed border-white/5 rounded-3xl">
@@ -291,11 +304,10 @@ function NavItem({
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-        active
-          ? "bg-white/10 text-white shadow-sm"
-          : "text-white/50 hover:text-white hover:bg-white/5"
-      }`}
+      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${active
+        ? "bg-white/10 text-white shadow-sm"
+        : "text-white/50 hover:text-white hover:bg-white/5"
+        }`}
     >
       {icon}
       {label}
@@ -416,9 +428,8 @@ function DeploymentItem({
 
   return (
     <div
-      className={`p-5 rounded-xl bg-white/[0.02] border flex items-center justify-between hover:bg-white/[0.04] transition-all group cursor-default ${
-        isOverQuota ? "border-red-500/20" : "border-white/5"
-      }`}
+      className={`p-5 rounded-xl bg-white/[0.02] border flex items-center justify-between hover:bg-white/[0.04] transition-all group cursor-default ${isOverQuota ? "border-red-500/20" : "border-white/5"
+        }`}
     >
       <div className="flex items-center gap-4">
         <div
@@ -480,11 +491,10 @@ function DeploymentItem({
           <button
             onClick={handleToggle}
             disabled={isGlobalLocked || localLoading || isTransitioning}
-            className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all min-w-[80px] flex items-center justify-center ${
-              canStop
-                ? "bg-red-500/10 text-red-500 hover:bg-red-500/20"
-                : "bg-green-500/10 text-green-500 hover:bg-green-500/20"
-            } disabled:opacity-30 disabled:cursor-not-allowed`}
+            className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all min-w-[80px] flex items-center justify-center ${canStop
+              ? "bg-red-500/10 text-red-500 hover:bg-red-500/20"
+              : "bg-green-500/10 text-green-500 hover:bg-green-500/20"
+              } disabled:opacity-30 disabled:cursor-not-allowed`}
           >
             {localLoading ? (
               <Loader2 className="w-3 h-3 animate-spin" />

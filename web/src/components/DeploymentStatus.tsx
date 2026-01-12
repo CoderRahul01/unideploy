@@ -8,6 +8,7 @@ import {
   Activity,
   Zap,
   Globe,
+  Sparkles,
 } from "lucide-react";
 import { projectsApi } from "@/lib/api";
 import Terminal from "./Terminal";
@@ -130,12 +131,69 @@ export default function DeploymentStatus({
         )}
 
         {status.status === "failed" && (
-          <div className="mt-10 p-4 rounded-xl bg-red-500/10 border border-red-500/20">
-            <p className="text-xs text-red-400 font-medium flex items-center gap-2">
-              <XCircle className="w-4 h-4" />
-              Error:{" "}
-              {status.error || "An unknown error occurred during deployment."}
-            </p>
+          <div className="mt-10 space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20">
+              <p className="text-xs text-red-400 font-medium flex items-center gap-2">
+                <XCircle className="w-4 h-4" />
+                Error:{" "}
+                {status.error || "An unknown error occurred during deployment."}
+              </p>
+            </div>
+
+            {status.autofix && (
+              <div className="p-6 rounded-2xl bg-[#1a0a2e]/40 border border-purple-500/20 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <Sparkles className="w-12 h-12 text-purple-500" />
+                </div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center border border-purple-500/30">
+                    <Sparkles className="w-4 h-4 text-purple-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-purple-100 uppercase tracking-widest">Magic Fix Suggestion</h3>
+                    <p className="text-[10px] text-purple-300/40 font-medium">Context retrieved from Dual Memory</p>
+                  </div>
+                </div>
+
+                <div className="bg-black/40 rounded-xl p-4 border border-white/5 font-mono text-[11px] text-white/80 leading-relaxed whitespace-pre-wrap">
+                  {status.autofix.suggestion}
+                </div>
+
+                <div className="mt-4 flex items-center justify-between">
+                  {status.autofix.context_retrieved && (
+                    <span className="text-[9px] text-green-400/60 font-black uppercase tracking-widest flex items-center gap-1">
+                      <Zap className="w-3 h-3" />
+                      Enhanced by Project History
+                    </span>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => navigator.clipboard.writeText(status.autofix.suggestion)}
+                      className="text-[10px] bg-white/5 border border-white/10 text-white/60 px-3 py-1.5 rounded-lg font-bold hover:bg-white/10 transition-all uppercase tracking-widest"
+                    >
+                      Copy Fix
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          setLoading(true);
+                          await projectsApi.applyFix(deploymentId);
+                          // The pipeline will broadcast updates via WS
+                        } catch (err: any) {
+                          alert(err.message || "Failed to apply fix");
+                          setLoading(false);
+                        }
+                      }}
+                      disabled={loading}
+                      className="text-[10px] bg-purple-500 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-purple-600 transition-all uppercase tracking-widest flex items-center gap-1.5 shadow-lg shadow-purple-500/20 disabled:opacity-50"
+                    >
+                      {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                      Apply & Redeploy
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -37,12 +37,16 @@ class DeployAgent:
             # We pass build/start commands if available
             build_cmd = project_data.get("build_command")
             start_cmd = project_data.get("start_command", "echo 'No Start Cmd'")
+            tier = project_data.get("tier", "SEED")
+            env_vars = project_data.get("env_vars", {})
 
             sandbox = self.e2b.create_sandbox(
                 repo_url=repo_url, 
                 build_command=build_cmd, 
                 start_command=start_cmd,
-                log_callback=log_callback
+                log_callback=log_callback,
+                tier=tier,
+                env_vars=env_vars
             )
 
             if not sandbox:

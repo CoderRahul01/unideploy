@@ -65,12 +65,23 @@ export interface Project {
 
 export const projectsApi = {
   list: () => api.get<Project[]>("/projects").then((res) => res.data),
-  create: (name: string, type?: string, port?: number) =>
-    api.post<Project>("/projects", { name, project_type: type, port }).then((res) => res.data),
+  create: (
+    name: string,
+    type: string = "unknown",
+    port: number = 80,
+    tier: string = "SEED",
+    env_vars: Record<string, string> = {}
+  ) =>
+    api
+      .post<Project>("/projects", { name, project_type: type, port, tier, env_vars })
+      .then((res) => res.data),
   start: (id: number) =>
     api.post(`/projects/${id}/start`).then((res) => res.data),
   stop: (id: number) =>
     api.post(`/projects/${id}/stop`).then((res) => res.data),
+  getHealth: () => api.get("/health").then((res) => res.data),
+  getMetrics: () => api.get("/metrics").then((res) => res.data),
+  getDeployment: (id: string) => api.get(`/deployments/${id}`).then((res) => res.data),
   deploy: (id: number, file: File) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -85,6 +96,15 @@ export const projectsApi = {
     api.post(`/deploy/${id}/git`, { repo_url: repoUrl }).then((res) => res.data),
   analyze: (repoUrl: string) =>
     api.post("/analyze", null, { params: { repo_url: repoUrl } }).then((res) => res.data),
+  getGithubRepos: async (token: string) => {
+    const response = await fetch("https://api.github.com/user/repos?sort=updated&per_page=100", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) throw new Error("Failed to fetch repositories");
+    return response.json();
+  },
   analyzeZip: (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -98,6 +118,8 @@ export const projectsApi = {
         daily_limit_mins: number;
       }>("/system/config")
       .then((res) => res.data),
+  applyFix: (deploymentId: string) =>
+    api.post(`/deployments/${deploymentId}/apply-fix`).then((res) => res.data),
 };
 
 export default api;

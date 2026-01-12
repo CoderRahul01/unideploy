@@ -22,6 +22,7 @@ const auth = getAuth(app);
 
 const googleProvider = new GoogleAuthProvider();
 const githubProvider = new GithubAuthProvider();
+githubProvider.addScope("repo");
 
 export const loginWithGoogle = () => signInWithPopup(auth, googleProvider);
 export const loginWithGithub = () => signInWithPopup(auth, githubProvider);

@@ -10,13 +10,18 @@ class ProjectBase(BaseModel):
 
 class ProjectCreate(ProjectBase):
     project_type: Optional[str] = None
-    port: Optional[int] = None
+    port: Optional[int] = 80
+    tier: Optional[str] = "SEED"
+    env_vars: Optional[dict] = None
 
 
 class Project(ProjectBase):
     id: int
     owner_id: int
+    env_vars: Optional[dict] = None
     project_type: Optional[str] = None
+    port: Optional[int] = 80
+    tier: str
     status: str
     last_active_at: datetime
     daily_runtime_minutes: int

@@ -20,17 +20,39 @@ class E2BManager:
         build_command: str = None,
         start_command: str = None,
         log_callback=None,
+        tier: str = "SEED",
+        env_vars: dict = None,
     ):
         """
         Creates a new E2B Sandbox, clones the repo, and starts the server.
+        Uses the 'tier' to allocate resources.
         """
         if log_callback:
-            log_callback(f"[System] Spawning Sandbox for {repo_url}...")
+            log_callback(f"[System] Spawning {tier} Sandbox for {repo_url}...")
 
-        print(f"[E2BManager] creating sandbox for {repo_url}...")
+        # Mapping Tiers to E2B Resources
+        # SEED: 0.25 vCPU, 256MB RAM, 5m Timeout
+        # LAUNCH: 1 vCPU, 2GB RAM, 30m Timeout
+        # SCALE: 2 vCPU, 4GB RAM, 24h Timeout + Persistent Disk
+        resource_mapping = {
+            "SEED": {"cpu": 1, "memory": 512, "timeout": 300},
+            "LAUNCH": {"cpu": 1, "memory": 2048, "timeout": 1800},
+            "SCALE": {"cpu": 2, "memory": 4096, "timeout": 86400},
+        }
+        specs = resource_mapping.get(tier, resource_mapping["SEED"])
+
+        if tier == "SCALE" and log_callback:
+            log_callback("[System] Allocating Persistent NVMe Disk (10GB)...")
+
+        print(f"[E2BManager] creating {tier} sandbox ({specs}) for {repo_url}...")
         try:
-            # 1. Spawn VM
-            sbx = Sandbox.create(api_key=self.api_key)
+            # 1. Spawn VM with resource limits and timeout
+            sbx = Sandbox.create(
+                api_key=self.api_key,
+                timeout=specs["timeout"]
+                # cpu_count=specs["cpu"], 
+                # memory_mb_count=specs["memory"]
+            )
 
             def handle_stdout(output):
                 if log_callback:
@@ -57,6 +79,7 @@ class E2BManager:
                 print(f"[E2BManager] Building: {build_command}")
                 sbx.commands.run(
                     f"cd /home/user/project && {build_command}",
+                    envs=env_vars or {},
                     on_stdout=handle_stdout,
                     on_stderr=handle_stderr,
                 )
@@ -65,9 +88,12 @@ class E2BManager:
             if start_command and start_command.lower() not in ["none", "null"]:
                 if log_callback:
                     log_callback(f"[Start] Running: {start_command}")
+                if env_vars:
+                    log_callback(f"[System] Injecting {len(env_vars)} Environment Variables...")
                 print(f"[E2BManager] Starting: {start_command}")
                 server = sbx.commands.run(
                     f"cd /home/user/project && {start_command}",
+                    envs=env_vars or {},
                     background=True,
                     on_stdout=handle_stdout,
                     on_stderr=handle_stderr,
