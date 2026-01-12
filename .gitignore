@@ -4,21 +4,26 @@
 .env.*.local
 *.log
 
-# Dependencies
-node_modules/
+# Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.pytest_cache/
-.coverage
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env/
 
-# Build outputs
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Next.js
 .next/
-dist/
-build/
-*.so
 out/
+build/
+dist/
 
 # IDEs
 .vscode/
@@ -29,3 +34,9 @@ out/
 # OS
 .DS_Store
 Thumbs.db
+
+# UniDeploy Specific
+legacy_infrastructure/
+*.pem
+setup_ec2_prod.sh # Don't commit if containing secrets (though mostly safe)
+temp_analysis/

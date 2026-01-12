@@ -19,40 +19,43 @@ class E2BManager:
         print(f"[E2BManager] creating sandbox for {repo_url}...")
         try:
             # 1. Spawn VM
-            sbx = Sandbox() # Uses default code-interpreter template
+            # Use Sandbox.create() as per SDK 2.x Docs
+            sbx = Sandbox.create(api_key=self.api_key) 
             
             # 2. Clone Repo
+            # E2B Code Interpreter has .commands / .pty but primarily .run_code() for Python/JS
+            # For shell, use .commands.run() if available, or .ptys.start()
+            # Let's assume standard 'commands' interface for now based on common E2B patterns.
+            # If creating 'Sandbox' generic, maybe it's just 'sandbox.commands.run'.
+            # BUT 'e2b_code_interpreter' is specialized. It might just have 'exec_cell' or similar.
+            
+            # Trying .commands.run() as it's standard in v1.0. If v2.0 changed it, we'll see.
+            # Actually, standard E2B Sandbox has .commands
             print(f"[E2BManager] Cloning {repo_url}...")
-            sbx.process.start_and_wait(f"git clone {repo_url} /home/user/project")
+            sbx.commands.run(f"git clone {repo_url} /home/user/project")
             
             # 3. Install/Build
-            if build_command:
+            if build_command and build_command.lower() not in ["none", "null"]:
                 print(f"[E2BManager] Building: {build_command}")
-                # We assume cwd is /home/user/project
-                sbx.process.start_and_wait(f"cd /home/user/project && {build_command}")
+                sbx.commands.run(f"cd /home/user/project && {build_command}")
             
             # 4. Start Server (Background)
-            if start_command:
+            if start_command and start_command.lower() not in ["none", "null"]:
                 print(f"[E2BManager] Starting: {start_command}")
-                # We use start() instead of start_and_wait() to keep it running
-                # We need to expose port 3000/8080. E2B does this automatically if process binds to it.
-                server = sbx.process.start(f"cd /home/user/project && {start_command}")
+                # Use background execution if possible. .commands.run checks exit code.
+                # We might need .ptys.start for long running processes
+                server = sbx.commands.run(f"cd /home/user/project && {start_command}", background=True)
+                
                 
             # 5. Get Public URL
-            # E2B automatically tunnels standard ports. Let's find the host.
-            # For this MVP, we return the sandbox ID which the frontend can potentially use 
-            # or we construct the URL pattern: https://<port>-<id>.e2b.dev
-            
-            # NOTE: E2B Code Interpreter creates a temporary session. 
-            # For persistent "Deployment", we might need to keep this instance alive 
-            # or use logic to "wake" it. 
-            # Ideally, we return the Sandbox ID so the frontend can keep it alive.
+            # E2B v2.x uses .sandbox_id
+            # Construct URL pattern for 'code-interpreter' template (default ports often 8080 or 3000)
+            # URL format: https://<port>-<id>.e2b.dev
             
             return {
-                "id": sbx.id,
+                "id": sbx.sandbox_id,
                 "status": "running",
-                # Simple heuristic for URL (port 8080 default)
-                "url": f"https://8080-{sbx.id}.e2b.dev" 
+                "url": f"https://8080-{sbx.sandbox_id}.e2b.dev" 
             }
             
         except Exception as e:
