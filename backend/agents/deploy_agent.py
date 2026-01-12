@@ -1,44 +1,40 @@
-from builder.docker_manager import DockerManager
-from builder.tunnel_manager import TunnelManager
+from builder.e2b_manager import E2BManager
 import time
 
 class DeployAgent:
     def __init__(self):
-        self.docker = DockerManager()
-        self.tunnel = TunnelManager()
-        
-        # Ensure Runner Image Exists
-        self.docker.build_runner_image()
+        self.e2b = E2BManager()
 
     async def run(self, project_data):
         """
-        Deploys project to Local Docker and exposes via Cloudflare Tunnel.
+        Deploys project to an E2B Sandbox (Serverless).
         """
-        print(f"[DeployAgent] Provisioning Local Cloud for: {project_data['project_name']}")
+        print(f"[DeployAgent] Provisioning E2B Sandbox for: {project_data['project_name']}")
         
         try:
             p_id = str(project_data['id'])
+            repo_url = project_data.get('repo_url')
             
-            # 1. Start Container
-            # Pass build/start commands if you want, but for now we trust the image defaults or envs
+            # 1. Create Sandbox
+            # We pass build/start commands if available
+            build_cmd = project_data.get('build_command')
             start_cmd = project_data.get('start_command', "echo 'No Start Cmd'")
-            sandbox = self.docker.create_sandbox(p_id, start_cmd)
+            
+            sandbox = self.e2b.create_sandbox(
+                repo_url=repo_url,
+                build_command=build_cmd,
+                start_command=start_cmd
+            )
             
             if not sandbox:
-                raise Exception("Failed to start Docker container")
+                raise Exception("Failed to create E2B Sandbox")
                 
-            print(f"[DeployAgent] Sandbox Active on Local Port: {sandbox['port']}")
+            print(f"[DeployAgent] Sandbox Active: {sandbox['url']}")
             
-            # 2. Start Global Tunnel
-            tunnel_info = self.tunnel.start_tunnel(sandbox['port'], p_id)
-            
-            if not tunnel_info:
-                raise Exception("Failed to start Cloudflare Tunnel")
-                
             return {
                 "status": "live", 
-                "url": tunnel_info['url'],
-                "container_id": sandbox['id']
+                "url": sandbox['url'],
+                "sandbox_id": sandbox['id']
             }
 
         except Exception as e:

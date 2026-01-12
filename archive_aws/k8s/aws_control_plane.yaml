@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unideploy-control-plane
+  namespace: unideploy
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: unideploy-control-plane
+  template:
+    metadata:
+      labels:
+        app: unideploy-control-plane
+    spec:
+      containers:
+      - name: control-plane
+        # Update this with your real AWS ECR image path
+        image: AWS_ACCOUNT_ID.dkr.ecr.AWS_REGION.amazonaws.com/unideploy-repo/backend:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: unideploy-secrets
+              key: database-url
+        - name: CLERK_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: unideploy-secrets
+              key: clerk-secret-key
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "512Mi"
+          limits:
+            cpu: "500m"
+            memory: "1Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: unideploy-control-plane
+  namespace: unideploy
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8000
+  selector:
+    app: unideploy-control-plane

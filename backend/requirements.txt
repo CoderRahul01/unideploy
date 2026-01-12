@@ -21,3 +21,4 @@ groq>=0.4.0
 requests
 docker
 requests
+e2b_code_interpreter
