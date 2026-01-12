@@ -1,0 +1,99 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: unideploy
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unideploy-backend
+  namespace: unideploy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+      - name: backend
+        image: 772709588451.dkr.ecr.us-east-1.amazonaws.com/unideploy/backend:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: unideploy-secrets
+              key: database-url
+        - name: FIREBASE_SERVICE_ACCOUNT_JSON
+          value: "/etc/unideploy/firebase-service-account.json"
+        volumeMounts:
+        - name: secrets-volume
+          mountPath: "/etc/unideploy"
+          readOnly: true
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+      volumes:
+      - name: secrets-volume
+        secret:
+          secretName: unideploy-secrets
+          items:
+          - key: firebase-service-account-json
+            path: firebase-service-account.json
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: unideploy-backend
+  namespace: unideploy
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8000
+  selector:
+    app: backend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unideploy-frontend
+  namespace: unideploy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: 772709588451.dkr.ecr.us-east-1.amazonaws.com/unideploy/frontend:latest
+        ports:
+        - containerPort: 3000
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: unideploy-frontend
+  namespace: unideploy
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 3000
+  selector:
+    app: frontend
