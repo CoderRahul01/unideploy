@@ -139,7 +139,8 @@ async def startup_event():
         db.close()
 
 # CORS Setup
-origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+raw_origins = os.getenv("ALLOWED_ORIGINS", "")
+origins = raw_origins.split(",") if raw_origins else []
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
