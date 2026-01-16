@@ -11,26 +11,23 @@ echo "🚀 Starting UniDeploy Production Setup..."
 # 1. Update & Install Dependencies
 echo "📦 Installing Dependencies..."
 sudo apt-get update
-sudo apt-get install -y \
-    ca-certificates \
-    curl \
-    gnupg \
-    git \
-    nginx \
-    python3-pip \
-    python3-venv \
-    nodejs \
-    npm
+sudo apt-get install -y ca-certificates curl gnupg git nginx python3-pip python3-venv
 
-# 2. Install Docker (For backend services if we containerize them)
+# Install Node.js 22 via NodeSource
+echo "🟢 Installing Node.js 22..."
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# 2. Install Docker
 echo "🐳 Installing Docker..."
 sudo install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+# Added --batch --yes to avoid TTY issues
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor --batch --yes -o /etc/apt/keyrings/docker.gpg
 sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
 echo \
   "deb [arch=\"$(dpkg --print-architecture)\" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-  \"$(. /etc/os-release && echo "$VERSION_CONAMENAME")\" stable" | \
+  "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
 sudo apt-get update
@@ -51,15 +48,19 @@ fi
 echo "🐍 Setting up Python Backend..."
 cd /home/ubuntu/unideploy/brain
 python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-pip install gunicorn uvicorn
+./venv/bin/pip install --upgrade pip
+./venv/bin/pip install -r requirements.txt
+./venv/bin/pip install gunicorn uvicorn docker kubernetes
 
-# 5. Setup Node Gateway
-echo "🟢 Setting up Node Gateway..."
+# 5. Setup Node Gateway & Web
+echo "🟢 Setting up Node Services..."
+sudo npm install -g pm2
+
 cd /home/ubuntu/unideploy/gateway
 npm install
-sudo npm install -g pm2
+
+cd /home/ubuntu/unideploy/web
+npm install
 
 # 6. Configure Nginx (Reverse Proxy)
 echo "🌐 Configuring Nginx..."
@@ -68,14 +69,22 @@ server {
     listen 80;
     server_name _; 
 
-    # Brain API (Python)
+    # Web (Next.js)
     location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+    }
+
+    # Brain API (Python)
+    location /api/ {
         proxy_pass http://localhost:8000;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
     # Gateway (WebSockets)
@@ -96,13 +105,16 @@ sudo systemctl restart nginx
 
 # 7. Start Services (PM2)
 echo "🔥 Starting Services..."
-# Use Gunicorn with Uvicorn workers for production performance
-cd /home/ubuntu/unideploy/brain
-source venv/bin/activate
-pm2 start "gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000" --name "unideploy-brain"
+cd /home/ubuntu/unideploy
 
-cd /home/ubuntu/unideploy/gateway
-pm2 start npm --name "unideploy-gateway" -- start
+# Start Brain
+pm2 start "/home/ubuntu/unideploy/brain/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000" --name "unideploy-brain" --cwd "/home/ubuntu/unideploy/brain"
+
+# Start Gateway
+pm2 start "npm start" --name "unideploy-gateway" --cwd "/home/ubuntu/unideploy/gateway"
+
+# Start Web (Next.js)
+pm2 start "npm run dev" --name "unideploy-web" --cwd "/home/ubuntu/unideploy/web"
 
 # Save PM2 list
 pm2 save
@@ -113,5 +125,6 @@ echo "------------------------------------------------"
 echo "CRITICAL: You MUST create .env files in:"
 echo "1. /home/ubuntu/unideploy/brain/.env"
 echo "2. /home/ubuntu/unideploy/gateway/.env"
-echo "Use the .env.template files in each directory as a guide."
+echo "3. /home/ubuntu/unideploy/web/.env"
+echo "Ensure firebase-credentials.json is in /home/ubuntu/unideploy/"
 echo "------------------------------------------------"
