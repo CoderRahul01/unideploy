@@ -140,7 +140,7 @@ async def startup_event():
 
 # CORS Setup
 raw_origins = os.getenv("ALLOWED_ORIGINS", "")
-origins = raw_origins.split(",") if raw_origins else []
+origins = [o.strip() for o in raw_origins.split(",")] if raw_origins else []
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
