@@ -59,7 +59,7 @@ pip install gunicorn uvicorn
 echo "🟢 Setting up Node Gateway..."
 cd /home/ubuntu/unideploy/gateway
 npm install
-npm install -g pm2
+sudo npm install -g pm2
 
 # 6. Configure Nginx (Reverse Proxy)
 echo "🌐 Configuring Nginx..."
