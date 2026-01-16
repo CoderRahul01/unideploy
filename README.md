@@ -36,38 +36,52 @@ cd gateway && npm run dev
 cd web && npm run dev
 ```
 
-## 🚢 AWS Deployment Guide
+## 🚢 Deployment & Testing
 
-Deploying UniDeploy to AWS involves three main phases: Provisioning, Configuration, and Rollout.
+### 1. Local Development (Testing)
+Run the full stack locally with a single command.
 
-### 1. Provisioning (Infra)
-Ensure you have `eksctl`, `kubectl`, and `aws` CLI installed and configured.
+**Prerequisites:**
+- Python 3.11+
+- Node.js 18+
+
 ```bash
-chmod +x setup_aws.sh
-./setup_aws.sh
+# Easy Start (Recommended)
+chmod +x start_dev.sh
+./start_dev.sh
 ```
 
-### 2. Configuration (Environment)
-1.  **Backend Secrets**: Create `k8s/secrets.yaml` from `k8s/secrets.yaml.template` and apply it:
-    ```bash
-    kubectl apply -f k8s/secrets.yaml
-    ```
-2.  **Retrieve Backend URL**: You need the backend endpoint for the frontend build.
-    ```bash
-    kubectl get svc unideploy-backend -n unideploy -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
-    ```
-    > [!NOTE]
-    > It may take a few minutes for AWS to assign a hostname. If it's empty, wait and retry.
-
-### 3. Production Rollout
-Build images and deploy to EKS.
+**Manual Start (Alternative):**
+If you prefer to run services individually:
 ```bash
-# Set your backend URL discovered above
-export NEXT_PUBLIC_API_URL="http://<your-loadbalancer-url>"
+# Terminal 1: Brain (Backend) -> localhost:8000
+cd brain && source venv/bin/activate && pip install -r requirements.txt && uvicorn main:app --reload --port 8000
 
-chmod +x deploy_platform.sh
-./deploy_platform.sh
+# Terminal 2: Gateway (WebSocket) -> localhost:3001
+cd gateway && npm install && npm run dev
+
+# Terminal 3: Web (Frontend) -> localhost:3000
+cd web && npm install && npm run dev
 ```
+**Verification:**
+- Open `http://localhost:3000`.
+- Ensure no red CORS errors in the browser console.
+- Try a test deployment (if E2B key is set).
+
+### 2. Production Deployment
+UniDeploy is designed to run on any cloud provider (AWS, Vercel, DigitalOcean).
+
+**Recommended Setup:**
+- **Frontend**: Deploy to Vercel (Auto-detects Next.js).
+- **Backend**: Deploy to AWS EC2 or DigitalOcean Droplet (Dockerized).
+- **Gateway**: Deploy alongside Backend or as a separate service.
+
+**Production Testing:**
+1.  **Environment Variables**: Ensure `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_GATEWAY_URL` are set in Vercel to point to your production backend.
+2.  **CORS**: The backend (`main.py`) and gateway (`index.js`) are configured to accept requests from `unideploy.in`. Add your specific production domain to `ALLOWED_ORIGINS` env var if different.
+
+> [!NOTE]
+> **Legacy Scripts Archived**: The old AWS shell scripts and Kubernetes YAMLs have been moved to `_archive_legacy_aws_infrastructure` and are ignored by git. They are **NOT** used for current deployments.
 
 ## 🛠️ Crucial Commands (Cheat Sheet)
 

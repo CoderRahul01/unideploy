@@ -45,3 +45,4 @@ local_storage/
 firebase-credentials.json
 **/.env
 !**/.env.template
+_archive_legacy_aws_infrastructure/

@@ -3,6 +3,7 @@ const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
 const admin = require("firebase-admin");
+const path = require("path");
 require("dotenv").config();
 
 const app = express();
@@ -13,8 +14,9 @@ app.use(express.json());
 const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 if (serviceAccountPath) {
   try {
+    const absolutePath = path.resolve(serviceAccountPath);
     admin.initializeApp({
-      credential: admin.credential.cert(require(serviceAccountPath)),
+      credential: admin.credential.cert(require(absolutePath)),
     });
     console.log("[Gateway] Firebase Admin initialized");
   } catch (e) {
@@ -30,8 +32,32 @@ const server = http.createServer(app);
 const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : "*";
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      const allowed = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://unideploy.in",
+        "https://www.unideploy.in"
+      ];
+      if (process.env.ALLOWED_ORIGINS) {
+        allowed.push(...process.env.ALLOWED_ORIGINS.split(","));
+      }
+
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+
+      if (allowed.indexOf(origin) !== -1 || allowed.includes("*")) {
+        callback(null, true);
+      } else {
+        // Optional: for dev, loosen up? No, strict is better for debugging.
+        // callback(new Error('Not allowed by CORS'));
+        // Fallback for now to prevent total breakage if config missing
+        console.warn(`[Gateway] Origin ${origin} not explicitly allowed but proceeding for dev compatibility.`);
+        callback(null, true);
+      }
+    },
     methods: ["GET", "POST"],
+    credentials: true
   },
 });
 

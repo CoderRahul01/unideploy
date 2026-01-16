@@ -8,6 +8,7 @@ from fastapi import (
     WebSocketDisconnect,
     Depends,
     Request,
+    Header,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -76,20 +77,48 @@ else:
     print("[Warning] Firebase Service Account JSON not found. Auth will be mocked.")
 
 
-async def get_current_user(token: str = None):
-    if not token:
-        return {"id": 1, "username": "mock_user"}
+from fastapi import Header
 
+async def get_current_user(authorization: str = Header(None), db: Session = Depends(get_db)):
+    if not authorization:
+        # For dev convenience, if no header, assume mock user IF allowed (check read_only or similar?)
+        # Or better, check for 'token' query param as fallback
+        return {"id": 1, "username": "mock_user", "email": "mock@local"}
+
+    token = authorization.replace("Bearer ", "")
+    
     try:
+        # 1. Verify Firebase Token
         decoded_token = auth.verify_id_token(token)
+        uid = decoded_token["uid"]
+        email = decoded_token.get("email")
+        name = decoded_token.get("name", email)
+        
+        # 2. Sync with Database
+        db_user = db.query(models.User).filter(models.User.clerk_id == uid).first()
+        
+        if not db_user:
+            # Create new user
+            db_user = models.User(
+                clerk_id=uid,
+                username=name,
+                email=email
+            )
+            db.add(db_user)
+            db.commit()
+            db.refresh(db_user)
+            print(f"[Auth] Created new user: {name} (ID: {db_user.id})")
+        
         return {
-            "id": decoded_token["uid"],
-            "email": decoded_token.get("email"),
-            "username": decoded_token.get("name", decoded_token.get("email")),
+            "id": db_user.id, # Integer ID
+            "auth_id": uid,   # Firebase String ID
+            "email": db_user.email,
+            "username": db_user.username,
         }
+        
     except Exception as e:
-        print(f"[Auth] Firebase token verification failed: {e}")
-        raise HTTPException(status_code=401, detail="Invalid authentication token")
+        print(f"[Auth] Verification failed: {e}")
+        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
 
 
 # Initialize Agents
@@ -139,8 +168,25 @@ async def startup_event():
         db.close()
 
 # CORS Setup
+
 raw_origins = os.getenv("ALLOWED_ORIGINS", "")
-origins = [o.strip() for o in raw_origins.split(",")] if raw_origins else []
+if raw_origins:
+    origins = [o.strip() for o in raw_origins.split(",")]
+else:
+    # If using proxy, the origin might be localhost or the frontend domain
+    # We add specific handling for development and production
+    origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://unideploy.in",
+        "https://www.unideploy.in",
+        # Add other specific domains if needed
+    ]
+    
+    # If ALLOWED_ORIGINS is explicitly set, extend the list
+    if os.getenv("ALLOWED_ORIGINS"):
+        origins.extend([o.strip() for o in os.getenv("ALLOWED_ORIGINS").split(",")])
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,

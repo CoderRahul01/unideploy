@@ -9,7 +9,7 @@ class SuperMemoryClient:
     Acts as the 'Wisdom' layer.
     """
 
-    BASE_URL = "https://supermemory.ai/api/v1"  # Placeholder, verify exact endpoint
+    BASE_URL = "https://v2.api.supermemory.ai"
 
     def __init__(self):
         self.api_key = os.getenv("SUPERMEMORY_API_KEY")

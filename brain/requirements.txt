@@ -19,3 +19,4 @@ groq>=0.4.0
 e2b_code_interpreter>=0.0.10
 prometheus-client>=0.20.0
 docker>=7.1.0
+kubernetes>=28.1.0
