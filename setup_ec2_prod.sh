@@ -128,3 +128,8 @@ echo "2. /home/ubuntu/unideploy/gateway/.env"
 echo "3. /home/ubuntu/unideploy/web/.env"
 echo "Ensure firebase-credentials.json is in /home/ubuntu/unideploy/brain/"
 echo "------------------------------------------------"
+# 8. SSL Setup (Optional - Requires Domain Name)
+# To enable HTTPS:
+# 1. Point a domain/subdomain to this IP.
+# 2. Run: sudo apt-get install -y certbot python3-certbot-nginx
+# 3. Run: sudo certbot --nginx -d your-domain.com
