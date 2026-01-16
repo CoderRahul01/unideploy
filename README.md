@@ -10,17 +10,17 @@ UniDeploy is a high-performance orchestration platform that abstracts away the c
 
 - 🤖 **Agent-Based Architecture**: Modular Build, Deploy, and Notify agents for autonomous orchestration.
 - ⚡ **Instant Framework Detection**: Auto-detects Python, Node.js, and Static sites.
-- 🔒 **Enterprise Auth**: Powered by Clerk for secure and seamless user management.
-- 📡 **Live Observability**: Real-time deployment feedback via WebSockets.
-- ☁️ **Cloud Native**: Native integration with AWS EKS, ECR, and Supabase (PostgreSQL).
+- 🔒 **GitHub-Only Auth**: Secure & streamlined identity via GitHub OAuth.
+- 📡 **Live Observability**: Real-time deployment feedback via WebSockets & Cost Tracking.
+- ☁️ **Hybrid Cloud**: Native integration with AWS (Stability) and E2B (Serverless Compute).
 
 ## 🏗️ Technical Stack
 
 - **Frontend**: Next.js 14, Tailwind CSS, Lucide Icons.
 - **Backend**: FastAPI (Python 3.11), SQLAlchemy.
-- **Infrastructure**: AWS (EKS, ECR), Kubernetes, Docker.
+- **Infrastructure**: AWS (EC2/ECS for Platform), E2B (Firecracker VMs for User Sandboxes).
 - **Database**: Supabase (Postgres).
-- **Auth**: Clerk.
+- **Auth**: Firebase (GitHub Provider).
 
 ## 🚀 Quick Start
 

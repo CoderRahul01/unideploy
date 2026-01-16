@@ -19,7 +19,8 @@ export default function PulseDashboard() {
         activeDeployments: 0,
         avgBuildTime: "0s",
         apiLatency: "0ms",
-        uptime: "99.9%"
+        uptime: "99.9%",
+        cost: "$0.00"
     });
     const [loading, setLoading] = useState(true);
 
@@ -27,13 +28,15 @@ export default function PulseDashboard() {
         const fetchStats = async () => {
             try {
                 const health = await projectsApi.getHealth();
+                const costData = await projectsApi.getSystemCost();
                 // Use real stats from the augmented /health endpoint
                 setStats({
                     status: health.status === "healthy" ? "System Online" : "Degraded",
                     activeDeployments: health.stats?.projects || 0,
                     avgBuildTime: "42s", // We'll need a dedicated metrics endpoint for p95 build times
                     apiLatency: "P95 Stability",
-                    uptime: "99.98%"
+                    uptime: "99.98%",
+                    cost: `$${costData.total_estimated_usd.toFixed(2)}`
                 });
             } catch (err) {
                 setStats(prev => ({ ...prev, status: "Offline" }));
@@ -89,6 +92,12 @@ export default function PulseDashboard() {
                     label="System Uptime"
                     value={stats.uptime}
                     trend="Last 30 days"
+                />
+                <PulseCard
+                    icon={<TrendingUp className="w-5 h-5 text-pink-400" />}
+                    label="Cloud Credits"
+                    value={stats.cost}
+                    trend="Spent of $100.00"
                 />
             </div>
 

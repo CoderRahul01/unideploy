@@ -13,7 +13,7 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
-import { loginWithGoogle, loginWithGithub, logout, auth } from "@/lib/firebase";
+import { loginWithGithub, logout, auth } from "@/lib/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
 import CreateProject from "@/components/CreateProject";
 import DeploymentStatus from "@/components/DeploymentStatus";
@@ -168,8 +168,7 @@ export default function Dashboard() {
               Free Tier
             </p>
             <p className="text-xs text-white/60 leading-relaxed">
-              Apps auto-sleep after 15m of inactivity.{" "}
-              <span className="text-purple-400">60m daily limit</span> per app.
+              Max <span className="text-purple-400">1-hour sessions</span>. Up to 20 concurrent sandboxes. Auto-sleep enabled.
             </p>
           </div>
           <div className="flex items-center gap-3 px-2 py-3 rounded-xl bg-white/5 border border-white/5">

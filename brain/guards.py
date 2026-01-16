@@ -29,48 +29,14 @@ class StateMachine:
 class StateAuthority:
     @staticmethod
     def get_effective_state(
-        project: models.Project, k8s_client: client.ApiClient
+        project: models.Project, infra_client=None
     ) -> str:
         """
-        Kubernetes is the source of truth for RUNNING vs NOT RUNNING.
-        In SANDBOX mode (k8s_client is None), we trust the DB.
+        For E2B (Serverless), we primarily trust the DB state.
+        If we want to verify reality, we would call E2B API with sandbox_id.
         """
-        # Sandbox Mode / Mock check
-        if k8s_client is None:
-            return project.status
-
-        # If project hasn't been built yet, it's CREATED
-        if project.status == "CREATED":
-            return "CREATED"
-
-        # Check K8s for actual pod status
-        try:
-            v1 = client.CoreV1Api(k8s_client)
-            # Find pods with app label
-            pods = v1.list_namespaced_pod(
-                namespace="default", label_selector=f"app={project.name}"
-            ).items
-
-            is_running = any(p.status.phase == "Running" for p in pods)
-
-            if is_running:
-                return "RUNNING"
-
-            # If DB says WAKING but no pod is running yet, respect the intent
-            if project.status == "WAKING":
-                return "WAKING"
-
-            # If DB says BUILT or SLEEPING and no pod is running, it's SLEEPING/BUILT
-            return (
-                project.status
-                if project.status in ["SLEEPING", "BUILT"]
-                else "SLEEPING"
-            )
-
-        except Exception as e:
-            print(f"[StateAuthority] Error querying K8s: {e}")
-            # Fallback to DB state if K8s is unreachable
-            return project.status
+        # For now, we trust the DB in the serverless hybrid model
+        return project.status
 
 
 class SystemGuard:
@@ -86,7 +52,8 @@ class SystemGuard:
         if SystemGuard.is_read_only():
             return False, "Platform is in READ-ONLY mode for maintenance."
 
-        PLATFORM_MAX_PODS = int(os.getenv("PLATFORM_MAX_PODS", 40))
+        # E2B Hobby Limit (from screenshot)
+        PLATFORM_MAX_SANDBOXES = int(os.getenv("PLATFORM_MAX_SANDBOXES", 20))
         DAILY_RUNTIME_LIMIT_MINS = int(os.getenv("DAILY_RUNTIME_LIMIT_MINS", 60))
 
         # 1. Daily Runtime Check
@@ -97,10 +64,10 @@ class SystemGuard:
             )
 
         # 2. Global Safety Limit Check
-        running_pods = (
+        running_count = (
             db.query(models.Project).filter(models.Project.status == "RUNNING").count()
         )
-        if running_pods >= PLATFORM_MAX_PODS:
+        if running_count >= PLATFORM_MAX_SANDBOXES:
             return False, "Platform capacity reached. Please try again later."
 
         # 3. User Concurrency Check (Free Tier: 1 app)

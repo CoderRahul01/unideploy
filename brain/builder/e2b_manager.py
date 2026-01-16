@@ -30,14 +30,12 @@ class E2BManager:
         if log_callback:
             log_callback(f"[System] Spawning {tier} Sandbox for {repo_url}...")
 
-        # Mapping Tiers to E2B Resources
-        # SEED: 0.25 vCPU, 256MB RAM, 5m Timeout
-        # LAUNCH: 1 vCPU, 2GB RAM, 30m Timeout
-        # SCALE: 2 vCPU, 4GB RAM, 24h Timeout + Persistent Disk
+        # Mapping Tiers to E2B Hobby (Free) Limits
+        # Screenshot shows: Max 1-hour session length
         resource_mapping = {
-            "SEED": {"cpu": 1, "memory": 512, "timeout": 300},
-            "LAUNCH": {"cpu": 1, "memory": 2048, "timeout": 1800},
-            "SCALE": {"cpu": 2, "memory": 4096, "timeout": 86400},
+            "SEED": {"cpu": 1, "memory": 512, "timeout": 600},      # 10m
+            "LAUNCH": {"cpu": 1, "memory": 1024, "timeout": 1800},   # 30m
+            "SCALE": {"cpu": 1, "memory": 2048, "timeout": 3600},    # 1h (MAX FREE)
         }
         specs = resource_mapping.get(tier, resource_mapping["SEED"])
 
@@ -115,7 +113,15 @@ class E2BManager:
             return None
 
     def kill_sandbox(self, sandbox_id):
-        # E2B Sandboxes auto-die after timeout, but we can kill explicitly if we stored the object
-        # With the SDK, we typically need the instance.
-        # For now, we rely on E2B's auto-timeout for Scale-to-Zero.
-        pass
+        """
+        Explicitly terminates an E2B sandbox.
+        """
+        try:
+            from e2b_code_interpreter import Sandbox
+            # We connect to the existing sandbox by ID and then close it
+            sandbox = Sandbox.connect(sandbox_id)
+            sandbox.kill()
+            return True
+        except Exception as e:
+            print(f"[E2BManager] Failed to kill sandbox {sandbox_id}: {e}")
+            return False

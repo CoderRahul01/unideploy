@@ -64,3 +64,8 @@ class DeployAgent:
         except Exception as e:
             print(f"[DeployAgent] Deployment failed: {e}")
             raise e
+    async def stop(self, sandbox_id):
+        """
+        Kills the E2B sandbox.
+        """
+        return self.e2b.kill_sandbox(sandbox_id)

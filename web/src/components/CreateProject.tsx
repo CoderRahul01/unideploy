@@ -463,21 +463,21 @@ export default function CreateProject({ onClose }: { onClose: () => void }) {
                     <div className="grid grid-cols-3 gap-3">
                       <TierCard
                         tier="SEED"
-                        specs="0.5 vCPU • 512MB"
+                        specs="1 vCPU • 512MB • 10m"
                         active={selectedTier === "SEED"}
                         recommended={analysis?.recommended_tier === "SEED"}
                         onClick={() => setSelectedTier("SEED")}
                       />
                       <TierCard
                         tier="LAUNCH"
-                        specs="1 vCPU • 2GB"
+                        specs="1 vCPU • 1GB • 30m"
                         active={selectedTier === "LAUNCH"}
                         recommended={analysis?.recommended_tier === "LAUNCH"}
                         onClick={() => setSelectedTier("LAUNCH")}
                       />
                       <TierCard
                         tier="SCALE"
-                        specs="2 vCPU • 4GB"
+                        specs="1 vCPU • 2GB • 1h"
                         active={selectedTier === "SCALE"}
                         recommended={analysis?.recommended_tier === "SCALE"}
                         onClick={() => setSelectedTier("SCALE")}

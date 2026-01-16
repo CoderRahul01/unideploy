@@ -120,6 +120,13 @@ export const projectsApi = {
       .then((res) => res.data),
   applyFix: (deploymentId: string) =>
     api.post(`/deployments/${deploymentId}/apply-fix`).then((res) => res.data),
+  getSystemCost: () =>
+    api
+      .get<{
+        total_estimated_usd: number;
+        events: any[];
+      }>("/system/cost")
+      .then((res) => res.data),
 };
 
 export default api;

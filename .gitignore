@@ -37,6 +37,11 @@ Thumbs.db
 
 # UniDeploy Specific
 *.pem
-setup_ec2_prod.sh # Don't commit if containing secrets (though mostly safe)
+setup_ec2_prod.sh # Don't commit if containing secrets (though mostly sleep)
 temp_analysis/
 temp/
+legacy_aws_infrastructure/k8s/secrets.yaml
+local_storage/
+.env
+brain/.env
+web/.env

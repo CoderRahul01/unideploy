@@ -68,20 +68,14 @@ server {
     listen 80;
     server_name _; 
 
-    # Web (Next.js) - Assuming we build static or run it on 3000
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-    }
-
     # Brain API (Python)
-    location /api/ {
+    location / {
         proxy_pass http://localhost:8000;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
     # Gateway (WebSockets)
@@ -90,6 +84,7 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
     }
 }
 EOF
@@ -101,13 +96,22 @@ sudo systemctl restart nginx
 
 # 7. Start Services (PM2)
 echo "🔥 Starting Services..."
-# We use PM2 to manage both Node and Python processes
-pm2 start "uvicorn main:app --host 0.0.0.0 --port 8000" --name "unideploy-brain" --namespace "python"
-pm2 start "npm start" --name "unideploy-gateway" --cwd "/home/ubuntu/unideploy/gateway"
+# Use Gunicorn with Uvicorn workers for production performance
+cd /home/ubuntu/unideploy/brain
+source venv/bin/activate
+pm2 start "gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000" --name "unideploy-brain"
+
+cd /home/ubuntu/unideploy/gateway
+pm2 start npm --name "unideploy-gateway" -- start
 
 # Save PM2 list
 pm2 save
 pm2 startup
 
 echo "✅ UniDeploy Control Plane is LIVE!"
-echo "NOTE: Ensure you create a .env file in /home/ubuntu/unideploy/backend with your API Keys!"
+echo "------------------------------------------------"
+echo "CRITICAL: You MUST create .env files in:"
+echo "1. /home/ubuntu/unideploy/brain/.env"
+echo "2. /home/ubuntu/unideploy/gateway/.env"
+echo "Use the .env.template files in each directory as a guide."
+echo "------------------------------------------------"

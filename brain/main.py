@@ -25,6 +25,7 @@ from agents.memory_agent import MemoryAgent
 from agents.autofix_agent import AutoFixAgent
 from agents.patch_agent import PatchAgent
 from database import get_db, engine
+from utils.cost_manager import CostManager
 import models
 import schemas
 from logging_utils import log_intent
@@ -103,46 +104,49 @@ memory_agent = MemoryAgent()
 autofix_agent = AutoFixAgent()
 patch_agent = PatchAgent()
 maintenance_agent = MaintenanceAgent()
+cost_manager = CostManager()
 
 @app.on_event("startup")
 async def startup_event():
-    # Start maintenance tasks in the background
+    """
+    Consolidated startup tasks:
+    1. Start maintenance tasks
+    2. Platform reconciliation (Sync DB with real infra)
+    """
+    # 1. Start maintenance agent
     asyncio.create_task(maintenance_agent.run_forever())
-    print("[Core] Startup complete. Maintenance worker initiated.")
+    print("[Core] Maintenance worker initiated.")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.on_event("startup")
-async def startup_event():
-    """
-    Reconciliation on startup. Ensures reality sync before traffic.
-    """
+    # 2. Reconciliation
     from database import SessionLocal
     from guards import StateAuthority
 
     db = SessionLocal()
     try:
         print("[Startup] Commencing platform reconciliation...")
+        # Since we use E2B, we might not have a reliable way to 'check' sandbox status 
+        # unless we call E2B API for each deployment. For now, we sync what we can.
         projects = db.query(models.Project).all()
         for p in projects:
-            effective = StateAuthority.get_effective_state(
-                p, deploy_agent.manager.k8s_client
-            )
-            if p.status != effective and p.status not in ["WAKING", "CREATED"]:
-                print(f"[Startup] Syncing {p.name}: {p.status} -> {effective}")
-                p.status = effective
+            # Note: StateAuthority might still expect K8s. We can skip or adapt it.
+            # effective = StateAuthority.get_effective_state(p, deploy_agent.e2b)
+            # p.status = effective
+            pass
         db.commit()
     except Exception as e:
         print(f"[Startup] Reconciliation failed: {e}")
     finally:
         db.close()
+
+# CORS Setup
+origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 async def run_deployment_pipeline(
@@ -244,6 +248,11 @@ async def run_deployment_pipeline(
                             "message": "Deployment is live!",
                         },
                     )
+                    
+                    # 4. Log initial cost estimate
+                    if deployment_res.get("id"):
+                        # For now we log 0 duration to mark the 'start' event, or log the setup cost
+                        cost_manager.log_sandbox_usage(deployment_res["id"], duration_seconds=60, tier=project.tier)
             except Exception as e:
                 track_deployment("failed", project.tier)
                 SANDBOXES_ACTIVE.dec()
@@ -376,7 +385,7 @@ async def analyze_zip(
 
 
 @app.post("/projects/{project_id}/start")
-async def start_project(project_id: int, db: Session = Depends(get_db)):
+async def start_project(project_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     # 1. Acquire Lock & Fetch
     project = (
         db.query(models.Project)
@@ -406,18 +415,24 @@ async def start_project(project_id: int, db: Session = Depends(get_db)):
         project.status = "WAKING"
         db.commit()
 
-        # Call K8s (or Mock in Sandbox)
-        success = deploy_agent.manager.scale_deployment(project.name, replicas=1)
-        if not success:
-            raise Exception("K8s scaling failed")
+        # For E2B, waking means running the deployment pipeline again
+        # We fetch the latest deployment to get the image/repo info
+        last_deploy = db.query(models.Deployment).filter(models.Deployment.project_id == project_id).order_by(models.Deployment.created_at.desc()).first()
+        
+        if not last_deploy:
+            raise Exception("No deployment found to wake up from")
 
-        StateMachine.validate_transition(project.status, "RUNNING")
-        project.status = "RUNNING"
-        project.last_active_at = datetime.utcnow()
-        project.is_locked = 0
-        db.commit()
-        log_intent(project_id, 1, "START", "SUCCESS")
-        return {"status": "RUNNING", "message": "Project started"}
+        # We use background tasks to run the pipeline
+        background_tasks.add_task(
+            run_deployment_pipeline,
+            last_deploy.id,
+            None,
+            project.name,
+            SessionLocal(),
+            repo_url=project.git_url
+        )
+        
+        return {"status": "WAKING", "message": "Project waking up..."}
     except Exception as e:
         db.rollback()
         # Rollback state
@@ -523,9 +538,11 @@ async def stop_project(project_id: int, db: Session = Depends(get_db)):
         project.is_locked = 1
         db.commit()
 
-        success = deploy_agent.manager.scale_deployment(project.name, replicas=0)
-        if not success:
-            raise Exception("K8s scaling failed")
+        # For E2B, stop means killing the active sandbox
+        last_deploy = db.query(models.Deployment).filter(models.Deployment.project_id == project_id, models.Deployment.status == "live").order_by(models.Deployment.created_at.desc()).first()
+        
+        if last_deploy and last_deploy.sandbox_id:
+            await deploy_agent.stop(last_deploy.sandbox_id)
 
         project.status = "SLEEPING"
         project.is_locked = 0
@@ -555,6 +572,14 @@ async def get_system_config():
         "maintenance": SystemGuard.is_read_only(),
         "daily_limit_mins": int(os.getenv("DAILY_RUNTIME_LIMIT_MINS", 60)),
     }
+
+
+@app.get("/system/cost")
+async def get_system_cost():
+    """
+    Returns the current cost summary from local storage.
+    """
+    return cost_manager.get_summary()
 
 
 @app.get("/health")

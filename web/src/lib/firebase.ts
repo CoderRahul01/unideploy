@@ -1,7 +1,6 @@
 import { initializeApp, getApps } from "firebase/app";
 import {
   getAuth,
-  GoogleAuthProvider,
   GithubAuthProvider,
   signInWithPopup,
   signOut,
@@ -20,11 +19,9 @@ const app =
   getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 const auth = getAuth(app);
 
-const googleProvider = new GoogleAuthProvider();
 const githubProvider = new GithubAuthProvider();
 githubProvider.addScope("repo");
 
-export const loginWithGoogle = () => signInWithPopup(auth, googleProvider);
 export const loginWithGithub = () => signInWithPopup(auth, githubProvider);
 export const logout = () => signOut(auth);
 
