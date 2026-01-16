@@ -67,7 +67,7 @@ echo "🌐 Configuring Nginx..."
 sudo tee /etc/nginx/sites-available/unideploy <<EOF
 server {
     listen 80;
-    server_name _; 
+    server_name api.unideploy.in unideploy.in; 
 
     # Web (Next.js)
     location / {
