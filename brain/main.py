@@ -202,6 +202,8 @@ async def run_deployment_pipeline(
     """
     Automated agent-based deployment pipeline with DB updates.
     """
+    # Give the frontend a tiny moment to connect to the WebSocket after the POST returns
+    await asyncio.sleep(1)
     try:
         if repo_url:
             work_dir = f"temp/{deployment_id}"
@@ -220,7 +222,26 @@ async def run_deployment_pipeline(
             str(deployment_id),
             {"status": "building", "message": "Starting build agent..."},
         )
-        image_tag = await build_agent.run(project_path, project_name)
+        
+        async def build_log_callback(msg: str):
+             # 1. Update dashboard status
+             await notify_agent.broadcast_status(
+                str(deployment_id),
+                {"status": "building", "log": msg}
+            )
+             # 2. Push to Gateway for Terminal display (Socket.io bridge)
+             try:
+                 gateway_url = os.getenv("GATEWAY_URL", "http://localhost:3001")
+                 import requests
+                 requests.post(
+                     f"{gateway_url}/internal/logs",
+                     json={"deploymentId": str(deployment_id), "log": msg},
+                     timeout=1
+                 )
+             except Exception as e:
+                 print(f"[Pipeline] Failed to push build log to gateway: {e}")
+
+        image_tag = await build_agent.run(project_path, project_name, log_callback=build_log_callback)
 
         # Update DB: Building complete
         db_deploy = (
@@ -278,7 +299,8 @@ async def run_deployment_pipeline(
                 if deployment_res and deployment_res["status"] == "live":
                     db_deploy.status = "live"
                     db_deploy.sandbox_id = deployment_res["sandbox_id"]
-                    db_deploy.domain = deployment_res["url"]
+                    # Generate Vercel-like domain pattern
+                    db_deploy.domain = f"{project.name.lower().replace(' ', '-')}.app.unideploy.in"
                     
                     # Update project state
                     StateMachine.validate_transition(project.status, "RUNNING")
@@ -291,7 +313,7 @@ async def run_deployment_pipeline(
                         str(deployment_id),
                         {
                             "status": "live",
-                            "domain": deployment_res["url"],
+                            "domain": f"{project.name.lower().replace(' ', '-')}.app.unideploy.in",
                             "message": "Deployment is live!",
                         },
                     )
@@ -328,14 +350,20 @@ async def run_deployment_pipeline(
                 str(deployment_id),
                 {
                     "status": "failed",
-                    "message": f"Deployment failed: {str(e)}",
+                    "error": f"Deployment failed: {str(e)}", # Changed 'message' to 'error'
+                    "message": f"Deployment failed: {str(e)}", # Keep message for backward compat
                     "autofix": fix_result
                 }
             )
         except Exception as af_error:
             print(f"[Pipeline] Auto-Fix failed: {af_error}")
             await notify_agent.broadcast_status(
-                str(deployment_id), {"status": "failed", "message": f"Deployment failed: {str(e)}"}
+                str(deployment_id), 
+                {
+                    "status": "failed", 
+                    "error": f"Deployment failed: {str(e)}",
+                    "message": f"Deployment failed: {str(e)}"
+                }
             )
     finally:
         db.close()
@@ -377,10 +405,21 @@ async def list_projects(db: Session = Depends(get_db)):
     # Sync status with StateAuthority for truth
     for p in db_projects:
         effective_status = StateAuthority.get_effective_state(
-            p, deploy_agent.manager.k8s_client
+            p, None
         )
         if p.status != effective_status and p.status not in ["WAKING", "CREATED"]:
             p.status = effective_status
+        
+        # Populate latest_deployment_id
+        last_deploy = (
+            db.query(models.Deployment)
+            .filter(models.Deployment.project_id == p.id)
+            .order_by(models.Deployment.created_at.desc())
+            .first()
+        )
+        if last_deploy:
+            p.latest_deployment_id = last_deploy.id
+            
     return db_projects
 
 

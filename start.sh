@@ -35,9 +35,9 @@ if [ ! -d "venv" ]; then
 fi
 source venv/bin/activate
 echo "📦 [Brain] Installing requirements..."
-pip install -r requirements.txt > /dev/null 2>&1
+pip install -r requirements.txt
 echo "🧠 [Brain] Starting on port 8000..."
-uvicorn main:app --reload --port 8000 &
+uvicorn main:app --reload --reload-exclude "temp/*" --port 8000 &
 cd ..
 
 # 3. Web (Next.js)

@@ -1,7 +1,7 @@
 import os
 import datetime
 from sqlalchemy.orm import Session
-from kubernetes import client
+# from kubernetes import client (Removed unused legacy import)
 import models
 
 

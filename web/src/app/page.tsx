@@ -66,14 +66,14 @@ export default function Dashboard() {
     fetchConfig();
     fetchProjects();
     const hasTransient = projects.some(
-      (p) => p.status === "WAKING" || p.status === "CREATED",
+      (p) => p.status === "WAKING" || p.status === "building" || p.status === "deploying",
     );
     const interval = setInterval(
       () => {
         fetchProjects();
         fetchConfig();
       },
-      hasTransient ? 3000 : 8000,
+      hasTransient ? 5000 : 15000,
     );
     return () => clearInterval(interval);
   }, [fetchProjects, fetchConfig, projects.length, user]);
@@ -259,7 +259,18 @@ export default function Dashboard() {
               <h2 className="text-xl font-semibold mb-6">Recent Deployments</h2>
               <div className="space-y-4">
                 {projects.map((p) => (
-                  <div key={p.id} onClick={() => setActiveDeployment(p.id.toString())} className="cursor-pointer">
+                  <div
+                    key={p.id}
+                    onClick={() => {
+                      if (p.latest_deployment_id) {
+                        setActiveDeployment(p.latest_deployment_id.toString());
+                      } else {
+                        // Optionally handle case with no deployment
+                        console.log("Project has no deployments yet");
+                      }
+                    }}
+                    className={`cursor-pointer ${!p.latest_deployment_id ? 'opacity-50' : ''}`}
+                  >
                     <DeploymentItem
                       project={p}
                       isGlobalLocked={isMutating || sysConfig.read_only}

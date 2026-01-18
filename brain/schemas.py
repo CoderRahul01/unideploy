@@ -28,6 +28,7 @@ class Project(ProjectBase):
     total_runtime_minutes: int
     last_reset_at: datetime
     last_deployed: Optional[datetime] = None
+    latest_deployment_id: Optional[int] = None
 
     class Config:
         from_attributes = True

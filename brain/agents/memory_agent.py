@@ -23,7 +23,7 @@ class MemoryAgent:
         # 1. Collect all relevant files (skipping large binaries, node_modules, etc.)
         files_to_index = []
         exclude_dirs = {".git", "node_modules", "vendor", "__pycache__", "dist", "build"}
-        exclude_extensions = {".png", ".jpg", ".jpeg", ".gif", ".pdf", ".zip", ".tar", ".gz", ".exe", ".bin"}
+        exclude_extensions = {".png", ".jpg", ".jpeg", ".gif", ".pdf", ".zip", ".tar", ".gz", ".exe", ".bin", ".lockb", ".ico"}
 
         for root, dirs, files in os.walk(project_path):
             dirs[:] = [d for d in dirs if d not in exclude_dirs]
@@ -38,7 +38,7 @@ class MemoryAgent:
         batch_vectors = []
         for file_path in files_to_index:
             try:
-                with open(file_path, "r", encoding="utf-8") as f:
+                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                     content = f.read()
                 
                 # Simple chunking for now (e.g., by line count or size)

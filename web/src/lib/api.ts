@@ -55,11 +55,12 @@ api.interceptors.response.use(
 export interface Project {
   id: number;
   name: string;
-  status: "CREATED" | "BUILT" | "WAKING" | "RUNNING" | "SLEEPING";
+  status: "CREATED" | "BUILT" | "WAKING" | "RUNNING" | "SLEEPING" | "building" | "deploying";
   last_active_at: string;
   daily_runtime_minutes: number;
   total_runtime_minutes: number;
   last_deployed: string;
+  latest_deployment_id?: number;
   domain?: string;
 }
 

@@ -63,9 +63,15 @@ const io = new Server(server, {
 
 const verifyToken = async (socket, next) => {
   const token = socket.handshake.auth.token;
+
+  // Allow bypass for local development/mocking
+  if (token === "mock-token") {
+    console.warn("[Gateway] Using mock-token bypass for development");
+    socket.user = { email: "local-dev@unideploy.in", uid: "mock-user-123" };
+    return next();
+  }
+
   if (!token) {
-    // For dev/mocking without firebase creds, maybe allow?
-    // No, strict auth is better. But if Admin not init, we can't verify.
     if (!admin.apps.length) {
       console.warn("[Gateway] Auth skipped (No Admin SDK)");
       socket.user = { email: "mock@local" };
@@ -78,7 +84,7 @@ const verifyToken = async (socket, next) => {
     socket.user = decodedToken;
     next();
   } catch (error) {
-    console.error("[Gateway] Token verification failed:", error);
+    console.error("[Gateway] Token verification failed:", error.message);
     next(new Error("Authentication error: Invalid token"));
   }
 };
