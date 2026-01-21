@@ -206,7 +206,7 @@ async def run_deployment_pipeline(
     await asyncio.sleep(1)
     try:
         if repo_url:
-            work_dir = f"temp/{deployment_id}"
+            work_dir = f"../temp/{deployment_id}"
             os.makedirs(work_dir, exist_ok=True)
             project_path = work_dir
             from git import Repo
@@ -447,7 +447,7 @@ async def analyze_zip(
     print(f"[API] Zip Analysis requested for {file.filename} by {user['username']}")
     
     project_id = str(uuid.uuid4())
-    temp_dir = os.path.join("temp_analysis", project_id)
+    temp_dir = os.path.join("../temp_analysis", project_id)
     os.makedirs(temp_dir, exist_ok=True)
     zip_path = os.path.join(temp_dir, "upload.zip")
     
@@ -566,12 +566,12 @@ async def trigger_deploy(
     db.refresh(db_deploy)
 
     # Save file
-    os.makedirs(f"temp/{db_deploy.id}", exist_ok=True)
-    temp_path = f"temp/{db_deploy.id}/source.zip"
+    os.makedirs(f"../temp/{db_deploy.id}", exist_ok=True)
+    temp_path = f"../temp/{db_deploy.id}/source.zip"
     with open(temp_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    project_path = f"temp/{db_deploy.id}"
+    project_path = f"../temp/{db_deploy.id}"
 
     project = db.query(models.Project).filter(models.Project.id == project_id).first()
     if not project:
@@ -749,7 +749,8 @@ async def apply_fix(deployment_id: int, background_tasks: BackgroundTasks, db: S
         raise HTTPException(status_code=400, detail="Could not generate a fix to apply")
 
     # 2. Apply the patch 
-    work_dir = os.path.join(os.getcwd(), f"temp_build_{project.id}")
+    # Use the same ../temp location if possible or consistent
+    work_dir = os.path.join(os.getcwd(), f"../temp/build_{project.id}")
     focus_file = fix_result.get("focus_file", "unknown")
     abs_path = os.path.join(work_dir, focus_file if focus_file != "unknown" else "index.js")
     

@@ -11,7 +11,7 @@ echo "======================================"
 # 1. Gateway (Node.js)
 # We start this early as it's lightweight
 echo "🔌 [Gateway] Checking setup..."
-cd gateway
+cd apps/gateway
 if [ ! -d "node_modules" ]; then
     echo "📦 [Gateway] Installing dependencies..."
     npm install
@@ -27,7 +27,7 @@ cd ..
 
 # 2. Brain (Python)
 echo "🧠 [Brain] Checking setup..."
-cd brain
+cd apps/backend
 # Check for venv
 if [ ! -d "venv" ]; then
     echo "🐍 [Brain] Creating virtual environment..."
@@ -42,7 +42,7 @@ cd ..
 
 # 3. Web (Next.js)
 echo "🌐 [Web] Checking setup..."
-cd web
+cd apps/frontend
 if [ ! -d "node_modules" ]; then
     echo "📦 [Web] Installing dependencies..."
     npm install

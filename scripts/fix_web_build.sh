@@ -2,7 +2,7 @@
 set -e
 
 echo "🧹 Cleaning Frontend Build Artifacts..."
-cd web
+cd apps/frontend
 
 # 1. Remove Cache
 if [ -d ".next" ]; then
