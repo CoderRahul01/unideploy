@@ -6,6 +6,11 @@ UniDeploy is a high-performance orchestration platform that abstracts away the c
 
 ![UniDeploy Dashboard](/Users/rahulpandey187/.gemini/antigravity/brain/094cce14-e6a8-4afb-b408-61eefb170de9/unideploy_dashboard_upload_ui_1768114075277.png)
 
+<a href="https://e2b.dev">
+  <img src="apps/frontend/public/e2b-logo.png" alt="Powered by E2B" height="40" />
+</a>
+
+
 ## ✨ Core Features
 
 - 🤖 **Agent-Based Architecture**: Modular Build, Deploy, and Notify agents for autonomous orchestration.

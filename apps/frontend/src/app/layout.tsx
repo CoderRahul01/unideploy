@@ -24,6 +24,12 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.variable} font-sans antialiased dark`}>
         {children}
+        <div className="fixed bottom-4 right-4 z-50 opacity-80 hover:opacity-100 transition-opacity">
+          <a href="https://e2b.dev" target="_blank" rel="noopener noreferrer">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/e2b-logo.png" alt="Powered by E2B" className="h-8 w-auto" />
+          </a>
+        </div>
       </body>
     </html>
   );
