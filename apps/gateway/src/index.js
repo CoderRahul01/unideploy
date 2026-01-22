@@ -91,7 +91,11 @@ const verifyToken = async (socket, next) => {
 
 // Health Check
 app.get("/", (req, res) => {
-  res.json({ status: "online", service: "UniDeploy Gateway (Node.js)" });
+  res.json({
+    status: "online",
+    service: "UniDeploy Gateway (Node.js)",
+    branding: "UniDeploy"
+  });
 });
 
 // Internal Endpoint for Brain to push logs

@@ -53,7 +53,7 @@ class AnalyzerAgent:
                 rel_path = os.path.relpath(os.path.join(root, file), repo_path)
                 files_structure.append(rel_path)
 
-        # 3. Consult Wisdom (SuperMemory)
+        # 3. Consult Wisdom (SuperMemory) & E2B Dynamic Analysis
         context = "No historical context available yet."
         try:
             context = self.memory.query(
@@ -61,6 +61,12 @@ class AnalyzerAgent:
             )
         except Exception as e:
             print(f"[Analyzer] Memory consult failed: {e}")
+
+        # 3.5 E2B Dynamic Scan (Detect actual runtime requirements)
+        from builder.e2b_manager import E2BManager
+        e2b = E2BManager()
+        dynamic_context = e2b.analyze_codebase(repo_path)
+        print(f"[Analyzer] E2B Analysis: {dynamic_context}")
 
         # 4. Generate Config (Groq LLM)
         if self.llm.client:
@@ -76,6 +82,7 @@ class AnalyzerAgent:
             Files: {files_structure[:100]}
             
             Context from Memory: {context}
+            E2B Dynamic Insights: {dynamic_context}
             
             Return ONLY valid JSON with keys: 
             - 'type': (node/python/go/static)

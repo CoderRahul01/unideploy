@@ -25,6 +25,10 @@ services:
     restart: always
     ports:
       - "3001:3001"
+    environment:
+      - PORT=3001
+      - NODE_ENV=production
+      - ALLOWED_ORIGINS=https://unideploy.in,https://www.unideploy.in,http://localhost:3000
     volumes:
       - ./apps/gateway/.env:/app/.env
     depends_on:

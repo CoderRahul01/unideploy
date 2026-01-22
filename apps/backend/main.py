@@ -644,7 +644,12 @@ async def stop_project(project_id: int, db: Session = Depends(get_db)):
 
 @app.get("/")
 async def root():
-    return {"status": "online", "service": "UniDeploy Backend"}
+    return {
+        "status": "online",
+        "service": "UniDeploy Brain API",
+        "version": "1.0.0",
+        "branding": "UniDeploy - One-Click Automated Deployment"
+    }
 
 
 @app.get("/system/config")

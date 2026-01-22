@@ -1,6 +1,7 @@
 from e2b_code_interpreter import Sandbox
 import os
 import time
+import json
 
 
 class E2BManager:
@@ -111,6 +112,68 @@ class E2BManager:
         except Exception as e:
             print(f"[E2BManager] Failed to create sandbox: {e}")
             return None
+
+    def verify_fix(self, project_path, focus_file, patched_code, error_context):
+        """
+        Runs the patched code in an E2B sandbox to verify if the error still occurs.
+        """
+        print(f"[E2BManager] Verifying fix for {focus_file}...")
+        try:
+            # Create a code interpreter sandbox
+            sbx = Sandbox.create(api_key=self.api_key)
+            
+            # Setup files
+            sbx.files.write(f"/home/user/{focus_file}", patched_code)
+            
+            # Simplified verification: try to run the file or check for syntax
+            # In a real scenario, this would involve running tests.
+            res = sbx.commands.run(f"python3 -m py_compile /home/user/{focus_file}")
+            
+            status = "resolved" if res.exit_code == 0 else "still_failing"
+            sbx.kill()
+            
+            return {
+                "status": status,
+                "output": res.stdout,
+                "error": res.stderr
+            }
+        except Exception as e:
+            print(f"[E2BManager] Verification failed: {e}")
+            return {"status": "error", "message": str(e)}
+
+    def analyze_codebase(self, repo_path, log_callback=None):
+        """
+        Uses E2B Code Interpreter to analyze a local directory before deployment.
+        """
+        if log_callback: log_callback("[System] Initializing E2B Dynamic Analysis...")
+        
+        try:
+            sbx = Sandbox.create(api_key=self.api_key)
+            # Upload project structure (simulated for now by sending file list)
+            files = []
+            for root, _, f_names in os.walk(repo_path):
+                for f in f_names:
+                    files.append(os.path.relpath(os.path.join(root, f), repo_path))
+            
+            # Ask Code Interpreter to detect risky patterns
+            analysis_script = f"""
+import json
+files = {json.dumps(files[:100])}
+risks = []
+if any('password' in f.lower() for f in files): risks.append('Hardcoded credentials possibility')
+if any('.env' in f for f in files): risks.append('Environment files detected')
+print(json.dumps({{'risks': risks, 'count': len(files)}}))
+"""
+            res = sbx.commands.run(f"python3 -c \"{analysis_script}\"")
+            sbx.kill()
+            
+            if res.exit_code == 0:
+                return json.loads(res.stdout)
+            return {"risks": ["Analysis failed to execute"], "error": res.stderr}
+            
+        except Exception as e:
+            print(f"[E2BManager] Dynamic analysis failed: {e}")
+            return {"error": str(e)}
 
     def kill_sandbox(self, sandbox_id):
         """

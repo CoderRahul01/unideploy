@@ -38,9 +38,15 @@ class AutoFixAgent:
         ]
         fix_suggestion = self.groq.chat_completion(messages)
         
+        # 5. Verify Fix (E2B Code Interpreter)
+        from builder.e2b_manager import E2BManager
+        e2b = E2BManager()
+        verification = e2b.verify_fix("../temp", focus_file, fix_suggestion, error_log)
+        
         return {
             "focus_file": focus_file,
             "suggestion": fix_suggestion,
+            "verification": verification,
             "context_retrieved": len(context["code_snippets"]) > 0
         }
 
