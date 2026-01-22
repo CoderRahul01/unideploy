@@ -193,7 +193,7 @@ async def cors_logging_middleware(request: Request, call_next):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origin_regex=".*", # Internal allow, Nginx handles external safety
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
