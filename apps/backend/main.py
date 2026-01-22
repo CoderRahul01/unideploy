@@ -180,12 +180,8 @@ else:
         "http://127.0.0.1:3000",
         "https://unideploy.in",
         "https://www.unideploy.in",
-        # Add other specific domains if needed
+        "https://api.unideploy.in",
     ]
-    
-    # If ALLOWED_ORIGINS is explicitly set, extend the list
-    if os.getenv("ALLOWED_ORIGINS"):
-        origins.extend([o.strip() for o in os.getenv("ALLOWED_ORIGINS").split(",")])
 
 app.add_middleware(
     CORSMiddleware,
