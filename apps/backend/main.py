@@ -183,6 +183,14 @@ else:
         "https://api.unideploy.in",
     ]
 
+@app.middleware("http")
+async def cors_logging_middleware(request: Request, call_next):
+    origin = request.headers.get("origin")
+    if origin:
+        print(f"[CORS] Request from origin: {origin}")
+    response = await call_next(request)
+    return response
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
