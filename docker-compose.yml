@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile
+    container_name: unideploy-brain
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./apps/backend/.env:/app/.env
+      - ./apps/backend/firebase-credentials.json:/app/firebase-credentials.json
+      - ./apps/backend/local_storage:/app/local_storage
+      - ./temp:/app/temp
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+
+  gateway:
+    build:
+      context: ./apps/gateway
+    container_name: unideploy-gateway
+    restart: always
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./apps/gateway/.env:/app/.env
+    depends_on:
+      - backend
+
+networks:
+  default:
+    name: unideploy-network
