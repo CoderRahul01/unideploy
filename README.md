@@ -4,12 +4,7 @@
 
 UniDeploy is a high-performance orchestration platform that abstracts away the complexities of AWS, Kubernetes, and Docker. Simply upload your project, and let our Agents handle the rest.
 
-![UniDeploy Dashboard](/Users/rahulpandey187/.gemini/antigravity/brain/094cce14-e6a8-4afb-b408-61eefb170de9/unideploy_dashboard_upload_ui_1768114075277.png)
-
-<a href="https://e2b.dev">
-  <img src="apps/frontend/public/e2b-logo.png" alt="Powered by E2B" height="40" />
-</a>
-
+[![SPONSORED BY E2B FOR STARTUPS](https://img.shields.io/badge/SPONSORED%20BY-E2B%20FOR%20STARTUPS-ff8800?style=for-the-badge)](https://e2b.dev/startups)
 
 ## ✨ Core Features
 
