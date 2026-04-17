@@ -16,11 +16,11 @@ const STATUS_CONFIG: Record<
 };
 
 interface SandboxStatusBadgeProps {
-  status: Status;
+  status: string;
 }
 
 export default function SandboxStatusBadge({ status }: SandboxStatusBadgeProps) {
-  const c = STATUS_CONFIG[status] ?? { dot: "bg-[#52525B]", text: "text-[#52525B]", label: status };
+  const c = STATUS_CONFIG[status as Status] ?? { dot: "bg-[#52525B]", text: "text-[#52525B]", label: status };
 
   return (
     <span className="flex items-center gap-1.5">
