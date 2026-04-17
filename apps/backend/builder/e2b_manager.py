@@ -23,6 +23,7 @@ class E2BManager:
         log_callback=None,
         tier: str = "SEED",
         env_vars: dict = None,
+        port: int = 3000,
     ):
         """
         Creates a new E2B Sandbox, clones the repo, and starts the server.
@@ -106,7 +107,7 @@ class E2BManager:
             return {
                 "id": sbx.sandbox_id,
                 "status": "running",
-                "url": f"https://8080-{sbx.sandbox_id}.e2b.dev",
+                "url": f"https://{port}-{sbx.sandbox_id}.e2b.dev",
             }
 
         except Exception as e:

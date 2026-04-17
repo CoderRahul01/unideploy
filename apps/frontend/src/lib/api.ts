@@ -62,6 +62,23 @@ export interface Project {
   last_deployed: string;
   latest_deployment_id?: number;
   domain?: string;
+  project_type?: string;
+  git_url?: string;
+}
+
+export interface FileNode {
+  name: string;
+  type: "file" | "directory";
+  extension?: string;
+  content?: string;
+  children?: FileNode[];
+}
+
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: string;
 }
 
 export const projectsApi = {
@@ -127,6 +144,15 @@ export const projectsApi = {
         total_estimated_usd: number;
         events: any[];
       }>("/system/cost")
+      .then((res) => res.data),
+  getProject: (id: string) => api.get<Project>(`/projects/${id}`).then((res) => res.data),
+  getProjectFiles: (id: string) =>
+    api
+      .get<{ files: FileNode[]; status: string }>(`/projects/${id}/files`)
+      .then((res) => res.data),
+  sendChatMessage: (id: string, message: string, history: ChatMessage[]) =>
+    api
+      .post<{ reply: string }>(`/projects/${id}/chat`, { message, history })
       .then((res) => res.data),
 };
 

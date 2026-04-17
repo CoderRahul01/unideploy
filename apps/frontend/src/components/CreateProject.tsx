@@ -26,7 +26,15 @@ import { GithubAuthProvider } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import AIThinking from "./AIThinking";
 
-export default function CreateProject({ onClose }: { onClose: () => void }) {
+// Maps onboarding template IDs to framework types used by the backend
+const TEMPLATE_FRAMEWORK_MAP: Record<string, string> = {
+  nextjs: "nextjs",
+  fastapi: "python",
+  express: "nodejs",
+  static: "vanilla-html",
+};
+
+export default function CreateProject({ onClose, template }: { onClose: () => void; template?: string | null }) {
   const [step, setStep] = useState(1);
   const [projectName, setProjectName] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -137,9 +145,10 @@ export default function CreateProject({ onClose }: { onClose: () => void }) {
         if (ev.key.trim()) envDict[ev.key.trim()] = ev.value;
       });
 
+      const templateFramework = template ? (TEMPLATE_FRAMEWORK_MAP[template] ?? "unknown") : "unknown";
       const project = await projectsApi.create(
         projectName || "my-awesome-project",
-        analysis?.framework || "unknown",
+        analysis?.framework || templateFramework,
         analysis?.port || 80,
         selectedTier,
         envDict
@@ -281,6 +290,11 @@ export default function CreateProject({ onClose }: { onClose: () => void }) {
                     placeholder="my-awesome-app"
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-purple-500/50 transition-all shadow-inner"
                   />
+                  {template && (
+                    <p className="mt-2 text-xs text-purple-400/70">
+                      Template: <span className="font-semibold capitalize">{template}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

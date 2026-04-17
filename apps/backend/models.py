@@ -46,6 +46,8 @@ class Deployment(Base):
     image_tag = Column(String)
     domain = Column(String)
     sandbox_id = Column(String)  # Added to track live sandboxes
+    sandbox_url = Column(String, nullable=True)
+    error_message = Column(String, nullable=True)
     logs = Column(JSON)  # Store build/deploy logs
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     project = relationship("Project", back_populates="deployments")

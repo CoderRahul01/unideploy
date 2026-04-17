@@ -3,26 +3,20 @@ import shutil
 import uuid
 import json
 from git import Repo
-from clients.pinecone_client import PineconeClient
-from clients.supermemory_client import SuperMemoryClient
 
-from clients.groq_client import GroqClient
+from clients.llm_client import LLMClient
 
 
 class AnalyzerAgent:
     """
     The 'Architect' of the system.
     1. Clones Repo
-    2. Indexes Code -> Pinecone
-    3. Fetches Wisdom -> SuperMemory
-    4. Generates Build Config -> Groq LLM
+    2. Generates Build Config via LLM with fallback chain
     """
 
     def __init__(self):
-        self.pinecone = PineconeClient()
-        self.memory = SuperMemoryClient()
-        self.llm = GroqClient()
-        self.work_dir = "temp_analysis"
+        self.llm = LLMClient()
+        self.work_dir = "/tmp/unideploy-analysis"
 
     async def analyze(self, repo_url: str, user_id: str):
         print(f"[Analyzer] Starting analysis for {repo_url}...")
@@ -53,14 +47,8 @@ class AnalyzerAgent:
                 rel_path = os.path.relpath(os.path.join(root, file), repo_path)
                 files_structure.append(rel_path)
 
-        # 3. Consult Wisdom (SuperMemory) & E2B Dynamic Analysis
+        # 3. E2B Dynamic Analysis
         context = "No historical context available yet."
-        try:
-            context = self.memory.query(
-                f"What is the preferred build pack for a project with files: {files_structure[:10]}?"
-            )
-        except Exception as e:
-            print(f"[Analyzer] Memory consult failed: {e}")
 
         # 3.5 E2B Dynamic Scan (Detect actual runtime requirements)
         from builder.e2b_manager import E2BManager
@@ -69,7 +57,7 @@ class AnalyzerAgent:
         print(f"[Analyzer] E2B Analysis: {dynamic_context}")
 
         # 4. Generate Config (Groq LLM)
-        if self.llm.client:
+        if self.llm.providers:
             prompt = f"""
             You are a DevOps Expert and Product Architect for UniDeploy. 
             Analyze this file structure and generate a JSON build configuration and infrastructure recommendation.
@@ -100,7 +88,7 @@ class AnalyzerAgent:
                 config = json.loads(response[start:end])
                 config["id"] = project_id
                 config["files"] = files_structure[:50]
-                config["suggestion_engine"] = f"UniDeploy AI ({self.llm.model})"
+                config["suggestion_engine"] = "UniDeploy AI (LLMClient)"
                 return config
             except Exception as e:
                 print(f"[Analyzer] LLM error or parsing error: {e}")

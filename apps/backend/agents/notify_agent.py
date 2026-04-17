@@ -1,5 +1,17 @@
+from __future__ import annotations
+
 from fastapi import WebSocket
 from typing import Dict, List
+
+_instance: "NotifyAgent | None" = None
+
+
+def get_notify_agent() -> "NotifyAgent":
+    """Returns the process-level NotifyAgent singleton."""
+    global _instance
+    if _instance is None:
+        _instance = NotifyAgent()
+    return _instance
 
 
 class NotifyAgent:

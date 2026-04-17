@@ -1,15 +1,11 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
-  title: "UniDeploy | One-Click Automated Deployment",
-  description: "Deploy your apps instantly with UniDeploy.",
+  title: "UniDeploy — From idea to deployed product",
+  description: "Describe what you want to build. Our AI writes the code, runs it in a real sandbox, and ships it to production — in minutes.",
   icons: {
     icon: "/favicon.png",
   },
@@ -21,8 +17,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${inter.variable} font-sans antialiased dark`}>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+      <body className="font-sans antialiased dark">
         {children}
         <div className="fixed bottom-4 right-4 z-50 opacity-80 hover:opacity-100 transition-opacity">
           <a href="https://e2b.dev" target="_blank" rel="noopener noreferrer">

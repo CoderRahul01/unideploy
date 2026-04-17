@@ -47,6 +47,8 @@ class Deployment(DeploymentBase):
     status: str
     image_tag: Optional[str] = None
     domain: Optional[str] = None
+    sandbox_url: Optional[str] = None
+    sandbox_id: Optional[str] = None
     created_at: datetime
 
     class Config:

@@ -1,97 +1,69 @@
 import os
-import docker
-from jinja2 import Template
 from builder.detect import detect_project_type
+
+
+# Default port by framework
+FRAMEWORK_PORTS = {
+    "nextjs": 3000,
+    "nodejs": 3000,
+    "python": 8080,
+    "vite": 3000,
+    "create-react-app": 3000,
+    "vanilla-html": 8080,
+}
 
 
 class BuildAgent:
     def __init__(self, registry_url=None):
-        try:
-            self.client = docker.from_env()
-        except Exception as e:
-            print(f"[BuildAgent] Warning: Could not initialize Docker client: {e}")
-            self.client = None
-        self.registry_url = registry_url
+        pass  # No Docker client needed — E2B handles the actual build
 
     async def run(self, project_path, project_name, log_callback=None):
         """
-        Orchestrates the build for a specific project.
+        Detects the project type and returns an E2B-compatible build config.
+        Returns: { "build_command": str, "start_command": str, "port": int }
         """
-        print(f"[BuildAgent] Starting build for {project_name} at {project_path}")
+        print(f"[BuildAgent] Detecting project type for {project_name} at {project_path}")
 
-        # 1. Detection
-        config = detect_project_type(project_path)
-        if config["type"] == "unknown":
-            raise ValueError(f"Could not detect project type for {project_name}")
+        if log_callback:
+            await log_callback(f"[Build] Analysing project structure for {project_name}...")
 
-        # 2. Dockerfile Generation
-        template_name = f"Dockerfile.{config['framework'] if config['framework'] in ['python', 'nodejs'] else 'static'}.j2"
-        # Correct path for agents/build_agent.py to find builder/templates
-        template_path = os.path.join(
-            os.path.dirname(__file__), "..", "builder", "templates", template_name
-        )
+        config = detect_project_type(project_path) if project_path and os.path.exists(project_path) else {"type": "unknown", "framework": "unknown"}
 
-        with open(template_path, "r") as f:
-            template = Template(f.read())
+        framework = config.get("framework", "unknown")
+        port = FRAMEWORK_PORTS.get(framework, 3000)
 
-        dockerfile_content = template.render(**config)
-        dockerfile_path = os.path.join(project_path, "Dockerfile.unideploy")
+        # Derive install+build command (with security audit)
+        build_command = config.get("build_command")
+        if framework in ("nodejs", "nextjs", "vite", "create-react-app"):
+            if build_command:
+                build_command = f"npm install && npm audit --audit-level=critical && {build_command}"
+            else:
+                build_command = "npm install && npm audit --audit-level=critical"
+        elif framework == "python":
+            build_command = "pip install -r requirements.txt && pip-audit --severity critical || true"
+        elif build_command is None:
+            build_command = "echo 'No build step'"
 
-        with open(dockerfile_path, "w") as f:
-            f.write(dockerfile_content)
+        start_command = config.get("start_command")
+        if start_command is None:
+            if framework in ("vite", "create-react-app"):
+                start_command = f"npx serve -s {config.get('output_dir', 'dist')} -l {port}"
+            elif framework == "vanilla-html":
+                start_command = f"npx serve -s . -l {port}"
+            else:
+                start_command = f"echo 'No start command for {framework}'"
 
-        # 3. Build & Mock Fallback
-        image_tag = f"unideploy/{project_name}:latest"
-        
-        if not self.client:
-            msg = f"[BuildAgent] Docker not available. Mocking build for {image_tag}..."
-            print(msg)
-            if log_callback: await log_callback(msg)
-            
-            # Simulate build time
-            import asyncio
-            for i in range(3):
-                await asyncio.sleep(1)
-                if log_callback: await log_callback(f"[Build] Mocking step {i+1}/3: Compiling assets...")
-                
-            msg = f"[BuildAgent] Mock Build successful: {image_tag}"
-            print(msg)
-            if log_callback: await log_callback(msg)
-            return image_tag
-            
-        if self.registry_url:
-            image_tag = f"{self.registry_url}/{project_name}:latest"
+        result = {
+            "build_command": build_command,
+            "start_command": start_command,
+            "port": port,
+            "framework": framework,
+        }
 
-        msg = f"[BuildAgent] Building {image_tag}..."
-        print(msg)
-        if log_callback: await log_callback(msg)
+        if log_callback:
+            await log_callback(f"[Build] Detected: {framework} — port {port}")
+            await log_callback(f"[Build] Build command: {build_command}")
+            await log_callback(f"[Build] Start command: {start_command}")
 
-        try:
-            image, logs = self.client.images.build(
-                path=project_path, dockerfile="Dockerfile.unideploy", tag=image_tag, rm=True
-            )
-
-            # Simple log processing
-            for log in logs:
-                if "stream" in log:
-                    line = f"[Docker] {log['stream'].strip()}"
-                    print(line)
-                    if log_callback: await log_callback(line)
-            
-            msg = f"[BuildAgent] Build successful: {image_tag}"
-            print(msg)
-            if log_callback: await log_callback(msg)
-            
-        except Exception as e:
-            print(f"[BuildAgent] Build failed: {e}")
-            # Fallback to mock if build fails locally (optional, but good for stability)
-            print(f"[BuildAgent] Falling back to mock build due to error.")
-            return image_tag
-
-
-
-        if self.registry_url:
-            print(f"[BuildAgent] Pushing {image_tag} to registry...")
-            self.client.images.push(image_tag)
-
-        return image_tag
+        print(f"[BuildAgent] Config resolved: {result}")
+        return result
