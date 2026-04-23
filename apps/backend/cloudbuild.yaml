@@ -1,0 +1,54 @@
+steps:
+  # Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${_TAG}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:latest'
+      - '.'
+    dir: 'apps/backend'
+
+  # Push the image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '--all-tags'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}'
+
+  # Deploy to Cloud Run
+  # Firebase credentials are mounted as a file at /secrets/firebase-credentials.json
+  # All other secrets are injected as environment variables
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_SERVICE}'
+      - '--image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${_TAG}'
+      - '--region=${_REGION}'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--port=8000'
+      - '--min-instances=0'
+      - '--max-instances=10'
+      - '--memory=2Gi'
+      - '--cpu=2'
+      - '--timeout=300'
+      - '--concurrency=80'
+      - '--set-secrets=DATABASE_URL=unideploy-db-url:latest,GROQ_API_KEY=unideploy-groq-key:latest,E2B_API_KEY=unideploy-e2b-key:latest,NVIDIA_API_KEY=unideploy-nvidia-key:latest,HF_API_KEY=unideploy-hf-key:latest,/secrets/firebase-credentials.json=unideploy-firebase-creds:latest'
+      - '--set-env-vars=^|^ENVIRONMENT=production|FIREBASE_SERVICE_ACCOUNT_JSON=/secrets/firebase-credentials.json|PREFECT_HOME=/tmp/prefect|ALLOWED_ORIGINS=https://unideploy.in,https://www.unideploy.in'
+
+images:
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${_TAG}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:latest'
+
+substitutions:
+  _REGION: us-central1
+  _REPO: unideploy
+  _SERVICE: unideploy-backend
+  _TAG: latest  # overridden by triggers with $SHORT_SHA; manual runs use 'latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
