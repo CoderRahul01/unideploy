@@ -12,6 +12,7 @@ class User(Base):
     clerk_id = Column(String, unique=True, index=True)
     username = Column(String)
     email = Column(String)
+    credits = Column(Integer, default=200)  # Added for deployment credits
     projects = relationship("Project", back_populates="owner")
 
 
@@ -33,6 +34,7 @@ class Project(Base):
     git_url = Column(String)  # Added for recovery
     tier = Column(String, default="SEED")
     env_vars = Column(JSON)  # Added for secrets/env vars
+    context_memory = Column(JSON, default=dict)  # Added for RecallMax agent context
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="projects")
     deployments = relationship("Deployment", back_populates="project")
@@ -45,6 +47,7 @@ class Deployment(Base):
     status = Column(String)  # queued, building, deploying, live, failed
     image_tag = Column(String)
     domain = Column(String)
+    custom_domain = Column(String)  # Added for production mapping
     sandbox_id = Column(String)  # Added to track live sandboxes
     sandbox_url = Column(String, nullable=True)
     error_message = Column(String, nullable=True)

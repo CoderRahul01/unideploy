@@ -156,16 +156,17 @@ class E2BManager:
                 for f in f_names:
                     files.append(os.path.relpath(os.path.join(root, f), repo_path))
             
-            # Ask Code Interpreter to detect risky patterns
-            analysis_script = f"""
-import json
-files = {json.dumps(files[:100])}
-risks = []
-if any('password' in f.lower() for f in files): risks.append('Hardcoded credentials possibility')
-if any('.env' in f for f in files): risks.append('Environment files detected')
-print(json.dumps({{'risks': risks, 'count': len(files)}}))
-"""
-            res = sbx.commands.run(f"python3 -c \"{analysis_script}\"")
+            # Write script to a file to avoid shell injection via embedded code strings
+            analysis_script = (
+                "import json\n"
+                f"files = {json.dumps(files[:100])}\n"
+                "risks = []\n"
+                "if any('password' in f.lower() for f in files): risks.append('Hardcoded credentials possibility')\n"
+                "if any('.env' in f for f in files): risks.append('Environment files detected')\n"
+                'print(json.dumps({"risks": risks, "count": len(files)}))\n'
+            )
+            sbx.files.write("/tmp/_analyze.py", analysis_script)
+            res = sbx.commands.run("python3 /tmp/_analyze.py")
             sbx.kill()
             
             if res.exit_code == 0:

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { io, Socket } from "socket.io-client";
+import { auth } from "@/lib/firebase";
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8001";
+const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:3001";
 
 interface DeploymentSocketState {
   logs: string[];
@@ -14,62 +16,83 @@ export function useDeploymentSocket(deploymentId: string | null): DeploymentSock
     status: "idle",
     sandboxUrl: null,
   });
-  const wsRef = useRef<WebSocket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     if (!deploymentId) return;
 
     setState({ logs: [], status: "connecting", sandboxUrl: null });
 
-    const ws = new WebSocket(`${WS_URL}/ws/deploy/${deploymentId}`);
-    wsRef.current = ws;
+    let cancelled = false;
+    let socket: Socket;
 
-    ws.onopen = () => {
-      setState((prev) => ({ ...prev, status: "queued" }));
-    };
+    (async () => {
+      if (!auth.currentUser) {
+        setState((prev) => ({
+          ...prev,
+          status: "error",
+          logs: [...prev.logs, "[ERR] Not authenticated — sign in to stream logs"],
+        }));
+        return;
+      }
+      const token = await auth.currentUser.getIdToken();
+      if (cancelled) return;
 
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
+      socket = io(GATEWAY_URL, {
+        auth: { token },
+        transports: ["websocket"],
+      });
+
+      socketRef.current = socket;
+
+      socket.on("connect", () => {
+        setState((prev) => ({ ...prev, status: "connected" }));
+        socket.emit("subscribe_build", deploymentId);
+      });
+
+      socket.on("log", (data: any) => {
+        let parsedData = data;
+        if (typeof data === "string") {
+          try {
+            if (data.startsWith("{")) {
+              parsedData = JSON.parse(data.replace(/'/g, '"'));
+            }
+          } catch (e) {
+            // fallback to literal string
+          }
+        }
 
         setState((prev) => {
           const next = { ...prev };
-
-          if (data.log) {
-            next.logs = [...prev.logs, data.log];
+          if (typeof parsedData === "string") {
+            next.logs = [...prev.logs, parsedData];
+          } else {
+            if (parsedData.log) next.logs = [...next.logs, parsedData.log];
+            if (parsedData.message) next.logs = [...next.logs, `[System] ${parsedData.message}`];
+            if (parsedData.status) next.status = parsedData.status;
+            if (parsedData.sandbox_url) next.sandboxUrl = parsedData.sandbox_url;
           }
-          if (data.message) {
-            next.logs = [...next.logs, `[System] ${data.message}`];
-          }
-          if (data.status) {
-            next.status = data.status;
-          }
-          if (data.sandboxUrl) {
-            next.sandboxUrl = data.sandboxUrl;
-          }
-
           return next;
         });
-      } catch {
-        setState((prev) => ({ ...prev, logs: [...prev.logs, event.data] }));
-      }
-    };
+      });
 
-    ws.onerror = () => {
-      setState((prev) => ({ ...prev, status: "error", logs: [...prev.logs, "[ERR] WebSocket connection failed"] }));
-    };
+      socket.on("connect_error", (err) => {
+        setState((prev) => ({
+          ...prev,
+          status: "error",
+          logs: [...prev.logs, `[ERR] Gateway connection failed: ${err.message}`],
+        }));
+      });
 
-    ws.onclose = () => {
-      setState((prev) =>
-        prev.status !== "live" && prev.status !== "failed"
-          ? { ...prev, status: "disconnected" }
-          : prev
-      );
-    };
+      socket.on("disconnect", () => {
+        setState((prev) => ({ ...prev, status: "disconnected" }));
+      });
+    })();
 
     return () => {
-      ws.close();
-      wsRef.current = null;
+      cancelled = true;
+      socket?.disconnect();
+      socketRef.current = null;
     };
   }, [deploymentId]);
 

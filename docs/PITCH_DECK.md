@@ -28,11 +28,12 @@ A simple platform where you take your code (Zip or GitHub), drop it in, and **BO
 ---
 
 ## 🛠️ How It Works
-**No config files. No AWS Console.**
+**No config files. No cloud console.**
 
-*   **Smart Analysis**: Our AI reads your codebase to detect frameworks and dependencies.
+*   **Smart Analysis**: Our Analyzer Agent reads your codebase to detect frameworks and dependencies automatically.
 *   **Tailored Packages**: AI suggests the perfect infrastructure tier (e.g., "MVP Starter" vs. "High Traffic") based on your domain and expected users.
-*   **One-Click Go**: We handle the builds, domain mapping, and scaling.
+*   **One-Click Go**: We handle the builds, sandbox provisioning, domain mapping, and scaling.
+*   **Always-On Memory**: RecallMax, our long-context AI agent, remembers your project's history across sessions — so your AI assistant gets smarter the more you use it.
 
 ---
 
@@ -41,7 +42,8 @@ Why UniDeploy wins:
 
 1.  **Future-Proof Engineering**: We don't just host; we understand your product's growth path and build the infrastructure to support it.
 2.  **User-Centric Landing**: We guide the user to choose the best way to land their product in the market (Cost vs. Performance).
-3.  **Seamless & Personal**: We provide proactive alerts and a "personal" connection to your deployment process—it feels like a partner, not a robot.
+3.  **Seamless & Personal**: We provide proactive alerts and a "personal" connection to your deployment process — it feels like a partner, not a robot.
+4.  **AI Memory Built-In**: RecallMax agent gives every project an AI assistant with persistent long-term memory, adaptive context compression, and built-in fact verification — not a stateless chatbot.
 
 ---
 

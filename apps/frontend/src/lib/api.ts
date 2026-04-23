@@ -112,6 +112,8 @@ export const projectsApi = {
   },
   deployFromGit: (id: number, repoUrl: string) =>
     api.post(`/deploy/${id}/git`, { repo_url: repoUrl }).then((res) => res.data),
+  deployProduction: (id: string) =>
+    api.post<{ deployment_id: number; status: string }>(`/api/deploy/${id}`).then((res) => res.data),
   analyze: (repoUrl: string) =>
     api.post("/analyze", null, { params: { repo_url: repoUrl } }).then((res) => res.data),
   getGithubRepos: async (token: string) => {
@@ -137,7 +139,9 @@ export const projectsApi = {
       }>("/system/config")
       .then((res) => res.data),
   applyFix: (deploymentId: string) =>
-    api.post(`/deployments/${deploymentId}/apply-fix`).then((res) => res.data),
+    api.post<{ deployment_id: number; status: string; message: string }>(
+      `/deployments/${deploymentId}/apply-fix`
+    ).then((res) => res.data),
   getSystemCost: () =>
     api
       .get<{
@@ -154,6 +158,39 @@ export const projectsApi = {
     api
       .post<{ reply: string }>(`/projects/${id}/chat`, { message, history })
       .then((res) => res.data),
+
+  // Multimodal Agents
+  sendVision: (projectId: string, file: File, mode: "screenshot_to_app" | "error_fix" = "screenshot_to_app") => {
+    const formData = new FormData();
+    formData.append("project_id", projectId);
+    formData.append("image", file);
+    formData.append("mode", mode);
+    return api
+      .post<{ spec: string; mode: string }>("/api/agent/vision", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((res) => res.data);
+  },
+  sendVoice: (projectId: string, file: Blob) => {
+    const formData = new FormData();
+    formData.append("project_id", projectId);
+    formData.append("audio", file, "voice_note.webm");
+    return api
+      .post<{ intent: string }>("/api/agent/voice", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((res) => res.data);
+  },
+  sendDocument: (projectId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("project_id", projectId);
+    formData.append("document", file);
+    return api
+      .post<{ requirements: string }>("/api/agent/document", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((res) => res.data);
+  },
 };
 
 export default api;

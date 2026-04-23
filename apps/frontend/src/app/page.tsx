@@ -16,6 +16,18 @@ import { loginWithGithub, auth } from "@/lib/firebase";
 export default function LandingPage() {
   const router = useRouter();
   const [scrolled, setScrolled] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  const handleSignIn = async () => {
+    setAuthError(null);
+    try {
+      await loginWithGithub();
+    } catch (err: any) {
+      if (err.code !== "auth/popup-closed-by-user") {
+        setAuthError(err.message || "Sign-in failed. Please try again.");
+      }
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -32,6 +44,12 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5]">
+      {authError && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] bg-[#EF4444]/10 border border-[#EF4444]/30 text-[#EF4444] text-xs px-4 py-2.5 rounded-lg flex items-center gap-3 shadow-lg">
+          {authError}
+          <button onClick={() => setAuthError(null)} className="opacity-60 hover:opacity-100">✕</button>
+        </div>
+      )}
       {/* Navbar */}
       <nav
         className={`fixed top-0 left-0 right-0 z-50 h-14 flex items-center justify-between px-6 md:px-12 transition-all ${
@@ -43,7 +61,7 @@ export default function LandingPage() {
           <span className="font-bold text-sm tracking-tight">UniDeploy</span>
         </div>
         <button
-          onClick={loginWithGithub}
+          onClick={handleSignIn}
           className="text-sm text-[#A1A1AA] hover:text-[#F5F5F5] transition-colors px-4 py-1.5 border border-[#2A2A2A] rounded-lg hover:border-[#3A3A3A]"
         >
           Sign in
@@ -70,7 +88,7 @@ export default function LandingPage() {
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
           <button
-            onClick={loginWithGithub}
+            onClick={handleSignIn}
             className="bg-[#00DC82] text-[#0A0A0A] font-bold px-6 py-3 rounded-xl hover:bg-[#00DC82]/90 transition-all text-sm w-full sm:w-auto"
           >
             Start building for free →
@@ -375,7 +393,7 @@ export default function LandingPage() {
                   ))}
                 </ul>
                 <button
-                  onClick={loginWithGithub}
+                  onClick={handleSignIn}
                   className={`w-full py-2.5 rounded-lg text-sm font-semibold transition-all ${
                     highlighted
                       ? "bg-[#00DC82] text-[#0A0A0A] hover:bg-[#00DC82]/90"

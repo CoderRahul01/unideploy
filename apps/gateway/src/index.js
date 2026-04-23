@@ -29,31 +29,20 @@ if (serviceAccountPath) {
 }
 
 const server = http.createServer(app);
-const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : "*";
+const rawOrigins = process.env.ALLOWED_ORIGINS || "http://localhost:3000,http://127.0.0.1:3000,https://unideploy.in,https://www.unideploy.in";
+const allowedOrigins = rawOrigins.split(",").map(o => o.trim());
+
 const io = new Server(server, {
   cors: {
     origin: (origin, callback) => {
-      const allowed = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "https://unideploy.in",
-        "https://www.unideploy.in"
-      ];
-      if (process.env.ALLOWED_ORIGINS) {
-        allowed.push(...process.env.ALLOWED_ORIGINS.split(","));
-      }
-
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
 
-      if (allowed.indexOf(origin) !== -1 || allowed.includes("*")) {
+      if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes("*")) {
         callback(null, true);
       } else {
-        // Optional: for dev, loosen up? No, strict is better for debugging.
-        // callback(new Error('Not allowed by CORS'));
-        // Fallback for now to prevent total breakage if config missing
-        console.warn(`[Gateway] Origin ${origin} not explicitly allowed but proceeding for dev compatibility.`);
-        callback(null, true);
+        console.warn(`[Gateway] Origin ${origin} not in whitelist: ${allowedOrigins.join(", ")}`);
+        callback(null, true); // Fallback for dev, but log warning
       }
     },
     methods: ["GET", "POST"],
@@ -64,21 +53,14 @@ const io = new Server(server, {
 const verifyToken = async (socket, next) => {
   const token = socket.handshake.auth.token;
 
-  // Allow bypass for local development/mocking
-  if (token === "mock-token") {
-    console.warn("[Gateway] Using mock-token bypass for development");
-    socket.user = { email: "local-dev@unideploy.in", uid: "mock-user-123" };
-    return next();
-  }
-
   if (!token) {
-    if (!admin.apps.length) {
-      console.warn("[Gateway] Auth skipped (No Admin SDK)");
-      socket.user = { email: "mock@local" };
-      return next();
-    }
     return next(new Error("Authentication error: No token provided"));
   }
+
+  if (!admin.apps.length) {
+    return next(new Error("Authentication error: Firebase Admin SDK not initialised — check FIREBASE_SERVICE_ACCOUNT_JSON"));
+  }
+
   try {
     const decodedToken = await admin.auth().verifyIdToken(token);
     socket.user = decodedToken;

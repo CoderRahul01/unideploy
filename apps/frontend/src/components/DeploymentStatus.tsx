@@ -14,10 +14,11 @@ import { projectsApi } from "@/lib/api";
 import Terminal from "./Terminal";
 
 export default function DeploymentStatus({
-  deploymentId,
+  deploymentId: initialDeploymentId,
 }: {
   deploymentId: string;
 }) {
+  const [deploymentId, setDeploymentId] = useState(initialDeploymentId);
   const [status, setStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -155,8 +156,9 @@ export default function DeploymentStatus({
                 </p>
 
                 <a
-                  href={`http://${status.domain}`}
+                  href={`https://${status.domain}`}
                   target="_blank"
+                  rel="noopener noreferrer"
                   className="group relative inline-flex items-center justify-center gap-3 px-10 py-5 bg-white text-black font-black rounded-2xl hover:bg-gray-100 transition-all active:scale-95 shadow-xl z-20"
                 >
                   <Globe className="w-5 h-5 group-hover:animate-spin" />
@@ -223,8 +225,10 @@ export default function DeploymentStatus({
                       onClick={async () => {
                         try {
                           setLoading(true);
-                          await projectsApi.applyFix(deploymentId);
-                          // The pipeline will broadcast updates via WS
+                          const res = await projectsApi.applyFix(deploymentId);
+                          // Switch to watching the new retry deployment
+                          setDeploymentId(String(res.deployment_id));
+                          setStatus(null);
                         } catch (err: any) {
                           alert(err.message || "Failed to apply fix");
                           setLoading(false);

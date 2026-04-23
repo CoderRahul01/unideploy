@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, Zap, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
+import { Plus, Zap, ArrowRight, AlertCircle, Loader2, ExternalLink } from "lucide-react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { projectsApi, Project } from "@/lib/api";
@@ -30,6 +30,7 @@ function DashboardInner() {
     maintenance: false,
     daily_limit_mins: 60,
   });
+  const [systemCost, setSystemCost] = useState<{ total_estimated_usd: number; events: any[] } | null>(null);
 
   const fetchConfig = useCallback(async () => {
     try {
@@ -74,6 +75,12 @@ function DashboardInner() {
     );
     return () => clearInterval(interval);
   }, [fetchProjects, fetchConfig, projects.length, user]);
+
+  useEffect(() => {
+    if (activeTab === "settings" && !systemCost) {
+      projectsApi.getSystemCost().then(setSystemCost).catch(() => {});
+    }
+  }, [activeTab, systemCost]);
 
   useEffect(() => {
     if (searchParams.get("showCreate") === "true") {
@@ -144,6 +151,46 @@ function DashboardInner() {
 
           {activeTab === "analytics" ? (
             <PulseDashboard />
+          ) : activeTab === "settings" ? (
+            <div className="max-w-2xl space-y-6">
+              <h2 className="text-base font-semibold text-[#F5F5F5]">Account</h2>
+              <div className="rounded-xl bg-[#111111] border border-[#2A2A2A] divide-y divide-[#2A2A2A]">
+                <div className="px-5 py-4 flex justify-between items-center">
+                  <span className="text-xs text-[#A1A1AA]">Email</span>
+                  <span className="text-sm text-[#F5F5F5]">{user.email ?? "—"}</span>
+                </div>
+                <div className="px-5 py-4 flex justify-between items-center">
+                  <span className="text-xs text-[#A1A1AA]">User ID</span>
+                  <span className="text-xs font-mono text-[#52525B]">{user.uid}</span>
+                </div>
+                <div className="px-5 py-4 flex justify-between items-center">
+                  <span className="text-xs text-[#A1A1AA]">Plan</span>
+                  <span className="text-sm text-[#00DC82] font-semibold">
+                    {sysConfig.maintenance ? "Maintenance" : "Active"}
+                  </span>
+                </div>
+                <div className="px-5 py-4 flex justify-between items-center">
+                  <span className="text-xs text-[#A1A1AA]">Daily Runtime Limit</span>
+                  <span className="text-sm text-[#F5F5F5]">{sysConfig.daily_limit_mins} min</span>
+                </div>
+              </div>
+
+              <h2 className="text-base font-semibold text-[#F5F5F5]">Usage &amp; Credits</h2>
+              <div className="rounded-xl bg-[#111111] border border-[#2A2A2A] divide-y divide-[#2A2A2A]">
+                <div className="px-5 py-4 flex justify-between items-center">
+                  <span className="text-xs text-[#A1A1AA]">Estimated Spend</span>
+                  <span className="text-sm text-[#F5F5F5]">
+                    {systemCost ? `$${systemCost.total_estimated_usd.toFixed(4)}` : <Loader2 className="w-3 h-3 animate-spin inline" />}
+                  </span>
+                </div>
+                <div className="px-5 py-4 flex justify-between items-center">
+                  <span className="text-xs text-[#A1A1AA]">Billing Events</span>
+                  <span className="text-sm text-[#F5F5F5]">
+                    {systemCost ? systemCost.events.length : "—"}
+                  </span>
+                </div>
+              </div>
+            </div>
           ) : activeDeployment ? (
             <div className="space-y-8">
               <button
@@ -155,6 +202,69 @@ function DashboardInner() {
               </button>
               <DeploymentStatus deploymentId={activeDeployment} />
             </div>
+          ) : activeTab === "deployments" ? (
+            <>
+              <h2 className="text-base font-semibold mb-5 text-[#F5F5F5]">Deployments</h2>
+              {projects.length === 0 ? (
+                <div className="py-16 text-center border border-dashed border-[#2A2A2A] rounded-xl">
+                  <Zap className="w-8 h-8 mx-auto mb-4 text-[#52525B]" />
+                  <p className="text-[#A1A1AA] text-sm">No deployments yet.</p>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-[#2A2A2A] overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[#2A2A2A] bg-[#111111]">
+                        <th className="text-left px-5 py-3 text-xs text-[#52525B] font-medium">Project</th>
+                        <th className="text-left px-5 py-3 text-xs text-[#52525B] font-medium">Status</th>
+                        <th className="text-left px-5 py-3 text-xs text-[#52525B] font-medium">Last Deployed</th>
+                        <th className="text-left px-5 py-3 text-xs text-[#52525B] font-medium">URL</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#2A2A2A]">
+                      {projects.map((p) => (
+                        <tr
+                          key={p.id}
+                          onClick={() => p.latest_deployment_id && setActiveDeployment(p.latest_deployment_id.toString())}
+                          className={`bg-[#0A0A0A] hover:bg-[#111111] transition-colors ${p.latest_deployment_id ? "cursor-pointer" : "opacity-50"}`}
+                        >
+                          <td className="px-5 py-3 font-medium text-[#F5F5F5]">{p.name}</td>
+                          <td className="px-5 py-3">
+                            <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${
+                              p.status === "RUNNING" ? "bg-[#00DC82]/10 text-[#00DC82]" :
+                              p.status === "SLEEPING" ? "bg-[#52525B]/20 text-[#52525B]" :
+                              "bg-[#F59E0B]/10 text-[#F59E0B]"
+                            }`}>
+                              {p.status === "RUNNING" && <span className="w-1.5 h-1.5 rounded-full bg-[#00DC82] animate-pulse" />}
+                              {p.status}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3 text-[#A1A1AA] text-xs">
+                            {p.last_deployed ? new Date(p.last_deployed).toLocaleDateString() : "—"}
+                          </td>
+                          <td className="px-5 py-3">
+                            {p.domain ? (
+                              <a
+                                href={`https://${p.domain}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="flex items-center gap-1 text-xs text-[#00DC82] hover:underline"
+                              >
+                                {p.domain}
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            ) : (
+                              <span className="text-xs text-[#52525B]">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">

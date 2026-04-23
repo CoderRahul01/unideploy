@@ -1,4 +1,4 @@
-from clients.groq_client import GroqClient
+from clients.model_router import router, TaskType
 from agents.memory_agent import MemoryAgent
 import re
 
@@ -10,7 +10,6 @@ class AutoFixAgent:
     """
 
     def __init__(self):
-        self.groq = GroqClient()
         self.memory = MemoryAgent()
 
     async def analyze_and_fix(self, project_id: int, error_log: str):
@@ -28,7 +27,7 @@ class AutoFixAgent:
         query = f"Error in {focus_file}: {error_log[-500:]}" # Use last 500 chars of log as query
         context = self.memory.retrieve_context(query, project_id)
         
-        # 3. Formulate Prompt for Brain (Groq)
+        # 3. Formulate Prompt for Brain
         prompt = self._build_prompt(error_log, context)
         
         # 4. Generate Fix
@@ -36,7 +35,7 @@ class AutoFixAgent:
             {"role": "system", "content": "You are UniDeploy's expert debug agent. Generate a precise fix for the following error."},
             {"role": "user", "content": prompt}
         ]
-        fix_suggestion = self.groq.chat_completion(messages)
+        fix_suggestion = await router.route(TaskType.CODE_GENERATION, messages)
         
         # 5. Verify Fix (E2B Code Interpreter)
         from builder.e2b_manager import E2BManager

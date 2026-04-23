@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { Terminal as TerminalIcon } from "lucide-react";
+import { auth } from "@/lib/firebase";
 
 interface TerminalProps {
     deploymentId: string;
@@ -13,30 +14,38 @@ export default function Terminal({ deploymentId }: TerminalProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        // 1. Connect to Gateway (Socket.io)
-        // In PROD, use env var. In DEV, assume localhost:3001
         const GATEWAY_URL =
             process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:3001";
 
-        console.log(`[Terminal] Connecting to ${GATEWAY_URL}...`);
+        let cancelled = false;
+        let socket: ReturnType<typeof io>;
 
-        const socket = io(GATEWAY_URL, {
-            auth: {
-                token: "mock-token", // In real app, pass firebase token
-            },
-        });
+        (async () => {
+            if (!auth.currentUser) {
+                setLogs(["[ERR] Not authenticated — sign in to stream logs"]);
+                return;
+            }
+            const token = await auth.currentUser.getIdToken();
+            if (cancelled) return;
 
-        socket.on("connect", () => {
-            console.log("[Terminal] Connected to Gateway");
-            socket.emit("subscribe_build", deploymentId);
-        });
+            socket = io(GATEWAY_URL, { auth: { token }, transports: ["websocket"] });
 
-        socket.on("log", (message: string) => {
-            setLogs((prev) => [...prev, message]);
-        });
+            socket.on("connect", () => {
+                socket.emit("subscribe_build", deploymentId);
+            });
+
+            socket.on("log", (message: string) => {
+                setLogs((prev) => [...prev, message]);
+            });
+
+            socket.on("connect_error", (err) => {
+                setLogs((prev) => [...prev, `[ERR] ${err.message}`]);
+            });
+        })();
 
         return () => {
-            socket.disconnect();
+            cancelled = true;
+            socket?.disconnect();
         };
     }, [deploymentId]);
 

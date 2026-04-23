@@ -4,6 +4,7 @@ from fastapi import (
     HTTPException,
     UploadFile,
     File,
+    Form,
     WebSocket,
     WebSocketDisconnect,
     Depends,
@@ -30,13 +31,36 @@ from core.orchestrator import deployment_flow
 from database import get_db, engine
 from utils.cost_manager import CostManager
 from guards import SystemGuard, StateAuthority, StateMachine
+
+from clients.model_router import router, TaskType
+from clients.vision_agent import vision_agent
+from clients.audio_agent import audio_agent
+from clients.document_agent import document_agent
+
 import models
 import schemas
 from logging_utils import log_intent
 from datetime import datetime
+from pathlib import Path
 from dotenv import load_dotenv
 import firebase_admin
 from firebase_admin import auth, credentials
+
+# ── Upload security constants ────────────────────────────────────────────────
+_ALLOWED_IMAGE_MIME = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+_ALLOWED_AUDIO_MIME = {"audio/webm", "audio/mp4", "audio/mpeg", "audio/wav", "audio/ogg"}
+_ALLOWED_DOC_MIME   = {"application/pdf"}
+_MAX_UPLOAD_BYTES   = 10 * 1024 * 1024  # 10 MB
+
+def _safe_filename(name: str) -> str:
+    """Strip path-traversal chars and return a plain basename."""
+    return Path(name).name or "upload"
+
+def _cleanup(path: str) -> None:
+    try:
+        shutil.rmtree(path, ignore_errors=True)
+    except Exception:
+        pass
 
 load_dotenv()
 
@@ -60,7 +84,7 @@ else:
 
 async def get_current_user(authorization: str = Header(None), db: Session = Depends(get_db)):
     if not authorization:
-        return {"id": 1, "username": "mock_user", "email": "mock@local"}
+        raise HTTPException(status_code=401, detail="Authorization header required")
 
     token = authorization.replace("Bearer ", "")
 
@@ -118,14 +142,8 @@ async def startup_event():
 
 
 # CORS Setup
-raw_origins = os.getenv("ALLOWED_ORIGINS", "")
-origins = [o.strip() for o in raw_origins.split(",")] if raw_origins else [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://unideploy.in",
-    "https://www.unideploy.in",
-    "https://api.unideploy.in",
-]
+raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000,https://unideploy.in,https://www.unideploy.in,https://api.unideploy.in")
+origins = [o.strip() for o in raw_origins.split(",")]
 
 
 @app.middleware("http")
@@ -177,8 +195,8 @@ async def create_project(
 
 
 @app.get("/projects", response_model=List[schemas.Project])
-async def list_projects(db: Session = Depends(get_db)):
-    db_projects = db.query(models.Project).all()
+async def list_projects(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    db_projects = db.query(models.Project).filter(models.Project.owner_id == user["id"]).all()
     for p in db_projects:
         effective_status = StateAuthority.get_effective_state(p, None)
         if p.status != effective_status and p.status not in ["WAKING", "CREATED"]:
@@ -197,8 +215,11 @@ async def list_projects(db: Session = Depends(get_db)):
 
 
 @app.get("/projects/{project_id}", response_model=schemas.Project)
-async def get_project(project_id: int, db: Session = Depends(get_db)):
-    project = db.query(models.Project).filter(models.Project.id == project_id).first()
+async def get_project(project_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    project = db.query(models.Project).filter(
+        models.Project.id == project_id,
+        models.Project.owner_id == user["id"],
+    ).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     last_deploy = (
@@ -228,12 +249,23 @@ async def project_chat(
     message = payload.get("message", "")
     history = payload.get("history", [])
 
-    project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    project = db.query(models.Project).filter(
+        models.Project.id == project_id,
+        models.Project.owner_id == user["id"],
+    ).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    from clients.llm_client import LLMClient
-    llm = LLMClient()
+    from agents.recallmax_agent import RecallMaxAgent
+    recallmax = RecallMaxAgent()
+
+    current_memory = project.context_memory or {}
+    updated_memory, retained_history = await recallmax.compress_history(current_memory, history)
+
+    # Save newly compressed memory if changed
+    if str(updated_memory) != str(current_memory):
+        project.context_memory = updated_memory
+        db.commit()
 
     project_type = project.project_type or "unknown"
     system_prompt = (
@@ -241,22 +273,180 @@ async def project_chat(
         "Help the user understand and modify their code. Be concise and practical."
     )
 
-    messages = [{"role": "system", "content": system_prompt}]
-    for h in history[-10:]:
+    # Inject context memory seamlessly into the system prompt
+    system_prompt_with_context = recallmax.inject_context(updated_memory, system_prompt)
+
+    messages = [{"role": "system", "content": system_prompt_with_context}]
+    
+    # We only inject the retained uncompressed portion
+    for h in retained_history[-10:]:
         if h.get("role") in ("user", "assistant"):
             messages.append({"role": h["role"], "content": h["content"]})
     messages.append({"role": "user", "content": message})
 
-    reply = llm.chat_completion(messages)
+    # Use the ModelRouter for inference
+    reply = await router.route(TaskType.CODE_GENERATION, messages)
+    
     if not reply:
         reply = "I'm currently unavailable. Please check back in a moment."
 
     return {"reply": reply}
 
 
+@app.post("/api/agent/vision")
+async def agent_vision(
+    background_tasks: BackgroundTasks,
+    project_id: int = Form(...),
+    mode: str = Form("screenshot_to_app"),
+    image: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Image/screenshot -> code spec -> build in sandbox"""
+    content = await image.read()
+    if len(content) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Image exceeds 10 MB limit")
+    if image.content_type not in _ALLOWED_IMAGE_MIME:
+        raise HTTPException(status_code=415, detail=f"Unsupported image type: {image.content_type}")
+
+    temp_dir = f"/tmp/unideploy-multimodal/{uuid.uuid4()}"
+    os.makedirs(temp_dir, exist_ok=True)
+    file_path = os.path.join(temp_dir, _safe_filename(image.filename or "upload.jpg"))
+    with open(file_path, "wb") as buf:
+        buf.write(content)
+
+    background_tasks.add_task(_cleanup, temp_dir)
+
+    if mode == "screenshot_to_app":
+        spec = await vision_agent.screenshot_to_spec(file_path)
+        background_tasks.add_task(handle_multimodal_intent, project_id, spec, db)
+        return {"spec": spec, "mode": mode, "status": "processing"}
+    else:
+        # Error Fix Mode — run synchronously so the fix is returned as a chat reply
+        error_text = await vision_agent.error_screenshot_to_text(file_path)
+        from agents.autofix_agent import AutoFixAgent
+        autofix = AutoFixAgent()
+        fix = await autofix.analyze_and_fix(project_id, error_text)
+        return {"spec": fix["suggestion"], "mode": mode, "status": "fixed"}
+
+
+@app.post("/api/agent/voice")
+async def agent_voice(
+    background_tasks: BackgroundTasks,
+    project_id: int = Form(...),
+    audio: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Voice note -> transcribe -> intent -> code -> sandbox"""
+    content = await audio.read()
+    if len(content) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Audio exceeds 10 MB limit")
+    if audio.content_type not in _ALLOWED_AUDIO_MIME:
+        raise HTTPException(status_code=415, detail=f"Unsupported audio type: {audio.content_type}")
+
+    temp_dir = f"/tmp/unideploy-multimodal/{uuid.uuid4()}"
+    os.makedirs(temp_dir, exist_ok=True)
+    file_path = os.path.join(temp_dir, _safe_filename(audio.filename or "voice.webm"))
+    with open(file_path, "wb") as buf:
+        buf.write(content)
+
+    background_tasks.add_task(_cleanup, temp_dir)
+
+    intent = await audio_agent.voice_to_intent(file_path)
+    background_tasks.add_task(handle_multimodal_intent, project_id, intent, db)
+    return {"intent": intent, "status": "processing"}
+
+
+@app.post("/api/agent/document")
+async def agent_document(
+    background_tasks: BackgroundTasks,
+    project_id: int = Form(...),
+    document: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """PDF spec -> requirements -> code -> sandbox"""
+    content = await document.read()
+    if len(content) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Document exceeds 10 MB limit")
+    if document.content_type not in _ALLOWED_DOC_MIME:
+        raise HTTPException(status_code=415, detail=f"Unsupported document type: {document.content_type}")
+
+    temp_dir = f"/tmp/unideploy-multimodal/{uuid.uuid4()}"
+    os.makedirs(temp_dir, exist_ok=True)
+    file_path = os.path.join(temp_dir, _safe_filename(document.filename or "spec.pdf"))
+    with open(file_path, "wb") as buf:
+        buf.write(content)
+
+    background_tasks.add_task(_cleanup, temp_dir)
+
+    requirements = await document_agent.doc_to_requirements(file_path)
+    background_tasks.add_task(handle_multimodal_intent, project_id, requirements, db)
+    return {"requirements": requirements, "status": "processing"}
+
+
+async def handle_multimodal_intent(project_id: int, intent: str, db: Session):
+    """
+    Bridge between multimodal extraction and the code-writing agents.
+    Generates code using the model router and broadcasts it as a chat reply.
+    """
+    project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not project:
+        return
+
+    notify = get_notify_agent()
+
+    await notify.broadcast_status(str(project_id), {
+        "type": "agent_action",
+        "status": "thinking",
+        "message": "Analysing multimodal input and generating code...",
+    })
+
+    system_prompt = (
+        f"You are a coding assistant for a {project.project_type or 'web'} project "
+        f"named '{project.name}'. The user has provided a multimodal specification "
+        "(extracted from a screenshot, voice note, or document). "
+        "Generate precise, ready-to-use code that implements what is described. "
+        "Include file paths, complete code blocks, and a brief explanation."
+    )
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": intent},
+    ]
+
+    try:
+        reply = await router.route(TaskType.CODE_GENERATION, messages)
+    except Exception as e:
+        print(f"[Multimodal] Code generation failed for project {project_id}: {e}")
+        await notify.broadcast_status(str(project_id), {
+            "type": "chat_reply",
+            "role": "assistant",
+            "content": f"Failed to generate code: {e}",
+            "status": "error",
+        })
+        return
+
+    await notify.broadcast_status(str(project_id), {
+        "type": "chat_reply",
+        "role": "assistant",
+        "content": reply,
+        "status": "ready",
+    })
+
+    print(f"[Multimodal] Code generated for project {project_id}")
+
+
 @app.get("/projects/{project_id}/files")
-async def get_project_files(project_id: int, db: Session = Depends(get_db)):
+async def get_project_files(project_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
     """Returns the file tree from the live E2B sandbox."""
+    project = db.query(models.Project).filter(
+        models.Project.id == project_id,
+        models.Project.owner_id == user["id"],
+    ).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
     live_deploy = (
         db.query(models.Deployment)
         .filter(
@@ -323,11 +513,14 @@ async def analyze_zip(file: UploadFile = File(...), user=Depends(get_current_use
 
 @app.post("/projects/{project_id}/start")
 async def start_project(
-    project_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
+    project_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
 ):
     project = (
         db.query(models.Project)
-        .filter(models.Project.id == project_id)
+        .filter(models.Project.id == project_id, models.Project.owner_id == user["id"])
         .with_for_update()
         .first()
     )
@@ -377,50 +570,163 @@ async def start_project(
         raise HTTPException(status_code=500, detail=f"Failed to start: {e}")
 
 
-@app.post("/deploy/{project_id}")
-@limiter.limit("5/minute")
-async def trigger_deploy(
-    request: Request,
+from builder.deploy_agent import deploy_agent as production_deploy_agent
+from core.credit_guard import credit_guard
+
+@app.post("/api/deploy/{project_id}")
+async def deploy_project_production(
     project_id: int,
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
+    user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    can_build, build_msg = SystemGuard.can_build_project(db)
-    if not can_build:
-        log_intent(project_id, 1, "DEPLOY", "REJECTED", build_msg)
-        raise HTTPException(status_code=503, detail=build_msg)
+    """
+    Triggers a production deployment to Google Cloud Run.
+    Consumes 100 credits.
+    """
+    # 1. Guard — raises 402 if not enough credits, deducts if enough
+    await credit_guard.check_and_deduct(user["id"], project_id, db)
 
-    if not file:
-        raise HTTPException(status_code=400, detail="No file uploaded")
+    # 2. Get the active sandbox for this project
+    # We find the latest live deployment to E2B
+    last_deploy = (
+        db.query(models.Deployment)
+        .filter(
+            models.Deployment.project_id == project_id,
+            models.Deployment.status == "live",
+            models.Deployment.sandbox_id != None
+        )
+        .order_by(models.Deployment.created_at.desc())
+        .first()
+    )
 
-    success, msg = SystemGuard.validate_upload(file.size or 0)
-    if not success:
-        log_intent(project_id, 1, "DEPLOY", "REJECTED", msg)
-        raise HTTPException(status_code=413, detail=msg)
+    if not last_deploy or not last_deploy.sandbox_id:
+        # Refund credits if no sandbox found
+        await credit_guard.refund(user["id"], project_id, db)
+        raise HTTPException(status_code=400, detail="No active sandbox found for this project. Please build it first.")
 
-    db_deploy = models.Deployment(project_id=project_id, status="queued")
-    db.add(db_deploy)
+    # 3. Create production deployment record
+    prod_deploy = models.Deployment(
+        project_id=project_id,
+        status="building",
+    )
+    db.add(prod_deploy)
     db.commit()
-    db.refresh(db_deploy)
+    db.refresh(prod_deploy)
 
-    os.makedirs(f"/tmp/unideploy/{db_deploy.id}", exist_ok=True)
-    temp_path = f"/tmp/unideploy/{db_deploy.id}/source.zip"
-    with open(temp_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    # 4. Broadcast status via WebSocket
+    await notify_agent.broadcast_status(str(project_id), {
+        "type": "deploy_status",
+        "status": "building",
+        "deployment_id": str(prod_deploy.id),
+        "message": "Starting production build on Google Cloud..."
+    })
 
-    project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    # 5. Run deploy in background
+    background_tasks.add_task(
+        _run_production_deploy,
+        project_id, last_deploy.sandbox_id, prod_deploy.id, user["id"], db
+    )
+
+    return {"deployment_id": prod_deploy.id, "status": "building"}
+
+
+async def _run_production_deploy(project_id: int, sandbox_id: str, deployment_id: int, user_id: int, db: Session):
+    try:
+        result = await production_deploy_agent.deploy(str(project_id), sandbox_id)
+
+        # Update deployment record
+        dep = db.query(models.Deployment).filter(models.Deployment.id == deployment_id).first()
+        dep.status = "live"
+        dep.sandbox_url = result["url"]
+        dep.custom_domain = result["custom_domain"]
+        db.commit()
+
+        # Broadcast success
+        await notify_agent.broadcast_status(str(project_id), {
+            "type": "deploy_status",
+            "status": "live",
+            "url": result["url"],
+            "custom_domain": result["custom_domain"],
+            "message": "Production deployment is LIVE!"
+        })
+
+    except Exception as e:
+        print(f"[ProductionDeploy] Failed: {e}")
+        # Refund credits on failure
+        from database import SessionLocal
+        inner_db = SessionLocal()
+        try:
+            await credit_guard.refund(user_id, project_id, inner_db)
+            
+            dep = inner_db.query(models.Deployment).filter(models.Deployment.id == deployment_id).first()
+            if dep:
+                dep.status = "failed"
+                dep.error_message = str(e)
+                inner_db.commit()
+
+            await notify_agent.broadcast_status(str(project_id), {
+                "type": "deploy_status",
+                "status": "failed",
+                "error": str(e),
+                "message": f"Production deployment failed: {str(e)}"
+            })
+        finally:
+            inner_db.close()
+
+
+@app.post("/deployments/{deployment_id}/apply-fix")
+async def apply_deployment_fix(
+    deployment_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """
+    Triggered from the UI when a deployment has failed and the user wants to
+    apply the AI-suggested fix and re-deploy.
+    """
+    dep = db.query(models.Deployment).filter(models.Deployment.id == deployment_id).first()
+    if not dep:
+        raise HTTPException(status_code=404, detail="Deployment not found")
+
+    # Verify ownership through the project
+    project = db.query(models.Project).filter(
+        models.Project.id == dep.project_id,
+        models.Project.owner_id == user["id"],
+    ).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    background_tasks.add_task(
-        deployment_flow,
-        deployment_id=db_deploy.id,
-        project_name=project.name,
-        project_path=f"/tmp/unideploy/{db_deploy.id}",
-    )
+    if dep.status != "failed":
+        raise HTTPException(status_code=400, detail="Deployment is not in a failed state")
 
-    return {"deployment_id": db_deploy.id, "status": "queued"}
+    error_log = dep.error_message or "Unknown build error"
+
+    # Create a new deployment record for the retry
+    retry_dep = models.Deployment(project_id=dep.project_id, status="queued")
+    db.add(retry_dep)
+    db.commit()
+    db.refresh(retry_dep)
+
+    async def _fix_and_redeploy():
+        from agents.autofix_agent import AutoFixAgent
+        autofix = AutoFixAgent()
+        fix = await autofix.analyze_and_fix(dep.project_id, error_log)
+        # Broadcast the fix suggestion before re-deploying
+        await notify_agent.broadcast_status(str(retry_dep.id), {
+            "type": "autofix",
+            "suggestion": fix.get("suggestion", ""),
+            "message": "Applying AI fix and redeploying...",
+        })
+        await deployment_flow(
+            deployment_id=retry_dep.id,
+            project_name=project.name,
+            repo_url=project.git_url,
+        )
+
+    background_tasks.add_task(_fix_and_redeploy)
+    return {"deployment_id": retry_dep.id, "status": "queued", "message": "Fix applied, redeploying..."}
 
 
 @app.get("/deployments/{deployment_id}", response_model=schemas.Deployment)
@@ -436,10 +742,10 @@ async def get_deployment_status(deployment_id: int, db: Session = Depends(get_db
 
 
 @app.post("/projects/{project_id}/stop")
-async def stop_project(project_id: int, db: Session = Depends(get_db)):
+async def stop_project(project_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
     project = (
         db.query(models.Project)
-        .filter(models.Project.id == project_id)
+        .filter(models.Project.id == project_id, models.Project.owner_id == user["id"])
         .with_for_update()
         .first()
     )
@@ -535,6 +841,7 @@ async def deploy_git(
     payload: dict,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    user=Depends(get_current_user),
 ):
     repo_url = payload.get("repo_url")
     if not repo_url:
@@ -544,14 +851,23 @@ async def deploy_git(
     if not can_build:
         raise HTTPException(status_code=503, detail=build_msg)
 
+    # Deduct credits for standard build (e.g., 20 credits)
+    # We use check_and_deduct which will handle the cost based on tier
+    # but maybe standard builds are cheaper. For now, let's keep it consistent
+    # or add a specific build_cost.
+    await credit_guard.check_and_deduct(user["id"], project_id, db)
+
+    project = db.query(models.Project).filter(
+        models.Project.id == project_id,
+        models.Project.owner_id == user["id"],
+    ).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
     db_deploy = models.Deployment(project_id=project_id, status="queued")
     db.add(db_deploy)
     db.commit()
     db.refresh(db_deploy)
-
-    project = db.query(models.Project).filter(models.Project.id == project_id).first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
 
     background_tasks.add_task(
         deployment_flow,

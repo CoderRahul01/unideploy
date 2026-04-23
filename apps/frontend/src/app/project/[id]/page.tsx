@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
-import { ChevronRight, ChevronDown, Send, GitBranch, Globe, Lock } from "lucide-react";
+import { ChevronRight, ChevronDown, Send, GitBranch, Globe, Lock, AlertCircle, X } from "lucide-react";
 import { projectsApi, FileNode, ChatMessage } from "@/lib/api";
 import { useDeploymentSocket } from "@/lib/useDeploymentSocket";
 import TerminalOutput from "@/components/ui/TerminalOutput";
 import SandboxStatusBadge from "@/components/ui/SandboxStatusBadge";
+import MultimodalInputBar from "@/components/ui/MultimodalInputBar";
 
 function FileTreeNode({
   node,
@@ -91,11 +92,12 @@ export default function ProjectIDEPage() {
   const [centreTab, setCentreTab] = useState<"chat" | "editor">("chat");
   const [rightTab, setRightTab] = useState<"preview" | "terminal">("terminal");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [fileTree, setFileTree] = useState<FileNode[]>([]);
   const [fileStatus, setFileStatus] = useState<"offline" | "live" | "loading">("loading");
   const [deploymentId, setDeploymentId] = useState<string | null>(null);
+  const [showCreditModal, setShowCreditModal] = useState(false);
+  const [creditModalData, setCreditModalData] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { logs, status: deployStatus, sandboxUrl } = useDeploymentSocket(deploymentId);
@@ -137,62 +139,18 @@ export default function ProjectIDEPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
-
-    const userMessage: ChatMessage = {
-      id: `msg-${Date.now()}`,
-      role: "user",
-      content: input,
-      timestamp: new Date().toISOString(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
-    setIsTyping(true);
-
-    try {
-      const { reply } = await projectsApi.sendChatMessage(
-        projectId,
-        input,
-        messages.slice(-10)
-      );
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `msg-${Date.now()}`,
-          role: "assistant",
-          content: reply,
-          timestamp: new Date().toISOString(),
-        },
-      ]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `msg-${Date.now()}`,
-          role: "assistant",
-          content: "Sorry, I couldn't process that request. Please try again.",
-          timestamp: new Date().toISOString(),
-        },
-      ]);
-    } finally {
-      setIsTyping(false);
-    }
-  };
-
   const handleDeploy = async () => {
     try {
-      const project = await projectsApi.getProject(projectId);
-      if (!project.git_url) {
-        alert("No git URL configured for this project.");
-        return;
-      }
-      const result = await projectsApi.deployFromGit(Number(projectId), project.git_url);
+      const result = await projectsApi.deployProduction(projectId);
       setDeploymentId(String(result.deployment_id));
       setRightTab("terminal");
     } catch (err: any) {
-      alert(err?.message || "Failed to trigger deployment.");
+      if (err.response?.status === 402) {
+        setCreditModalData(err.response.data.detail);
+        setShowCreditModal(true);
+      } else {
+        alert(err?.message || "Failed to trigger production deployment.");
+      }
     }
   };
 
@@ -313,22 +271,33 @@ export default function ProjectIDEPage() {
                 <div ref={messagesEndRef} />
               </div>
               <div className="p-4 border-t border-[#2A2A2A]">
-                <div className="flex gap-2">
-                  <input
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-                    placeholder="Describe a change..."
-                    className="flex-1 bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm text-[#F5F5F5] placeholder-[#52525B] focus:outline-none focus:border-[#00DC82]/50"
-                  />
-                  <button
-                    onClick={handleSend}
-                    disabled={isTyping || !input.trim()}
-                    className="bg-[#00DC82] text-[#0A0A0A] p-2 rounded-lg hover:bg-[#00DC82]/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Send className="w-4 h-4" />
-                  </button>
-                </div>
+                <MultimodalInputBar
+                  projectId={projectId}
+                  isTyping={isTyping}
+                  setIsTyping={setIsTyping}
+                  onUserMessage={(content) => {
+                    setMessages((prev) => [
+                      ...prev,
+                      {
+                        id: `msg-${Date.now()}`,
+                        role: "user",
+                        content,
+                        timestamp: new Date().toISOString(),
+                      },
+                    ]);
+                  }}
+                  onAssistantReply={(reply) => {
+                    setMessages((prev) => [
+                      ...prev,
+                      {
+                        id: `msg-${Date.now()}`,
+                        role: "assistant",
+                        content: reply,
+                        timestamp: new Date().toISOString(),
+                      },
+                    ]);
+                  }}
+                />
               </div>
             </div>
           ) : (
@@ -391,6 +360,38 @@ export default function ProjectIDEPage() {
           )}
         </div>
       </div>
+
+      {/* Credit Modal */}
+      {showCreditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-[#111111] border border-[#2A2A2A] rounded-2xl w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-6">
+                <div className="p-3 bg-[#00DC82]/10 rounded-xl">
+                  <AlertCircle className="w-6 h-6 text-[#00DC82]" />
+                </div>
+                <button onClick={() => setShowCreditModal(false)} className="text-[#52525B] hover:text-[#F5F5F5] transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <h3 className="text-xl font-bold mb-2">Insufficient Credits</h3>
+              <p className="text-[#A1A1AA] text-sm leading-relaxed mb-6">
+                You need <span className="text-[#F5F5F5] font-semibold">{creditModalData?.required} credits</span> to push to production. 
+                Your current balance is <span className="text-[#F5F5F5] font-semibold">{creditModalData?.available} credits</span>.
+              </p>
+              
+              <div className="space-y-3">
+                <button className="w-full bg-[#00DC82] text-[#0A0A0A] font-bold py-3 rounded-xl hover:bg-[#00DC82]/90 transition-all flex items-center justify-center gap-2">
+                  Top Up Credits
+                </button>
+                <button onClick={() => setShowCreditModal(false)} className="w-full bg-transparent text-[#A1A1AA] font-medium py-3 rounded-xl hover:bg-[#1A1A1A] transition-all">
+                  Maybe Later
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
