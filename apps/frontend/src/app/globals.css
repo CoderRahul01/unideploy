@@ -1,16 +1,186 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   UniDeploy Design System
+   Inspired by skyping.app — warm, calm, minimal, trustworthy dev tool.
+   ═══════════════════════════════════════════════════════════════════════ */
+
 @import "tailwindcss";
 
+/* ── Design Tokens ──────────────────────────────────────────────────── */
+
 :root {
-  --font-geist-sans: '';
-  --font-geist-mono: '';
+  /* Backgrounds */
+  --bg-primary: #eeecc0;
+  --bg-terminal: #141f14;
+  --bg-terminal-text: #c8d8b0;
+
+  /* Text */
+  --text-primary: #1a1f0e;
+  --text-secondary: #5c6340;
+  --text-muted: #8a9070;
+
+  /* Accents */
+  --accent-green: #5c7a3e;
+  --accent-live: #6db84a;
+  --accent-critical: #c94040;
+  --accent-high: #c47a20;
+  --accent-medium: #8a9070;
+
+  /* Borders */
+  --border: #d4d9b8;
+  --border-focus: #5c7a3e;
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+
+  /* Dashboard-only dark palette (scoped via .dashboard) */
+  --dash-bg: #0f1410;
+  --dash-surface: #161d16;
+  --dash-border: #2a3a2a;
+  --dash-text: #e8f0d8;
+  --dash-muted: #6a7a5a;
 }
 
-@theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ── Base Reset ─────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 body {
-  background: #0A0A0A;
-  color: #F5F5F5;
+  font-family: var(--font-body), "DM Sans", sans-serif;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  line-height: 1.5;
+}
+
+/* ── Utility: Badge ─────────────────────────────────────────────────── */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* ── Utility: Terminal Block ────────────────────────────────────────── */
+
+.terminal-block {
+  background: var(--bg-terminal);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  font-family: var(--font-mono), "JetBrains Mono", monospace;
+  color: var(--bg-terminal-text);
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-x: auto;
+}
+
+.terminal-dots {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.terminal-dot-red {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff5f57;
+}
+
+.terminal-dot-amber {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffbd2e;
+}
+
+.terminal-dot-green {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #28ca42;
+}
+
+/* ── Utility: Status Dot ────────────────────────────────────────────── */
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Utility: Section Divider ───────────────────────────────────────── */
+
+.section-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--border);
+  border: none;
+}
+
+/* ── OTP Shake Animation ────────────────────────────────────────────── */
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+.shake {
+  animation: shake 0.4s ease-in-out;
+}
+
+/* ── Cursor Blink ───────────────────────────────────────────────────── */
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.cursor-blink {
+  animation: blink 1.1s step-end infinite;
+}
+
+/* ── Step Counter Fade-In ───────────────────────────────────────────── */
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.5s ease-out forwards;
 }

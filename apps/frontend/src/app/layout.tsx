@@ -1,13 +1,49 @@
 import type { Metadata } from "next";
-import { GeistSans } from "geist/font/sans";
-import { GeistMono } from "geist/font/mono";
+import { Sora, DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
+const sora = Sora({
+  variable: "--font-display",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+});
+
+const dmSans = DM_Sans({
+  variable: "--font-body",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-mono",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "UniDeploy — From idea to deployed product",
-  description: "Describe what you want to build. Our AI writes the code, runs it in a real sandbox, and ships it to production — in minutes.",
-  icons: {
-    icon: "/favicon.png",
+  title: "UniDeploy — Production-readiness for vibe-coded apps",
+  description:
+    "Scan, harden, and deploy your AI-generated app in seconds.",
+  keywords: [
+    "security scanner",
+    "vibe coding",
+    "production readiness",
+    "AI code review",
+    "Lovable",
+    "Bolt",
+    "Cursor",
+    "Claude Code",
+  ],
+  openGraph: {
+    title: "UniDeploy — Production-readiness for vibe-coded apps",
+    description:
+      "Scan, harden, and deploy your AI-generated app in seconds.",
+    url: "https://unideploy.in",
+    siteName: "UniDeploy",
+    type: "website",
   },
 };
 
@@ -17,15 +53,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
-      <body className="font-sans antialiased dark">
+    <html lang="en">
+      <body
+        className={`${sora.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}
+        style={{ background: "var(--bg-primary)" }}
+      >
         {children}
-        <div className="fixed bottom-4 right-4 z-50 opacity-80 hover:opacity-100 transition-opacity">
-          <a href="https://e2b.dev" target="_blank" rel="noopener noreferrer">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/e2b-logo.png" alt="Powered by E2B" className="h-8 w-auto" />
-          </a>
-        </div>
       </body>
     </html>
   );

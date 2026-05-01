@@ -1,0 +1,172 @@
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+import asyncio, json
+from datetime import datetime
+
+router = APIRouter(tags=["websockets"])
+
+# Import shared session store from sessions router
+from .sessions import _sessions
+from core.database import db_update
+
+@router.websocket("/ws/cli/{session_code}")
+async def cli_websocket(websocket: WebSocket, session_code: str):
+    """
+    CLI connects here after creating a session.
+    Receives: project manifest, streams findings
+    Sends: browser_connected signal, apply_fix commands
+    """
+    code = session_code.upper()
+    session = _sessions.get(code)
+    
+    if not session:
+        await websocket.close(code=4004, reason="Session not found")
+        return
+    
+    await websocket.accept()
+    session["cli_ws"] = websocket
+    session["status"] = "cli_connected"
+    session["cli_connected_at"] = datetime.utcnow()
+    
+    # Drain queued messages (browser may have connected before CLI)
+    for queued_msg in session.get("message_queue", []):
+        await websocket.send_json(queued_msg)
+    session["message_queue"] = []
+    
+    # Notify CLI if browser already connected
+    if session.get("browser_ws"):
+        await websocket.send_json({
+            "type": "browser_connected",
+            "session_id": session["session_id"]
+        })
+    
+    try:
+        while True:
+            data = await websocket.receive_json()
+            msg_type = data.get("type")
+            
+            if msg_type == "cli_ready":
+                # CLI sent project manifest — trigger scan pipeline
+                session["project_manifest"] = data.get("project_manifest", {})
+                session["machine_name"] = data.get("machine_name", "Unknown")
+                session["status"] = "scanning"
+                
+                # Notify browser that CLI is ready
+                if session.get("browser_ws"):
+                    await session["browser_ws"].send_json({
+                        "type": "cli_ready",
+                        "machine_name": session["machine_name"],
+                        "project_manifest": session["project_manifest"]
+                    })
+                
+                # TODO Phase 1: Trigger Gemini AnalyzerAgent here
+                # asyncio.create_task(run_analyzer_agent(code, session["project_manifest"]))
+            
+            elif msg_type == "finding":
+                # CLI/agent found an issue — relay to browser immediately
+                finding = data.get("finding", {})
+                session["findings"].append(finding)
+                
+                if session.get("browser_ws"):
+                    await session["browser_ws"].send_json({
+                        "type": "finding",
+                        "finding": finding
+                    })
+            
+            elif msg_type == "scan_complete":
+                session["status"] = "complete"
+                session["completed_at"] = datetime.utcnow()
+                session["security_grade"] = data.get("summary", {}).get("grade")
+                
+                if session.get("browser_ws"):
+                    await session["browser_ws"].send_json({
+                        "type": "scan_complete",
+                        "summary": data.get("summary", {})
+                    })
+
+                await db_update("scan_sessions", session["session_id"], {
+                    "status": "complete",
+                    "scan_result": session["findings"],
+                    "security_grade": data.get("summary", {}).get("grade"),
+                    "completed_at": datetime.utcnow().isoformat(),
+                })
+            
+            elif msg_type == "fix_applied":
+                # CLI applied a fix — notify browser
+                if session.get("browser_ws"):
+                    await session["browser_ws"].send_json(data)
+    
+    except WebSocketDisconnect:
+        session["cli_ws"] = None
+        if session["status"] not in ("complete", "expired"):
+            session["status"] = "pending"
+
+
+@router.websocket("/ws/browser/{session_id}")
+async def browser_websocket(websocket: WebSocket, session_id: str):
+    """
+    Browser connects here after entering the session code.
+    Receives: real-time findings, scan_complete
+    Sends: apply_fix commands
+    """
+    # Find session by session_id
+    session = None
+    session_code = None
+    for code, s in _sessions.items():
+        if s["session_id"] == session_id:
+            session = s
+            session_code = code
+            break
+    
+    if not session:
+        await websocket.close(code=4004, reason="Session not found")
+        return
+    
+    await websocket.accept()
+    session["browser_ws"] = websocket
+    
+    # Notify CLI that browser has connected
+    cli_ws = session.get("cli_ws")
+    if cli_ws:
+        await cli_ws.send_json({
+            "type": "browser_connected",
+            "session_id": session_id
+        })
+    else:
+        # Queue the message for when CLI connects
+        session["message_queue"].append({
+            "type": "browser_connected",
+            "session_id": session_id
+        })
+    
+    # Send existing findings (browser may have connected mid-scan)
+    for finding in session.get("findings", []):
+        await websocket.send_json({"type": "finding", "finding": finding})
+    
+    if session["status"] == "complete":
+        await websocket.send_json({
+            "type": "scan_complete",
+            "summary": {
+                "grade": session.get("security_grade"),
+                "total_findings": len(session.get("findings", [])),
+                "findings": session.get("findings", [])
+            }
+        })
+    
+    try:
+        while True:
+            data = await websocket.receive_json()
+            msg_type = data.get("type")
+            
+            if msg_type == "apply_fix":
+                # User clicked "Apply Fix" in dashboard — relay to CLI
+                cli_ws = session.get("cli_ws")
+                if cli_ws:
+                    await cli_ws.send_json(data)
+                else:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "CLI is no longer connected"
+                    })
+    
+    except WebSocketDisconnect:
+        session["browser_ws"] = None

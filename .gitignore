@@ -25,6 +25,10 @@ out/
 build/
 dist/
 
+# CLI build output
+apps/cli/dist/
+apps/mcp/dist/
+
 # IDEs
 .vscode/
 .idea/
@@ -37,12 +41,17 @@ Thumbs.db
 
 # UniDeploy Specific
 *.pem
-setup_ec2_prod.sh
 temp_analysis/
 temp/
-legacy_aws_infrastructure/k8s/secrets.yaml
 local_storage/
 firebase-credentials.json
 **/.env
 !**/.env.template
-_archive_legacy_aws_infrastructure/
+!**/.env.example
+
+# Test databases
+*.db
+
+# Credentials (CLI stores API key here locally)
+# Never commit user credentials
+~/.unideploy/

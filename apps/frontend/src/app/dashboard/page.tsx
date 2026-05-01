@@ -1,359 +1,123 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, Zap, ArrowRight, AlertCircle, Loader2, ExternalLink } from "lucide-react";
-import { onAuthStateChanged, User } from "firebase/auth";
-import { auth } from "@/lib/firebase";
-import { projectsApi, Project } from "@/lib/api";
-import Sidebar from "@/components/Sidebar";
-import ProjectCard from "@/components/ui/ProjectCard";
-import CreateProject from "@/components/CreateProject";
-import DeploymentStatus from "@/components/DeploymentStatus";
-import PulseDashboard from "@/components/PulseDashboard";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { UniDeploySocket, WSMessage, Finding, ScanSummary } from "@/lib/websocket";
 
-function DashboardInner() {
-  const router = useRouter();
+const dash = {
+  bg: "#0F1410",
+  surface: "#161D16",
+  border: "#2A3A2A",
+  text: "#E8F0D8",
+  muted: "#6A7A5A",
+  green: "#6DB84A",
+  red: "#FF6B6B",
+  amber: "#F0A830",
+};
+
+function DashboardContent() {
   const searchParams = useSearchParams();
+  const sessionId = searchParams.get("session_id");
+  const urlMachine = searchParams.get("machine");
 
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [showCreate, setShowCreate] = useState(false);
-  const [createTemplate, setCreateTemplate] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<string>("deployments");
-  const [activeDeployment, setActiveDeployment] = useState<string | null>(null);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [isMutating, setIsMutating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [sysConfig, setSysConfig] = useState({
-    read_only: false,
-    maintenance: false,
-    daily_limit_mins: 60,
-  });
-  const [systemCost, setSystemCost] = useState<{ total_estimated_usd: number; events: any[] } | null>(null);
-
-  const fetchConfig = useCallback(async () => {
-    try {
-      const config = await projectsApi.getSystemConfig();
-      setSysConfig(config);
-    } catch (err) {
-      console.error("Failed to fetch system config:", err);
-    }
-  }, []);
-
-  const fetchProjects = useCallback(async () => {
-    try {
-      const data = await projectsApi.list();
-      setProjects(data);
-    } catch (err: any) {
-      console.error("Failed to fetch projects:", err);
-    }
-  }, []);
+  const [machineName, setMachineName] = useState<string | null>(urlMachine);
+  const [status, setStatus] = useState<"waiting" | "connected" | "scanning" | "complete">("waiting");
+  const [findings, setFindings] = useState<Finding[]>([]);
+  const [summary, setSummary] = useState<ScanSummary | null>(null);
+  const [socket, setSocket] = useState<UniDeploySocket | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setLoading(false);
-      if (!u) router.push("/");
-    });
-    return () => unsubscribe();
-  }, [router]);
+    if (!sessionId) return;
 
-  useEffect(() => {
-    if (!user) return;
-    fetchConfig();
-    fetchProjects();
-    const hasTransient = projects.some(
-      (p) => p.status === "WAKING" || p.status === "building" || p.status === "deploying",
-    );
-    const interval = setInterval(
-      () => {
-        fetchProjects();
-        fetchConfig();
+    const ws = new UniDeploySocket(
+      sessionId,
+      (msg: WSMessage) => {
+        if (msg.type === "browser_connected") {
+          setStatus("connected");
+        } else if (msg.type === "cli_ready") {
+          setStatus("scanning");
+          if (msg.machine_name) setMachineName(msg.machine_name);
+        } else if (msg.type === "finding") {
+          setFindings((prev) => [...prev, msg.finding]);
+        } else if (msg.type === "scan_complete") {
+          setStatus("complete");
+          setSummary(msg.summary);
+        }
       },
-      hasTransient ? 5000 : 15000,
+      () => console.log("WS connected"),
+      () => console.log("WS disconnected")
     );
-    return () => clearInterval(interval);
-  }, [fetchProjects, fetchConfig, projects.length, user]);
 
-  useEffect(() => {
-    if (activeTab === "settings" && !systemCost) {
-      projectsApi.getSystemCost().then(setSystemCost).catch(() => {});
-    }
-  }, [activeTab, systemCost]);
+    ws.connect();
+    setSocket(ws);
 
-  useEffect(() => {
-    if (searchParams.get("showCreate") === "true") {
-      setShowCreate(true);
-      const t = searchParams.get("template");
-      if (t) setCreateTemplate(t);
-    }
-  }, [searchParams]);
+    return () => ws.disconnect();
+  }, [sessionId]);
 
-  if (loading) {
+  if (!sessionId) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-[#00DC82] animate-spin" />
+      <div style={{ color: dash.text, padding: 40, background: dash.bg, minHeight: "100vh" }}>
+        No session ID provided. Please run <code style={{ color: dash.green }}>npx unideploy init</code> in your terminal.
       </div>
     );
   }
 
-  if (!user) return null;
-
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-sans">
-      <Sidebar
-        user={user}
-        activeTab={activeTab}
-        onTabChange={(tab) => {
-          setActiveTab(tab);
-          setActiveDeployment(null);
-        }}
-      />
+    <div style={{ minHeight: "100vh", background: dash.bg, color: dash.text, padding: 40, fontFamily: "var(--font-body), DM Sans, sans-serif" }}>
+      <h1 style={{ fontFamily: "var(--font-display), Sora, sans-serif", marginBottom: 20 }}>
+        Session: {machineName || "Unknown Machine"}
+      </h1>
+      
+      <div style={{ marginBottom: 20 }}>
+        <strong>Status: </strong>
+        <span style={{ color: dash.green, fontWeight: "bold" }}>
+          {status === 'waiting' ? 'WAITING FOR BROWSER...' : status.toUpperCase()}
+        </span>
+      </div>
 
-      <main className="pl-[220px] min-h-screen">
-        <header className="h-14 border-b border-[#2A2A2A] flex items-center justify-between px-8 sticky top-0 bg-[#0A0A0A]/80 backdrop-blur-md z-40">
-          <h1 className="text-sm font-medium text-[#A1A1AA]">
-            {activeDeployment
-              ? "Overview / Deployment Detail"
-              : `Overview / ${activeTab === "deployments" ? "Deployments" : activeTab === "analytics" ? "Analytics" : "Settings"}`}
-          </h1>
-          <button
-            onClick={() => setShowCreate(true)}
-            disabled={sysConfig.read_only}
-            className="bg-[#00DC82] text-[#0A0A0A] px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#00DC82]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            New Project
-          </button>
-        </header>
-
-        <div className="p-8 max-w-6xl mx-auto">
-          {sysConfig.read_only && (
-            <div className="mb-6 p-4 rounded-xl bg-[#F59E0B]/10 border border-[#F59E0B]/20 flex items-center gap-3 text-[#F59E0B] text-sm">
-              <AlertCircle className="w-4 h-4" />
-              Platform is in READ-ONLY mode for maintenance. Mutations are disabled.
-            </div>
-          )}
-
-          {error && (
-            <div className="mb-6 p-4 rounded-xl bg-[#EF4444]/10 border border-[#EF4444]/20 flex items-center gap-3 text-[#EF4444] text-sm">
-              <AlertCircle className="w-4 h-4" />
-              {error}
-              <button
-                onClick={() => setError(null)}
-                className="ml-auto opacity-60 hover:opacity-100"
-              >
-                Dismiss
-              </button>
-            </div>
-          )}
-
-          {activeTab === "analytics" ? (
-            <PulseDashboard />
-          ) : activeTab === "settings" ? (
-            <div className="max-w-2xl space-y-6">
-              <h2 className="text-base font-semibold text-[#F5F5F5]">Account</h2>
-              <div className="rounded-xl bg-[#111111] border border-[#2A2A2A] divide-y divide-[#2A2A2A]">
-                <div className="px-5 py-4 flex justify-between items-center">
-                  <span className="text-xs text-[#A1A1AA]">Email</span>
-                  <span className="text-sm text-[#F5F5F5]">{user.email ?? "—"}</span>
+      {findings.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <h2 style={{ fontFamily: "var(--font-display), Sora, sans-serif" }}>Findings ({findings.length})</h2>
+          <ul style={{ listStyleType: "none", padding: 0 }}>
+            {findings.map((f, i) => (
+              <li key={i} style={{ background: dash.surface, border: `1px solid ${dash.border}`, padding: 15, marginBottom: 10, borderRadius: 8 }}>
+                <div style={{ color: f.severity === 'CRITICAL' ? dash.red : dash.amber, fontWeight: "bold", marginBottom: 4 }}>
+                  [{f.severity}] {f.title}
                 </div>
-                <div className="px-5 py-4 flex justify-between items-center">
-                  <span className="text-xs text-[#A1A1AA]">User ID</span>
-                  <span className="text-xs font-mono text-[#52525B]">{user.uid}</span>
+                <div style={{ color: dash.muted, fontSize: 14, fontFamily: "var(--font-mono), JetBrains Mono, monospace" }}>
+                  {f.file}:{f.line}
                 </div>
-                <div className="px-5 py-4 flex justify-between items-center">
-                  <span className="text-xs text-[#A1A1AA]">Plan</span>
-                  <span className="text-sm text-[#00DC82] font-semibold">
-                    {sysConfig.maintenance ? "Maintenance" : "Active"}
-                  </span>
-                </div>
-                <div className="px-5 py-4 flex justify-between items-center">
-                  <span className="text-xs text-[#A1A1AA]">Daily Runtime Limit</span>
-                  <span className="text-sm text-[#F5F5F5]">{sysConfig.daily_limit_mins} min</span>
-                </div>
-              </div>
-
-              <h2 className="text-base font-semibold text-[#F5F5F5]">Usage &amp; Credits</h2>
-              <div className="rounded-xl bg-[#111111] border border-[#2A2A2A] divide-y divide-[#2A2A2A]">
-                <div className="px-5 py-4 flex justify-between items-center">
-                  <span className="text-xs text-[#A1A1AA]">Estimated Spend</span>
-                  <span className="text-sm text-[#F5F5F5]">
-                    {systemCost ? `$${systemCost.total_estimated_usd.toFixed(4)}` : <Loader2 className="w-3 h-3 animate-spin inline" />}
-                  </span>
-                </div>
-                <div className="px-5 py-4 flex justify-between items-center">
-                  <span className="text-xs text-[#A1A1AA]">Billing Events</span>
-                  <span className="text-sm text-[#F5F5F5]">
-                    {systemCost ? systemCost.events.length : "—"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ) : activeDeployment ? (
-            <div className="space-y-8">
-              <button
-                onClick={() => setActiveDeployment(null)}
-                className="text-xs text-[#A1A1AA] hover:text-[#F5F5F5] flex items-center gap-2 mb-4 group"
-              >
-                <ArrowRight className="w-3 h-3 rotate-180 transition-transform group-hover:-translate-x-1" />
-                Back to Dashboard
-              </button>
-              <DeploymentStatus deploymentId={activeDeployment} />
-            </div>
-          ) : activeTab === "deployments" ? (
-            <>
-              <h2 className="text-base font-semibold mb-5 text-[#F5F5F5]">Deployments</h2>
-              {projects.length === 0 ? (
-                <div className="py-16 text-center border border-dashed border-[#2A2A2A] rounded-xl">
-                  <Zap className="w-8 h-8 mx-auto mb-4 text-[#52525B]" />
-                  <p className="text-[#A1A1AA] text-sm">No deployments yet.</p>
-                </div>
-              ) : (
-                <div className="rounded-xl border border-[#2A2A2A] overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-[#2A2A2A] bg-[#111111]">
-                        <th className="text-left px-5 py-3 text-xs text-[#52525B] font-medium">Project</th>
-                        <th className="text-left px-5 py-3 text-xs text-[#52525B] font-medium">Status</th>
-                        <th className="text-left px-5 py-3 text-xs text-[#52525B] font-medium">Last Deployed</th>
-                        <th className="text-left px-5 py-3 text-xs text-[#52525B] font-medium">URL</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#2A2A2A]">
-                      {projects.map((p) => (
-                        <tr
-                          key={p.id}
-                          onClick={() => p.latest_deployment_id && setActiveDeployment(p.latest_deployment_id.toString())}
-                          className={`bg-[#0A0A0A] hover:bg-[#111111] transition-colors ${p.latest_deployment_id ? "cursor-pointer" : "opacity-50"}`}
-                        >
-                          <td className="px-5 py-3 font-medium text-[#F5F5F5]">{p.name}</td>
-                          <td className="px-5 py-3">
-                            <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${
-                              p.status === "RUNNING" ? "bg-[#00DC82]/10 text-[#00DC82]" :
-                              p.status === "SLEEPING" ? "bg-[#52525B]/20 text-[#52525B]" :
-                              "bg-[#F59E0B]/10 text-[#F59E0B]"
-                            }`}>
-                              {p.status === "RUNNING" && <span className="w-1.5 h-1.5 rounded-full bg-[#00DC82] animate-pulse" />}
-                              {p.status}
-                            </span>
-                          </td>
-                          <td className="px-5 py-3 text-[#A1A1AA] text-xs">
-                            {p.last_deployed ? new Date(p.last_deployed).toLocaleDateString() : "—"}
-                          </td>
-                          <td className="px-5 py-3">
-                            {p.domain ? (
-                              <a
-                                href={`https://${p.domain}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                className="flex items-center gap-1 text-xs text-[#00DC82] hover:underline"
-                              >
-                                {p.domain}
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
-                            ) : (
-                              <span className="text-xs text-[#52525B]">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
-                <StatCard label="Active Sites" value={projects.length.toString()} change={`${projects.filter(p => p.status === "RUNNING").length} running`} />
-                <StatCard label="Total Deployments" value={projects.reduce((n, p) => n + (p.latest_deployment_id ? 1 : 0), 0).toString()} change="across all projects" />
-                <StatCard label="Sandbox Engine" value="E2B" change="Firecracker microVMs" />
-              </div>
-
-              <h2 className="text-base font-semibold mb-5 text-[#F5F5F5]">Projects</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {projects.map((p) => (
-                  <ProjectCard
-                    key={p.id}
-                    project={p}
-                    isLocked={isMutating || sysConfig.read_only}
-                    onUpdate={fetchProjects}
-                    onMutationStart={() => setIsMutating(true)}
-                    onMutationEnd={() => setIsMutating(false)}
-                    onError={setError}
-                    onClick={() => {
-                      if (p.latest_deployment_id) {
-                        setActiveDeployment(p.latest_deployment_id.toString());
-                      }
-                    }}
-                  />
-                ))}
-
-                {/* New Project card */}
-                <button
-                  onClick={() => setShowCreate(true)}
-                  disabled={sysConfig.read_only}
-                  className="bg-[#111111] border border-dashed border-[#2A2A2A] rounded-xl p-5 hover:border-[#00DC82]/50 hover:bg-[#111111] transition-all flex flex-col items-center justify-center gap-3 min-h-[160px] disabled:opacity-50 disabled:cursor-not-allowed group"
-                >
-                  <div className="w-10 h-10 rounded-full border border-dashed border-[#2A2A2A] group-hover:border-[#00DC82]/50 flex items-center justify-center transition-colors">
-                    <Plus className="w-5 h-5 text-[#52525B] group-hover:text-[#00DC82] transition-colors" />
-                  </div>
-                  <span className="text-sm text-[#52525B] group-hover:text-[#A1A1AA] transition-colors">
-                    New Project
-                  </span>
-                </button>
-
-                {projects.length === 0 && (
-                  <div className="col-span-full py-16 text-center border border-dashed border-[#2A2A2A] rounded-xl">
-                    <Zap className="w-8 h-8 mx-auto mb-4 text-[#52525B]" />
-                    <p className="text-[#A1A1AA] text-sm">
-                      No projects yet. Deploy your first one!
-                    </p>
-                  </div>
+                <div style={{ marginTop: 8 }}>{f.description}</div>
+                {f.auto_fixable && (
+                  <button 
+                    onClick={() => socket?.sendApplyFix(f.id)}
+                    style={{ background: dash.green, color: dash.bg, border: "none", padding: "6px 12px", borderRadius: 4, cursor: "pointer", marginTop: 12, fontWeight: "bold" }}
+                  >
+                    Apply Fix
+                  </button>
                 )}
-              </div>
-            </>
-          )}
+              </li>
+            ))}
+          </ul>
         </div>
-      </main>
-
-      {showCreate && (
-        <CreateProject
-          template={createTemplate}
-          onClose={() => {
-            setShowCreate(false);
-            setCreateTemplate(null);
-            fetchProjects();
-          }}
-        />
       )}
-    </div>
-  );
-}
 
-function StatCard({ label, value, change }: { label: string; value: string; change: string }) {
-  return (
-    <div className="p-5 rounded-xl bg-[#111111] border border-[#2A2A2A] hover:border-[#3A3A3A] transition-all">
-      <p className="text-xs text-[#A1A1AA] mb-1">{label}</p>
-      <p className="text-2xl font-bold text-[#F5F5F5] mb-1">{value}</p>
-      <p className="text-xs text-[#00DC82] font-medium">{change}</p>
+      {summary && (
+        <div style={{ background: dash.surface, padding: 20, border: `1px solid ${dash.border}`, borderRadius: 8 }}>
+          <h2 style={{ fontFamily: "var(--font-display), Sora, sans-serif" }}>Scan Complete</h2>
+          <p>Security Grade: <strong style={{ fontSize: 24, color: dash.green }}>{summary.grade}</strong></p>
+          <p>Total Findings: {summary.total}</p>
+          <p>Auto-fixable: {summary.auto_fixable}</p>
+        </div>
+      )}
     </div>
   );
 }
 
 export default function DashboardPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-[#00DC82] animate-spin" />
-        </div>
-      }
-    >
-      <DashboardInner />
+    <Suspense fallback={<div style={{ color: dash.text, padding: 40, background: dash.bg, minHeight: "100vh" }}>Loading session...</div>}>
+      <DashboardContent />
     </Suspense>
   );
 }

@@ -1,248 +1,151 @@
-# UniDeploy — Multimodal AI Development Cloud
+# UniDeploy — Production-Readiness for Vibe-Coded Apps
 
-**Describe it. Screenshot it. Say it. Upload it. It ships.**
+**Ship without getting hacked.** UniDeploy scans your AI-generated codebase for security vulnerabilities, missing production configs, and deployment anti-patterns — then auto-fixes what it can and opens a PR with the patches.
 
-UniDeploy is a sandbox-first AI development cloud powered by a multimodal input pipeline. You can describe your app in text, sketch a wireframe and take a photo, record a voice note, or upload a PDF spec — the agent understands all of it, writes the code, runs it in a real Linux VM, and deploys to production in one click.
-
-[![Sponsored by E2B](https://e2b.dev/badge.svg)](https://e2b.dev)
-[![E2B Pro — $20K Credits](https://img.shields.io/badge/E2B-Pro%20Partner-%2300DC82)](https://e2b.dev)
-[![NVIDIA NIM](https://img.shields.io/badge/Inference-NVIDIA%20NIM-%2376B900)](https://build.nvidia.com)
-[![HuggingFace](https://img.shields.io/badge/Models-HuggingFace-%23FF9D00)](https://huggingface.co)
+[![E2B Partner](https://e2b.dev/badge.svg)](https://e2b.dev)
 
 ---
 
-## What's New: Multimodal Input System
+## The Problem
 
-UniDeploy now accepts **five input modalities**. Every modality routes to the right model automatically — no configuration needed.
+**45% of AI-generated code contains OWASP Top 10 vulnerabilities** (Veracode, 2025). Lovable, Bolt, V0, and Cursor make it easy to build apps — but the code they generate ships with hardcoded secrets, missing auth checks, disabled RLS policies, and zero rate limiting. **2,000+ critical vulnerabilities were found in just 5,600 vibe-coded apps** (Escape.tech).
+
+UniDeploy is the production-readiness layer that catches what the AI missed.
+
+---
+
+## How It Works
+
+```bash
+# 1. Install
+npx unideploy@latest init
+
+# 2. Scan
+unideploy scan
+
+# 3. Fix
+unideploy fix
+```
+
+That's it. Three commands from "vibe-coded app" to "production-ready."
+
+### What Happens Under the Hood
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                 MULTIMODAL INPUT LAYER                  │
-│                                                         │
-│  Text prompt ──────────────────────────────────────┐   │
-│  Screenshot / Wireframe image ─── Vision model ──┐ │   │
-│  Voice note / Audio ──── Whisper (HF) ────────┐  │ │   │
-│  PDF / Spec document ─── Doc parser ────────┐ │  │ │   │
-│  Video screen recording ─── Frame extractor┐│ │  │ │   │
-│                                             ▼▼ ▼  ▼ ▼   │
-│                        ┌──────────────────────────┐    │
-│                        │     ModelRouter           │    │
-│                        │   (unified text context)  │    │
-│                        └──────────────┬───────────┘    │
-└───────────────────────────────────────┼─────────────────┘
-                                        ▼
-                              Agent Swarm (E2B Sandbox)
-                                        │
-                                        ▼
-                              Google Cloud Run deploy
+┌────────────────────────────────────────────────────────────────────┐
+│  Developer runs: unideploy scan                                    │
+│                                                                    │
+│  CLI ──► Detects framework (Next.js / FastAPI / Django / Express)  │
+│      ──► Builds project manifest (files, deps, env, git remote)    │
+│      ──► Redacts secrets locally                                   │
+│      ──► Sends manifest to UniDeploy API                           │
+│                                                                    │
+│  API ──► AnalyzerAgent (Gemini Flash) scans 13 categories          │
+│      ──► BuildAgent verifies project builds in sandbox             │
+│      ──► AutoFixAgent (Gemini Pro) generates patches               │
+│      ──► PatchAgent opens PR via Composio GitHub                   │
+│                                                                    │
+│  CLI ◄── Streams findings with severity + auto-fix indicators      │
+│      ◄── Shows security grade (A/B/C/D/F)                         │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## The Inference Stack (Free Tier — Zero Cost)
+## What It Checks (13 Categories)
 
-UniDeploy runs entirely on free API tiers. No Anthropic. No OpenAI. No per-token billing.
-
-### NVIDIA NIM  (`https://integrate.api.nvidia.com/v1`)
-
-OpenAI-compatible API. 40 requests/minute free. 100+ models. Swap `base_url` and `api_key` — zero other code changes.
-
-| Role in UniDeploy | Model | Why |
+| # | Category | Example Finding |
 |---|---|---|
-| Code generation (primary) | `qwen/qwen2.5-coder-32b-instruct` | Best open-weight code model. Beats GPT-4 on HumanEval. |
-| Code generation (fast) | `deepseek-ai/deepseek-coder-6.7b-instruct` | Sub-second for autocomplete + small edits |
-| Complex reasoning / planning | `meta/llama-3.3-70b-instruct` | Agent orchestration, architecture decisions |
-| Vision → Code (screenshot to app) | `meta/llama-3.2-90b-vision-instruct` | Understands wireframes, UI screenshots, design mockups |
-| Vision → Code (fast) | `microsoft/phi-3.5-vision-instruct` | Quick image reads, error screenshot analysis |
-| Multimodal reasoning | `qwen/qwen3.5` | Native vision+text, 400B MoE, best for complex UI understanding |
-| Embeddings (project memory) | `nvidia/llama-3.2-nv-embedqa-1b-v2` | Replaces Pinecone calls for semantic search within a project |
+| 1 | **Secrets & Credentials** | Stripe live key hardcoded in `src/lib/stripe.ts` |
+| 2 | **Authentication** | No auth check on `POST /api/users` |
+| 3 | **Authorization & RLS** | Supabase RLS disabled on `profiles` table |
+| 4 | **Input Validation** | `dangerouslySetInnerHTML` with user content |
+| 5 | **Rate Limiting** | No rate limit on `/api/auth/login` |
+| 6 | **CORS & CSRF** | `Access-Control-Allow-Origin: *` on auth endpoints |
+| 7 | **Error Handling** | Stack trace returned to client in production |
+| 8 | **Dependencies** | 3 packages with known RCE CVEs |
+| 9 | **Environment Config** | `DEBUG=True` in production settings |
+| 10 | **Security Headers** | Missing Content-Security-Policy |
+| 11 | **Database** | No indexes on foreign key columns |
+| 12 | **Frontend Security** | Auth tokens stored in localStorage |
+| 13 | **Deployment Readiness** | No health check endpoint, running as root |
 
-### HuggingFace Inference API (`https://router.huggingface.co/v1`)
+Each finding includes severity (Critical/High/Medium/Low), file path + line number, and whether an auto-fix is available.
 
-OpenAI-compatible router. Free tier: ~50 req/hour. Best for audio and specialized tasks.
+---
 
-| Role in UniDeploy | Model | Why |
-|---|---|---|
-| Voice → Code (speech transcription) | `openai/whisper-large-v3` | Best open ASR model. Multilingual. Handles Indian English perfectly. |
-| Document understanding | `facebook/bart-large-cnn` | Summarizes uploaded spec PDFs before passing to code agent |
-| Embeddings fallback | `sentence-transformers/all-MiniLM-L6-v2` | Fast, lightweight, good enough for session-scoped memory |
-| Image captioning (fallback) | `Salesforce/blip-image-captioning-large` | When NIM vision quota is exhausted |
+## Installation
 
-### Rate Limit Strategy
+### CLI (npm)
+```bash
+npx unideploy@latest init
+# or install globally
+npm install -g unideploy
+```
 
-```python
-# Priority order per task — auto-falls back on 429
-ROUTING_TABLE = {
-    "code":      ["nvidia/qwen2.5-coder-32b", "nvidia/deepseek-coder-6.7b"],
-    "reasoning": ["nvidia/llama-3.3-70b",     "nvidia/llama-3.1-8b"],
-    "vision":    ["nvidia/llama-3.2-90b-vision", "nvidia/phi-3.5-vision", "hf/blip-large"],
-    "audio":     ["hf/whisper-large-v3"],
-    "embedding": ["nvidia/nv-embedqa-1b-v2",  "hf/all-MiniLM-L6-v2"],
+### MCP Server (Cursor / Claude Code)
+```json
+{
+  "mcpServers": {
+    "unideploy": {
+      "command": "npx",
+      "args": ["-y", "@unideploy/mcp"],
+      "env": { "UNIDEPLOY_API_KEY": "your_key_here" }
+    }
+  }
 }
 ```
 
----
-
-## Multimodal Input Flows
-
-### 1. Text → App (original)
-```
-"Build me a FastAPI backend with JWT auth and PostgreSQL"
-    │
-    ▼  ModelRouter → qwen2.5-coder-32b (NVIDIA NIM)
-    ▼  Agent writes files in E2B sandbox
-    ▼  Live preview URL → Deploy
-```
-
-### 2. Screenshot / Wireframe → App  *(new)*
-```
-User uploads: napkin sketch photo, Figma screenshot, or existing app UI
-    │
-    ▼  llama-3.2-90b-vision (NVIDIA NIM)
-       "Describe the UI layout, components, and interactions
-        as a technical spec for code generation."
-    │
-    ▼  Vision output → text spec → qwen2.5-coder-32b generates implementation
-    ▼  E2B sandbox builds + previews matching UI
-```
-
-Use cases: whiteboard wireframe → working code · competitor UI → rebuild it · Figma screenshot → Next.js components
-
-### 3. Voice → App  *(new)*
-```
-User records: voice note explaining what they want to build
-    │
-    ▼  HuggingFace Whisper large-v3 transcribes audio → clean text
-    ▼  Text runs through standard pipeline
-    ▼  E2B sandbox builds + previews
-```
-
-Use cases: non-technical founders who think faster than they type · complex flows described verbally · mobile-first / accessibility
-
-### 4. PDF / Document → App  *(new)*
-```
-User uploads: product spec, PRD, or API documentation PDF
-    │
-    ▼  pdfplumber extracts text + structure (local, zero cost)
-    ▼  HuggingFace BART summarizes long documents into key requirements
-    ▼  llama-3.3-70b (NVIDIA NIM) extracts: entities, endpoints, data models
-    ▼  Structured spec → qwen2.5-coder-32b generates implementation
-    ▼  E2B sandbox builds + previews
-```
-
-Use cases: upload a Notion PRD → get a working prototype · API spec → full client + server · legacy docs → modern code
-
-### 5. Error Screenshot → Fix  *(new)*
-```
-User pastes: screenshot of error message, browser console, or stack trace
-    │
-    ▼  phi-3.5-vision (NVIDIA NIM) reads the error from the image
-    ▼  AutoFixAgent gets error text + current codebase context
-    ▼  Generates patch → tests in correction sandbox → applies if passing
-```
-
-Use cases: "something is broken" with a screenshot · visual browser bugs · Sentry error screenshot
+### Cursor Rules (auto-scan on code generation)
+Drop `.cursor/rules/unideploy.mdc` in your project — Cursor's AI will automatically call UniDeploy whenever it generates new code.
 
 ---
 
-## Updated Agent Architecture
+## Pricing
 
-```
-                    ┌──────────────────────┐
-                    │     ModelRouter      │
-                    │                      │
-                    │  Input type detector │
-                    │  Rate limit tracker  │
-                    │  Auto-fallback       │
-                    └──────────┬───────────┘
-                               │
-            ┌──────────────────┼──────────────────┐
-            ▼                  ▼                   ▼
-     VisionAgent          AudioAgent          TextAgent
-  (NVIDIA NIM VLMs)   (HF Whisper)        (NVIDIA NIM LLMs)
-  llama-3.2-90b-v      whisper-large-v3    qwen2.5-coder-32b
-  phi-3.5-vision       ──────┬──────       llama-3.3-70b
-  qwen3.5 VL                 │             deepseek-coder-6.7b
-  ──────┬──────              │             ──────┬────────
-        │                    │                   │
-        └────────────────────┴───────────────────┘
-                                    │
-                                    ▼
-                         ┌──────────────────────┐
-                         │    AnalyzerAgent      │
-                         │  Detects framework,   │
-                         │  dependencies, stack  │
-                         └──────────┬────────────┘
-                                    │
-                                    ▼
-                    ┌───────────────────────────────┐
-                    │       E2B Firecracker VM       │
-                    │                               │
-                    │  BuildAgent                   │
-                    │    │                          │
-                    │    ├─ Error? → AutoFixAgent   │
-                    │    │      │                   │
-                    │    │  Correction sandbox      │
-                    │    │      │                   │
-                    │    │  PatchAgent applies      │
-                    │    │                          │
-                    │    └─ Success → Live preview  │
-                    └───────────────┬───────────────┘
-                                    │
-                              RecallMaxAgent
-                         (nv-embedqa-1b-v2 + Pinecone)
-                                    │
-                                    ▼
-                         Google Cloud Run deploy
-```
+| Tier | Price | Scans | Projects | Key Features |
+|---|---|---|---|---|
+| **Free** | $0 | 5/month | 1 | AnalyzerAgent only, CLI + MCP, 7-day history |
+| **Indie** | $15/mo | Unlimited | 3 | + AutoFix, GitHub PRs, secrets scanning |
+| **Pro** | $39/mo | Unlimited | 10 | + All agents, Sentry/Vercel integrations, voice reports |
+| **Team** | $99/mo + $19/seat | Unlimited | ∞ | + SSO, audit logs, custom rules, scheduled scans |
+
+Payments powered by [Dodo Payments](https://dodopayments.com) — supports UPI (India), cards, Apple Pay, Google Pay worldwide.
 
 ---
 
-## Technical Stack
+## Tech Stack
 
 ```
-Frontend        Next.js 14 (App Router), Tailwind CSS, Framer Motion
-Backend         FastAPI (Python 3.11), SQLAlchemy, Prefect
-Compute         E2B Firecracker VMs (sandboxes), Google Cloud Run (control plane)
-
-─── Inference (zero API cost) ───────────────────────────────────────
-Code models     NVIDIA NIM → qwen2.5-coder-32b, deepseek-coder-6.7b
-Reasoning       NVIDIA NIM → llama-3.3-70b-instruct
-Vision models   NVIDIA NIM → llama-3.2-90b-vision, phi-3.5-vision, qwen3.5
-Speech / ASR    HuggingFace → openai/whisper-large-v3
-Embeddings      NVIDIA NIM → nv-embedqa-1b-v2 | HF → all-MiniLM-L6-v2
-Image fallback  HuggingFace → blip-image-captioning-large
-
-─── Base URLs ────────────────────────────────────────────────────────
-NVIDIA NIM      https://integrate.api.nvidia.com/v1  (OpenAI-compatible)
-HuggingFace     https://router.huggingface.co/v1     (OpenAI-compatible)
-HF Native       https://api-inference.huggingface.co (Whisper)
-──────────────────────────────────────────────────────────────────────
-
-PDF parsing     pdfplumber (local, zero cost)
-Memory          Pinecone + RecallMax | fallback: HF sentence-transformers
+CLI             Node.js / TypeScript
+MCP Server      @unideploy/mcp (stdio)
+Dashboard       Next.js 14 (Vercel)
+API             FastAPI (Cloud Run)
+Agents          Google Gemini Enterprise Agent Platform (ADK)
+  ├── AnalyzerAgent     Gemini 2.5 Flash (pattern matching, cheap)
+  ├── BuildAgent        Gemini 2.5 Flash + E2B sandbox
+  ├── AutoFixAgent      Gemini 2.5 Pro (reasoning for patches)
+  └── PatchAgent        No LLM — pure Composio tool execution
 Auth            Clerk
 Database        Supabase (PostgreSQL)
-WebSockets      Node.js gateway
+Payments        Dodo Payments (Merchant of Record)
+Integrations    Composio (GitHub, Sentry, Vercel, Slack, Linear)
+Memory          Supermemory (per-project context)
+Email           AutoSend (transactional + marketing)
 ```
 
 ---
 
-## Environment Variables
+## Partner Stack
 
-```bash
-# Required
-E2B_API_KEY=            # build.e2b.dev
-NVIDIA_API_KEY=         # build.nvidia.com → API Keys
-HF_API_KEY=             # huggingface.co → Settings → Access Tokens
-
-# Optional (fallbacks work without these)
-PINECONE_API_KEY=
-SUPABASE_URL=
-SUPABASE_ANON_KEY=
-CLERK_SECRET_KEY=
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
-```
+| Partner | Role | What It Does for UniDeploy |
+|---|---|---|
+| **Composio** | Action Layer | GitHub OAuth, PR creation, Sentry/Vercel/Slack integrations — agents act, never store tokens |
+| **Google Gemini** | Agent Brain | ADK defines the agent graph, Agent Runtime executes, Model Armor blocks prompt injection |
+| **Dodo Payments** | Billing | Full Merchant of Record with UPI + global payments, usage metering, tax compliance |
+| **Supermemory** | Memory | Per-project scan history, user preferences, incremental scans — sub-300ms retrieval |
+| **AutoSend** | Notifications | Scan reports, weekly digests, onboarding emails — pay per send, not per contact |
+| **E2B** | Sandbox | Firecracker microVMs for BuildAgent to verify projects actually compile |
 
 ---
 
@@ -251,35 +154,16 @@ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
 ```
 unideploy/
 ├── apps/
-│   ├── backend/
-│   │   ├── agents/
-│   │   │   ├── analyzer_agent.py
-│   │   │   ├── build_agent.py
-│   │   │   ├── autofix_agent.py
-│   │   │   ├── patch_agent.py
-│   │   │   ├── recall_max_agent.py
-│   │   │   └── notify_agent.py
-│   │   ├── clients/
-│   │   │   ├── model_router.py       ← unified routing (NVIDIA NIM + HF)
-│   │   │   ├── vision_agent.py       ← screenshot / wireframe → code
-│   │   │   ├── audio_agent.py        ← voice → code (Whisper)
-│   │   │   └── document_agent.py     ← PDF → code (pdfplumber)
-│   │   ├── builder/
-│   │   │   └── e2b_manager.py
-│   │   └── core/
-│   │       └── prefect_flows.py
-│   ├── frontend/
-│   │   ├── app/
-│   │   │   ├── page.tsx
-│   │   │   ├── dashboard/
-│   │   │   └── project/[id]/page.tsx
-│   │   └── components/
-│   │       ├── MultimodalInputBar/   ← text | image | voice | doc tabs
-│   │       ├── VoiceRecorder/        ← MediaRecorder API
-│   │       └── ImageDropzone/        ← drag + drop upload
-│   └── gateway/
-├── docs/
-└── scripts/
+│   ├── backend/        ← FastAPI scan API + Gemini agents
+│   │   ├── agents/     ← ADK agent definitions
+│   │   ├── routers/    ← API route modules
+│   │   ├── rules/      ← 13 security check categories
+│   │   └── core/       ← Config, plan enforcement, grading
+│   ├── frontend/       ← Next.js dashboard + landing page
+│   ├── cli/            ← Node.js CLI (npx unideploy)
+│   └── mcp/            ← MCP server for Cursor/Claude Code
+├── docs/               ← Architecture, check categories, agent design
+└── README.md
 ```
 
 ---
@@ -287,39 +171,26 @@ unideploy/
 ## Roadmap
 
 ```
-✅  Phase 1 — Core sandbox loop
-✅  Phase 2 — AutoFix brain (correction sandbox)
-✅  Phase 3 — RecallMax memory
-🔄  Phase 4 — Multimodal input (current)
-      ✅ NVIDIA NIM ModelRouter (code + reasoning + vision)
-      ✅ HuggingFace Whisper (voice input)
-      ✅ Auto-fallback on rate limits
-      ⬜ MultimodalInputBar frontend component
-      ⬜ PDF document agent (pdfplumber)
-      ⬜ Error screenshot → AutoFix pipeline
-⬜  Phase 5 — Production deploy
-      One-click → Google Cloud Run
-      Custom domains (*.unideploy.in)
-      Deployment history + rollback
-⬜  Phase 6 — Multi-repo orchestration
-⬜  Phase 7 — AI model deployment (E2B GPU tier)
+✅  Phase 0 — Pivot from sandbox-IDE to security tool
+🔄  Phase 1 — Core scanner (Secrets + Auth + RLS) — catches 80% of criticals
+⬜  Phase 2 — Expand to 13 categories + basic AutoFix
+⬜  Phase 3 — GitHub integration + PR flow via Composio
+⬜  Phase 4 — MCP server + Cursor rules
+⬜  Phase 5 — Dodo billing + plan enforcement
+⬜  Phase 6 — Dashboard polish + team features
 ```
 
 ---
 
-## Getting Started
+## Contributing
 
-```bash
-pip install openai huggingface-hub pdfplumber
+UniDeploy's moat is the **rule library** — framework-specific security checks. To add a new rule:
 
-chmod +x scripts/start.sh
-./scripts/start.sh
-```
-
-Starts: FastAPI (8000) · WebSocket Gateway (3001) · Next.js Frontend (3000)
+1. Create a rule file in `apps/backend/rules/`
+2. Define the check function with `framework`, `severity`, and `auto_fixable` metadata
+3. Add test cases in `apps/backend/tests/`
+4. Submit a PR
 
 ---
 
-*Built by Rahul Pandey — E2B startup partner*
-*Inference: NVIDIA NIM + HuggingFace (zero API cost during development)*
-*unideploy.in*
+*Built by Rahul Pandey — [unideploy.in](https://unideploy.in)*

@@ -1,0 +1,32 @@
+{
+  "name": "@unideploy/mcp",
+  "version": "0.1.0",
+  "description": "MCP server for UniDeploy — use from Cursor, Claude Code, or any MCP client",
+  "main": "./dist/index.js",
+  "bin": {
+    "unideploy-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "security",
+    "unideploy",
+    "cursor",
+    "claude-code"
+  ],
+  "author": "Rahul Pandey",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "tsx": "^4.19.0",
+    "@types/node": "^22.0.0"
+  }
+}
