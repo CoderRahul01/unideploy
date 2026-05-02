@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "unideploy": {
+      "command": "npx",
+      "args": ["ts-node", "apps/mcp/src/index.ts"],
+      "env": {
+        "UNIDEPLOY_API_URL": "http://localhost:8000",
+        "UNIDEPLOY_API_KEY": "dev_key"
+      }
+    }
+  }
+}

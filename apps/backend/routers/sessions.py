@@ -70,14 +70,17 @@ async def create_session(
         "created_at": datetime.utcnow()
     }
     
-    await db_insert("scan_sessions", {
-        "id": session_id,
-        "code": code,
-        "status": "pending",
-        "machine_name": request.machine_name,
-        "project_path": request.project_path,
-        "expires_at": expiry.isoformat(),
-    })
+    try:
+        await db_insert("scan_sessions", {
+            "id": session_id,
+            "code": code,
+            "status": "pending",
+            "machine_name": request.machine_name,
+            "project_path": request.project_path,
+            "expires_at": expiry.isoformat(),
+        })
+    except Exception:
+        pass  # InsForge persistence is best-effort; session still works locally
 
     base_url = os.getenv("BASE_URL", "wss://api.unideploy.in")
     return CreateSessionResponse(
@@ -112,10 +115,13 @@ async def connect_session(
     session["browser_connected_at"] = datetime.utcnow()
     session["user_id"] = user["user_id"] if user else None
     
-    await db_update("scan_sessions", session["session_id"], {
-        "status": "browser_connected",
-        "browser_connected_at": datetime.utcnow().isoformat(),
-    })
+    try:
+        await db_update("scan_sessions", session["session_id"], {
+            "status": "browser_connected",
+            "browser_connected_at": datetime.utcnow().isoformat(),
+        })
+    except Exception:
+        pass
 
     base_url = os.getenv("BASE_URL", "wss://api.unideploy.in").replace("wss://", "ws://").replace("https://", "ws://").replace("http://", "ws://")
     

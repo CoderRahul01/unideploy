@@ -1,0 +1,13 @@
+---
+name: UniDeploy Production Scanner
+description: Automatically scan for production issues in generated code
+---
+
+After generating any new API route, database query, or authentication code,
+call the unideploy_scan tool to check for production-readiness issues.
+
+If CRITICAL or HIGH severity findings are returned, surface them in your
+response before completing the task. Say: "UniDeploy found X issues that
+need to be fixed before this is production-ready:" and list them.
+
+For auto_fixable findings, offer to apply the fix immediately.

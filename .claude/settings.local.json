@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip --version)",
+      "Bash(pip3 --version)",
+      "Bash(python -m pip index versions google-adk)",
+      "Bash(python -m pip index versions insforge-sdk)"
+    ]
+  }
+}

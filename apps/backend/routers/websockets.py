@@ -4,9 +4,68 @@ from datetime import datetime
 
 router = APIRouter(tags=["websockets"])
 
-# Import shared session store from sessions router
 from .sessions import _sessions
 from core.database import db_update
+from agents.analyzer import run_analysis, compute_grade
+
+
+async def run_agent_pipeline(session_code: str, project_manifest: dict):
+    session = _sessions.get(session_code)
+    if not session:
+        return
+
+    try:
+        findings = await run_analysis(project_manifest)
+
+        for finding in findings:
+            session["findings"].append(finding)
+            msg = {"type": "finding", "finding": finding}
+            if session.get("cli_ws"):
+                await session["cli_ws"].send_json(msg)
+            if session.get("browser_ws"):
+                await session["browser_ws"].send_json(msg)
+            await asyncio.sleep(0.2)
+
+        grade = compute_grade(findings)
+        session["security_grade"] = grade
+        session["status"] = "complete"
+
+        critical = sum(1 for f in findings if f.get("severity") == "CRITICAL")
+        high = sum(1 for f in findings if f.get("severity") == "HIGH")
+        medium = sum(1 for f in findings if f.get("severity") == "MEDIUM")
+        auto_fixable = sum(1 for f in findings if f.get("auto_fixable"))
+
+        summary = {
+            "grade": grade,
+            "total": len(findings),
+            "critical": critical,
+            "high": high,
+            "medium": medium,
+            "low": len(findings) - critical - high - medium,
+            "auto_fixable": auto_fixable,
+        }
+        complete_msg = {"type": "scan_complete", "summary": summary}
+        if session.get("cli_ws"):
+            await session["cli_ws"].send_json(complete_msg)
+        if session.get("browser_ws"):
+            await session["browser_ws"].send_json(complete_msg)
+
+        try:
+            await db_update("scan_sessions", session["session_id"], {
+                "status": "complete",
+                "scan_result": findings,
+                "security_grade": grade,
+                "completed_at": datetime.utcnow().isoformat(),
+            })
+        except Exception:
+            pass
+
+    except Exception as e:
+        error_msg = {"type": "error", "message": f"Scan failed: {str(e)}"}
+        if session.get("cli_ws"):
+            await session["cli_ws"].send_json(error_msg)
+        if session.get("browser_ws"):
+            await session["browser_ws"].send_json(error_msg)
 
 @router.websocket("/ws/cli/{session_code}")
 async def cli_websocket(websocket: WebSocket, session_code: str):
@@ -58,8 +117,7 @@ async def cli_websocket(websocket: WebSocket, session_code: str):
                         "project_manifest": session["project_manifest"]
                     })
                 
-                # TODO Phase 1: Trigger Gemini AnalyzerAgent here
-                # asyncio.create_task(run_analyzer_agent(code, session["project_manifest"]))
+                asyncio.create_task(run_agent_pipeline(code, session["project_manifest"]))
             
             elif msg_type == "finding":
                 # CLI/agent found an issue — relay to browser immediately

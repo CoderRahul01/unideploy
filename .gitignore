@@ -1,57 +1,77 @@
-# Environment
-.env
-.env.local
-.env.*.local
-*.log
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-venv/
-.venv/
-env/
-.env/
-
-# Node
+# Dependencies
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+.pnp
+.pnp.js
 
-# Next.js
+# Build outputs
+dist/
+build/
 .next/
 out/
-build/
-dist/
+*.egg-info/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
 
-# CLI build output
-apps/cli/dist/
-apps/mcp/dist/
+# Environment files — NEVER commit these
+.env
+.env.local
+.env.production
+.env.development
+.env.*.local
+apps/backend/.env
+apps/backend/.env.development
+apps/frontend/.env.local
+apps/frontend/.env.production
+apps/cli/.env
 
-# IDEs
-.vscode/
+# Credentials
+.unideploy/
+credentials.json
+*.pem
+*.key
+service-account*.json
+gcloud-credentials*.json
+
+# Python
+venv/
+.venv/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+
+# IDE
 .idea/
+.vscode/
 *.swp
 *.swo
-
-# OS
 .DS_Store
 Thumbs.db
 
-# UniDeploy Specific
-*.pem
-temp_analysis/
-temp/
-local_storage/
-firebase-credentials.json
-**/.env
-!**/.env.template
-!**/.env.example
+# Logs
+*.log
+logs/
+npm-debug.log*
 
-# Test databases
+# Testing
+coverage/
+.coverage
+htmlcov/
 *.db
 
-# Credentials (CLI stores API key here locally)
-# Never commit user credentials
-~/.unideploy/
+# Vercel
+.vercel
+
+# Turbo
+.turbo
+
+# TypeScript
+*.tsbuildinfo
+
+# Cloud build artifacts
+*.tar.gz
+
+# CLI/MCP build output
+apps/cli/dist/
+apps/mcp/dist/
