@@ -1,0 +1,72 @@
+name: UniDeploy
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install UniDeploy CLI
+        run: npm install -g unideploy
+
+      - name: Run UniDeploy scan
+        env:
+          UNIDEPLOY_API_KEY: ${{ secrets.UNIDEPLOY_API_KEY }}
+        run: unideploy scan --ci --output=json > unideploy-report.json
+
+      - name: Summarize report
+        if: always()
+        env:
+          DASHBOARD_URL: ${{ vars.UNIDEPLOY_DASHBOARD_URL || 'https://unideploy.in/dashboard' }}
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('unideploy-report.json', 'utf8'));
+          const critical = report?.severity_counts?.critical || 0;
+          const summary = [
+            '## UniDeploy Scan',
+            `Critical findings: ${critical}`,
+            `Dashboard: ${process.env.DASHBOARD_URL}`,
+          ].join('\n');
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary + '\n');
+          if (critical > 0) {
+            process.exit(1);
+          }
+          NODE
+
+      - name: Comment on pull request
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          DASHBOARD_URL: ${{ vars.UNIDEPLOY_DASHBOARD_URL || 'https://unideploy.in/dashboard' }}
+        with:
+          script: |
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('unideploy-report.json', 'utf8'));
+            const critical = report?.severity_counts?.critical || 0;
+            const body = [
+              '## UniDeploy Scan',
+              `Critical findings: ${critical}`,
+              `Dashboard: ${process.env.DASHBOARD_URL}`,
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
