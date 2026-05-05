@@ -39,6 +39,8 @@ gcloud run deploy unideploy-api \
   --set-secrets DODO_WEBHOOK_SECRET=dodo-webhook-secret:latest \
   --set-secrets SUPERMEMORY_API_KEY=supermemory-api-key:latest \
   --set-secrets AUTOSEND_API_KEY=autosend-api-key:latest \
+  --set-secrets E2B_API_KEY=e2b-api-key:latest \
+  --service-account unideploy-api@$PROJECT_ID.iam.gserviceaccount.com \
   --project $PROJECT_ID
 
 URL=$(gcloud run services describe unideploy-api \

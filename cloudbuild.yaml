@@ -46,6 +46,8 @@ steps:
       - --set-secrets=DODO_WEBHOOK_SECRET=dodo-webhook-secret:latest
       - --set-secrets=SUPERMEMORY_API_KEY=supermemory-api-key:latest
       - --set-secrets=AUTOSEND_API_KEY=autosend-api-key:latest
+      - --set-secrets=E2B_API_KEY=e2b-api-key:latest
+      - --service-account=unideploy-api@manifest-design-484007-m8.iam.gserviceaccount.com
 
 images:
   - 'gcr.io/$PROJECT_ID/unideploy-api:$COMMIT_SHA'
