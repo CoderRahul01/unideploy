@@ -73,18 +73,19 @@ function computeGrade(findings: Finding[]): "A" | "B" | "C" | "D" | "F" {
 // ── File collection ───────────────────────────────────────────────────────────
 
 const SCAN_EXTENSIONS = new Set([
-  ".ts", ".tsx", ".js", ".jsx", ".py", ".json", ".toml",
-  ".yaml", ".yml", ".sql", ".sh",
+  ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".py", ".json", ".toml",
+  ".yaml", ".yml", ".sql", ".sh", ".go", ".rb", ".java", ".kt", ".rs",
 ]);
 const SCAN_BASENAMES = new Set([
   "Dockerfile", "docker-compose.yml", "docker-compose.yaml",
   ".env.example", ".env.template", "next.config.js", "next.config.ts",
   "next.config.mjs", "vite.config.ts", "vite.config.js",
-  ".gitignore", ".unideployignore",
+  ".gitignore", ".unideployignore", "requirements.txt", "Pipfile",
 ]);
 const SKIP_DIRS = new Set([
   "node_modules", ".git", "dist", ".next", "__pycache__",
   "venv", ".venv", "build", "coverage", ".turbo", ".cache", ".vercel",
+  "vendor", ".adk", "site-packages", "eggs",
 ]);
 const SKIP_FILES = new Set([".env", ".env.local", ".env.production", ".env.development"]);
 
@@ -95,7 +96,9 @@ function loadIgnorePatterns(root: string): string[] {
     if (fs.existsSync(p)) {
       fs.readFileSync(p, "utf-8").split("\n").forEach(line => {
         const t = line.trim();
-        if (t && !t.startsWith("#")) patterns.push(t);
+        // Skip blank lines, comments, and glob patterns we can't safely evaluate
+        if (!t || t.startsWith("#") || t.includes("*") || t.includes("?") || t.includes("{")) return;
+        patterns.push(t);
       });
     }
   }
@@ -103,10 +106,17 @@ function loadIgnorePatterns(root: string): string[] {
 }
 
 function isIgnored(rel: string, patterns: string[]): boolean {
-  const parts = rel.split(path.sep);
+  const normalRel = rel.replace(/\\/g, "/");
+  const parts = normalRel.split("/");
   return patterns.some(p => {
     const name = p.replace(/^\//, "").replace(/\/$/, "");
-    return parts.includes(name) || rel.startsWith(name);
+    if (!name) return false;
+    // Pattern with slash: match as path prefix only
+    if (name.includes("/")) {
+      return normalRel === name || normalRel.startsWith(name + "/");
+    }
+    // Simple name: match any path segment (directory name or filename)
+    return parts.includes(name);
   });
 }
 
@@ -138,27 +148,43 @@ function collectFiles(root: string): { path: string; content: string }[] {
 }
 
 function detectFramework(root: string): string {
-  const pkg = path.join(root, "package.json");
-  const req = path.join(root, "requirements.txt");
-  const pyproj = path.join(root, "pyproject.toml");
-  if (fs.existsSync(pkg)) {
-    try {
-      const raw = JSON.parse(fs.readFileSync(pkg, "utf-8"));
-      const deps = { ...raw.dependencies ?? {}, ...raw.devDependencies ?? {} };
-      if (deps["next"]) return "Next.js";
-      if (deps["@nestjs/core"]) return "NestJS";
-      if (deps["express"]) return "Express";
-      if (deps["fastify"]) return "Fastify";
-      return "Node.js";
-    } catch { return "Node.js"; }
+  // Search root and one level of subdirectories for framework files
+  const searchDirs = [root];
+  try {
+    fs.readdirSync(root).forEach(entry => {
+      if (SKIP_DIRS.has(entry)) return;
+      const full = path.join(root, entry);
+      try { if (fs.statSync(full).isDirectory()) searchDirs.push(full); } catch { /* skip */ }
+    });
+  } catch { /* skip */ }
+
+  for (const dir of searchDirs) {
+    const pkg = path.join(dir, "package.json");
+    if (fs.existsSync(pkg)) {
+      try {
+        const raw = JSON.parse(fs.readFileSync(pkg, "utf-8"));
+        const deps = { ...raw.dependencies ?? {}, ...raw.devDependencies ?? {} };
+        if (deps["next"]) return "Next.js";
+        if (deps["@nestjs/core"]) return "NestJS";
+        if (deps["express"]) return "Express";
+        if (deps["fastify"]) return "Fastify";
+        return "Node.js";
+      } catch { /* try next */ }
+    }
   }
-  if (fs.existsSync(req) || fs.existsSync(pyproj)) {
-    const c = fs.existsSync(req) ? fs.readFileSync(req, "utf-8").toLowerCase() : "";
-    if (c.includes("fastapi")) return "FastAPI";
-    if (c.includes("django")) return "Django";
-    if (c.includes("flask")) return "Flask";
-    return "Python";
+
+  for (const dir of searchDirs) {
+    const req = path.join(dir, "requirements.txt");
+    const pyproj = path.join(dir, "pyproject.toml");
+    if (fs.existsSync(req) || fs.existsSync(pyproj)) {
+      const c = fs.existsSync(req) ? fs.readFileSync(req, "utf-8").toLowerCase() : "";
+      if (c.includes("fastapi")) return "FastAPI";
+      if (c.includes("django")) return "Django";
+      if (c.includes("flask")) return "Flask";
+      return "Python";
+    }
   }
+
   return "Unknown";
 }
 
@@ -641,6 +667,11 @@ program
 
     console.log(chalk.gray(`  Framework: ${framework} detected`));
     console.log(chalk.gray(`  Scanning ${files.length} files...`));
+    if (files.length === 0) {
+      console.log(chalk.yellow(`  ⚠ No scannable files found in ${cwd}`));
+      console.log(chalk.gray(`    Scans: .ts .tsx .js .jsx .mjs .py .json .yaml .toml .go .rb .java .kt .rs`));
+      console.log(chalk.gray(`    Make sure you're running this from your project root.`));
+    }
     console.log("");
     console.log(chalk.white(`  Your session code: `) + chalk.green.bold(formatted));
     console.log(chalk.gray(`  Open https://unideploy.in/connect and enter this code.`));
