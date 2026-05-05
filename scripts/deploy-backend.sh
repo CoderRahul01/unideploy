@@ -29,7 +29,7 @@ gcloud run deploy unideploy-api \
   --set-env-vars GOOGLE_GENAI_USE_VERTEXAI=TRUE \
   --set-env-vars GOOGLE_CLOUD_LOCATION=$REGION \
   --set-env-vars FRONTEND_URL=https://www.unideploy.in \
-  --set-env-vars "ALLOWED_ORIGINS=https://www.unideploy.in,https://unideploy.vercel.app" \
+  --set-env-vars "^@^ALLOWED_ORIGINS=https://www.unideploy.in,https://unideploy.vercel.app" \
   --set-env-vars BASE_URL=https://api.unideploy.in \
   --set-secrets INSFORGE_API_KEY=insforge-api-key:latest \
   --set-secrets INSFORGE_PROJECT_ID=insforge-project-id:latest \
