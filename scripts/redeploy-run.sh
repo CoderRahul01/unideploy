@@ -20,6 +20,7 @@ gcloud run deploy unideploy-api \
   --set-env-vars="GOOGLE_CLOUD_LOCATION=${REGION}" \
   --set-env-vars="FRONTEND_URL=https://www.unideploy.in" \
   --set-env-vars="BASE_URL=https://api.unideploy.in" \
+  --set-env-vars="AGENT_ENGINE_RESOURCE_NAME=projects/1063190328420/locations/us-central1/reasoningEngines/8590568460453412864" \
   --set-env-vars="^@^ALLOWED_ORIGINS=https://www.unideploy.in,https://unideploy.vercel.app" \
   --set-secrets="GEMINI_API_KEY=gemini-api-key:latest" \
   --set-secrets="E2B_API_KEY=e2b-api-key:latest" \
