@@ -25,44 +25,76 @@ jobs:
         run: npm install -g unideploy
 
       - name: Run UniDeploy scan
+        id: unideploy
         env:
           UNIDEPLOY_API_KEY: ${{ secrets.UNIDEPLOY_API_KEY }}
-        run: unideploy scan --ci --output=json > unideploy-report.json
+        run: unideploy scan --ci --json > unideploy-report.json
+
+      - name: Parse report
+        id: report
+        if: always()
+        run: |
+          CRITICAL=$(jq -r '.severity_counts.critical // 0' unideploy-report.json)
+          HIGH=$(jq -r '.severity_counts.high // 0' unideploy-report.json)
+          GRADE=$(jq -r '.security_grade // "?"' unideploy-report.json)
+          SCAN_ID=$(jq -r '.scan_id // ""' unideploy-report.json)
+          echo "critical=${CRITICAL}" >> $GITHUB_OUTPUT
+          echo "high=${HIGH}" >> $GITHUB_OUTPUT
+          echo "grade=${GRADE}" >> $GITHUB_OUTPUT
+          echo "scan_id=${SCAN_ID}" >> $GITHUB_OUTPUT
 
       - name: Summarize report
         if: always()
         env:
           DASHBOARD_URL: ${{ vars.UNIDEPLOY_DASHBOARD_URL || 'https://unideploy.in/dashboard' }}
+          CRITICAL: ${{ steps.report.outputs.critical }}
+          HIGH: ${{ steps.report.outputs.high }}
+          GRADE: ${{ steps.report.outputs.grade }}
+          SCAN_ID: ${{ steps.report.outputs.scan_id }}
         run: |
-          node <<'NODE'
-          const fs = require('fs');
-          const report = JSON.parse(fs.readFileSync('unideploy-report.json', 'utf8'));
-          const critical = report?.severity_counts?.critical || 0;
-          const summary = [
-            '## UniDeploy Scan',
-            `Critical findings: ${critical}`,
-            `Dashboard: ${process.env.DASHBOARD_URL}`,
-          ].join('\n');
-          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary + '\n');
-          if (critical > 0) {
-            process.exit(1);
-          }
-          NODE
+          {
+            echo "## UniDeploy Security Scan"
+            echo ""
+            echo "| Grade | Critical | High |"
+            echo "|-------|----------|------|"
+            echo "| ${GRADE} | ${CRITICAL} | ${HIGH} |"
+            echo ""
+            if [ -n "${SCAN_ID}" ]; then
+              echo "[View full report](${DASHBOARD_URL}?scan_id=${SCAN_ID})"
+            else
+              echo "[View dashboard](${DASHBOARD_URL})"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "${CRITICAL}" -gt 0 ]; then
+            echo "::error::UniDeploy found ${CRITICAL} CRITICAL finding(s)"
+            exit 1
+          fi
 
       - name: Comment on pull request
         if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
         env:
           DASHBOARD_URL: ${{ vars.UNIDEPLOY_DASHBOARD_URL || 'https://unideploy.in/dashboard' }}
+          CRITICAL: ${{ steps.report.outputs.critical }}
+          HIGH: ${{ steps.report.outputs.high }}
+          GRADE: ${{ steps.report.outputs.grade }}
+          SCAN_ID: ${{ steps.report.outputs.scan_id }}
         with:
           script: |
-            const fs = require('fs');
-            const report = JSON.parse(fs.readFileSync('unideploy-report.json', 'utf8'));
-            const critical = report?.severity_counts?.critical || 0;
+            const critical = parseInt(process.env.CRITICAL || '0', 10);
+            const high = parseInt(process.env.HIGH || '0', 10);
+            const grade = process.env.GRADE || '?';
+            const scanId = process.env.SCAN_ID || '';
+            const dashUrl = process.env.DASHBOARD_URL;
+            const reportUrl = scanId ? `${dashUrl}?scan_id=${scanId}` : dashUrl;
+            const status = critical > 0 ? '🔴 Failed' : '✅ Passed';
             const body = [
-              '## UniDeploy Scan',
-              `Critical findings: ${critical}`,
-              `Dashboard: ${process.env.DASHBOARD_URL}`,
+              '## UniDeploy Security Scan',
+              '',
+              `**Status**: ${status}`,
+              `**Grade**: ${grade}   **Critical**: ${critical}   **High**: ${high}`,
+              '',
+              `[View full report](${reportUrl})`,
             ].join('\n');
             await github.rest.issues.createComment({
               owner: context.repo.owner,
