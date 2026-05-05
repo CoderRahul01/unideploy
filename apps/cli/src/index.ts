@@ -130,45 +130,58 @@ function collectFiles(root: string): { path: string; content: string }[] {
     for (const entry of entries) {
       if (SKIP_DIRS.has(entry)) continue;
       const full = path.join(dir, entry);
-      const rel = path.relative(root, full);
+      const rel = path.relative(root, full).replace(/\\/g, "/");
       if (isIgnored(rel, ignorePatterns)) continue;
       let stat: fs.Stats;
-      try { stat = fs.statSync(full); } catch { continue; }
+      try { stat = fs.statSync(full, { bigint: false }); } catch { continue; }
+      // Skip symlinks — they can point to network paths that ETIMEDOUT
+      if (stat.isSymbolicLink()) continue;
       if (stat.isDirectory()) { walk(full); continue; }
       if (SKIP_FILES.has(path.basename(full))) continue;
       if (!SCAN_EXTENSIONS.has(path.extname(entry)) && !SCAN_BASENAMES.has(entry)) continue;
       if (stat.size > 100_000) continue;
-      try {
-        files.push({ path: rel, content: fs.readFileSync(full, "utf-8") });
-      } catch { continue; }
+      const content = safeReadFile(full);
+      if (content) files.push({ path: rel, content });
     }
   }
   walk(root);
   return files;
 }
 
+function safeReadFile(p: string): string {
+  try { return fs.readFileSync(p, "utf-8"); } catch { return ""; }
+}
+
+function safeIsFile(p: string): boolean {
+  try { return fs.statSync(p, { bigint: false }).isFile(); } catch { return false; }
+}
+
+function safeIsDir(p: string): boolean {
+  try { return fs.statSync(p, { bigint: false }).isDirectory(); } catch { return false; }
+}
+
 function detectFramework(root: string): string {
   // Search root and one level of subdirectories for framework files
   const searchDirs = [root];
   try {
-    fs.readdirSync(root).forEach(entry => {
-      if (SKIP_DIRS.has(entry)) return;
+    for (const entry of fs.readdirSync(root)) {
+      if (SKIP_DIRS.has(entry) || entry.startsWith(".")) continue;
       const full = path.join(root, entry);
-      try { if (fs.statSync(full).isDirectory()) searchDirs.push(full); } catch { /* skip */ }
-    });
+      if (safeIsDir(full)) searchDirs.push(full);
+    }
   } catch { /* skip */ }
 
   for (const dir of searchDirs) {
     const pkg = path.join(dir, "package.json");
-    if (fs.existsSync(pkg)) {
+    if (safeIsFile(pkg)) {
       try {
-        const raw = JSON.parse(fs.readFileSync(pkg, "utf-8"));
+        const raw = JSON.parse(safeReadFile(pkg));
         const deps = { ...raw.dependencies ?? {}, ...raw.devDependencies ?? {} };
         if (deps["next"]) return "Next.js";
         if (deps["@nestjs/core"]) return "NestJS";
         if (deps["express"]) return "Express";
         if (deps["fastify"]) return "Fastify";
-        return "Node.js";
+        if (Object.keys(deps).length > 0) return "Node.js";
       } catch { /* try next */ }
     }
   }
@@ -176,13 +189,16 @@ function detectFramework(root: string): string {
   for (const dir of searchDirs) {
     const req = path.join(dir, "requirements.txt");
     const pyproj = path.join(dir, "pyproject.toml");
-    if (fs.existsSync(req) || fs.existsSync(pyproj)) {
-      const c = fs.existsSync(req) ? fs.readFileSync(req, "utf-8").toLowerCase() : "";
-      if (c.includes("fastapi")) return "FastAPI";
-      if (c.includes("django")) return "Django";
-      if (c.includes("flask")) return "Flask";
-      return "Python";
-    }
+    try {
+      if (safeIsFile(req)) {
+        const c = safeReadFile(req).toLowerCase();
+        if (c.includes("fastapi")) return "FastAPI";
+        if (c.includes("django")) return "Django";
+        if (c.includes("flask")) return "Flask";
+        if (c.length > 0) return "Python";
+      }
+      if (safeIsFile(pyproj)) return "Python";
+    } catch { /* try next */ }
   }
 
   return "Unknown";
