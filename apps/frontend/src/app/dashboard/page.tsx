@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { UniDeploySocket, WSMessage, Finding as WSFinding, ScanSummary } from "@/lib/websocket";
+import { UniDeploySocket, WSMessage } from "@/lib/websocket";
 import {
-  Finding, RemediationPlan, ScanStatus,
-  startScan, getScanStatus, getScanPlan, triggerFix,
+  Finding, RemediationPlan, ScanStatus, ScanReport, ReportFinding,
+  startScan, getScanStatus, getScanPlan, triggerFix, getScanReport,
 } from "@/lib/api";
 import SecurityGrade from "@/components/SecurityGrade";
 
@@ -27,32 +27,153 @@ const C = {
   display: "var(--font-display), Sora, sans-serif",
 };
 
-const severityColor = (s: string) =>
-  s === "CRITICAL" ? C.red : s === "HIGH" ? C.amber : s === "MEDIUM" ? "#E0D060" : C.muted;
+const severityColor = (s: string) => {
+  const n = s.toLowerCase();
+  if (n === "critical") return C.red;
+  if (n === "high") return C.amber;
+  if (n === "medium") return "#E0D060";
+  return C.muted;
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  secrets: "Secrets",
+  auth: "Auth",
+  rls: "RLS",
+  cors: "CORS",
+  rate_limiting: "Rate Limiting",
+  input_validation: "Input Validation",
+  dependency: "Dependency",
+  error_handling: "Error Handling",
+  other: "Other",
+};
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    queued: C.muted,
-    running: C.amber,
-    planning: C.blue,
-    done: C.green,
-    failed: C.red,
-    scanning: C.amber,
-    complete: C.green,
-    connected: C.blue,
-    waiting: C.muted,
+    queued: C.muted, running: C.amber, planning: C.blue,
+    done: C.green, failed: C.red, scanning: C.amber,
+    complete: C.green, connected: C.blue, waiting: C.muted,
   };
+  const col = colors[status] ?? C.muted;
   return (
     <span style={{
       fontFamily: C.mono, fontSize: 12, fontWeight: 700, letterSpacing: "0.08em",
-      color: colors[status] ?? C.muted, textTransform: "uppercase",
-      padding: "3px 10px", border: `1px solid ${colors[status] ?? C.muted}33`,
-      borderRadius: 4, background: `${colors[status] ?? C.muted}11`,
+      color: col, textTransform: "uppercase", padding: "3px 10px",
+      border: `1px solid ${col}33`, borderRadius: 4, background: `${col}11`,
     }}>
       {status}
     </span>
+  );
+}
+
+function SeverityBar({ findings }: { findings: Array<{ severity: string }> }) {
+  const counts = {
+    critical: findings.filter(f => f.severity.toLowerCase() === "critical").length,
+    high: findings.filter(f => f.severity.toLowerCase() === "high").length,
+    medium: findings.filter(f => f.severity.toLowerCase() === "medium").length,
+    low: findings.filter(f => f.severity.toLowerCase() === "low").length,
+  };
+  return (
+    <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+      {(["critical", "high", "medium", "low"] as const).map(sev => (
+        <div key={sev} style={{ textAlign: "center" }}>
+          <div style={{
+            fontSize: 28, fontWeight: 800, color: severityColor(sev),
+            fontFamily: C.display,
+          }}>{counts[sev]}</div>
+          <div style={{ fontSize: 11, color: C.muted, fontFamily: C.mono, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            {sev}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ReportFindingCard({
+  f,
+  onFix,
+}: {
+  f: ReportFinding;
+  onFix?: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div style={{
+      background: C.surface, border: `1px solid ${C.border}`,
+      borderLeft: `3px solid ${severityColor(f.severity)}`,
+      borderRadius: 8, marginBottom: 10, overflow: "hidden",
+    }}>
+      <div
+        style={{ padding: "12px 16px", display: "flex", gap: 12, alignItems: "flex-start", cursor: "pointer" }}
+        onClick={() => setExpanded(e => !e)}
+      >
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4, flexWrap: "wrap" }}>
+            <span style={{
+              fontSize: 11, fontWeight: 700, color: severityColor(f.severity),
+              fontFamily: C.mono, letterSpacing: "0.06em", textTransform: "uppercase",
+            }}>{f.severity}</span>
+            <span style={{
+              fontSize: 10, fontFamily: C.mono, color: C.muted,
+              background: `${C.muted}18`, padding: "1px 6px", borderRadius: 3,
+            }}>{CATEGORY_LABELS[f.category] ?? f.category}</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{f.title}</span>
+          </div>
+          <div style={{ fontSize: 12, color: C.muted, fontFamily: C.mono }}>
+            {f.file_path}{f.line_number ? `:${f.line_number}` : ""}
+          </div>
+        </div>
+        {f.auto_fixable && (
+          <span style={{ fontSize: 10, color: C.green, fontFamily: C.mono,
+            border: `1px solid ${C.green}44`, padding: "2px 7px", borderRadius: 3 }}>
+            auto-fixable
+          </span>
+        )}
+        <span style={{ color: C.muted, fontSize: 12 }}>{expanded ? "▲" : "▼"}</span>
+      </div>
+
+      {expanded && (
+        <div style={{ padding: "0 16px 16px", borderTop: `1px solid ${C.border}` }}>
+          <p style={{ fontSize: 14, color: C.text, marginTop: 12, lineHeight: 1.6 }}>
+            {f.description}
+          </p>
+          {f.evidence && (
+            <pre style={{
+              background: "#0A120A", padding: "10px 14px", borderRadius: 6,
+              fontFamily: C.mono, fontSize: 12, color: "#C8D8B0", overflowX: "auto",
+              marginTop: 10, border: `1px solid ${C.border}`,
+            }}>{f.evidence}</pre>
+          )}
+          {f.fix_guideline && (
+            <div style={{
+              marginTop: 12, padding: "12px 14px", background: "#0D1D0D",
+              borderRadius: 6, border: `1px solid ${C.border}`,
+            }}>
+              <div style={{ fontSize: 11, color: C.green, fontWeight: 700, marginBottom: 6, fontFamily: C.mono }}>
+                FIX GUIDELINE
+              </div>
+              <p style={{ fontSize: 13, color: C.text, lineHeight: 1.7, margin: 0 }}>
+                {f.fix_guideline}
+              </p>
+            </div>
+          )}
+          {f.auto_fixable && onFix && (
+            <button
+              onClick={onFix}
+              style={{
+                marginTop: 12, background: C.green, color: C.bg, border: "none",
+                padding: "7px 16px", borderRadius: 6, cursor: "pointer",
+                fontWeight: 700, fontSize: 13, fontFamily: C.font,
+              }}
+            >
+              Fix with AI
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -70,8 +191,10 @@ function FindingRow({ f, plan, selected, onToggle, onFix }: {
       borderLeft: `3px solid ${severityColor(f.severity)}`,
       borderRadius: 8, marginBottom: 10, overflow: "hidden",
     }}>
-      <div style={{ padding: "12px 16px", display: "flex", gap: 12, alignItems: "flex-start", cursor: "pointer" }}
-        onClick={() => setExpanded(!expanded)}>
+      <div
+        style={{ padding: "12px 16px", display: "flex", gap: 12, alignItems: "flex-start", cursor: "pointer" }}
+        onClick={() => setExpanded(e => !e)}
+      >
         {f.auto_fixable && (
           <input type="checkbox" checked={selected} onChange={onToggle}
             onClick={(e) => e.stopPropagation()}
@@ -114,16 +237,6 @@ function FindingRow({ f, plan, selected, onToggle, onFix }: {
                   fontFamily: C.mono, fontSize: 12, color: "#C8D8B0", overflowX: "auto",
                   marginTop: 10, border: `1px solid ${C.border}` }}>{plan.code_example}</pre>
               )}
-              {plan.references.length > 0 && (
-                <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {plan.references.map((ref, i) => (
-                    <a key={i} href={ref} target="_blank" rel="noopener noreferrer"
-                      style={{ fontSize: 11, color: C.blue, fontFamily: C.mono }}>
-                      {ref.replace(/^https?:\/\//, "").split("/")[0]}
-                    </a>
-                  ))}
-                </div>
-              )}
               <p style={{ fontSize: 12, color: C.red, marginTop: 10, fontStyle: "italic" }}>
                 Risk if ignored: {plan.risk_if_ignored}
               </p>
@@ -144,6 +257,177 @@ function FindingRow({ f, plan, selected, onToggle, onFix }: {
   );
 }
 
+// ── CLI Session / Report View ─────────────────────────────────────────────────
+
+function CliReportView({ sessionId }: { sessionId: string }) {
+  const [report, setReport] = useState<ScanReport | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [scanStatus, setScanStatus] = useState<"waiting" | "scanning" | "complete">("waiting");
+  const [filesScanned, setFilesScanned] = useState(0);
+  const [totalFiles, setTotalFiles] = useState(0);
+  const socketRef = useRef<UniDeploySocket | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Load report immediately (session might already be complete)
+  useEffect(() => {
+    getScanReport(sessionId)
+      .then(r => { setReport(r); setScanStatus("complete"); })
+      .catch(() => setScanStatus("waiting"));
+  }, [sessionId]);
+
+  // Connect browser WebSocket to receive live progress + scan_complete
+  useEffect(() => {
+    const ws = new UniDeploySocket(
+      sessionId,
+      (msg: WSMessage) => {
+        if (msg.type === "scan_progress" as string) {
+          const m = msg as unknown as { type: string; files_scanned: number; total_files: number };
+          setScanStatus("scanning");
+          setFilesScanned(m.files_scanned ?? 0);
+          setTotalFiles(m.total_files ?? 0);
+        } else if (msg.type === "scan_complete" as string) {
+          setScanStatus("complete");
+          // Poll until report is available
+          pollRef.current = setInterval(async () => {
+            try {
+              const r = await getScanReport(sessionId);
+              setReport(r);
+              clearInterval(pollRef.current!);
+            } catch { /* keep polling */ }
+          }, 1500);
+        }
+      }
+    );
+    ws.connect();
+    socketRef.current = ws;
+    return () => {
+      ws.disconnect();
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [sessionId]);
+
+  // ── Waiting / Scanning state ────────────────────────────────────────────────
+
+  if (!report) {
+    const progressPct = totalFiles > 0 ? Math.round((filesScanned / totalFiles) * 100) : 0;
+    return (
+      <div style={{ maxWidth: 800, margin: "0 auto", padding: "40px 24px", fontFamily: C.font }}>
+        <nav style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 48 }}>
+          <a href="/" style={{ fontFamily: C.mono, fontSize: 15, fontWeight: 700, color: C.text, textDecoration: "none" }}>
+            unideploy
+          </a>
+        </nav>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 40,
+          padding: "14px 18px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10 }}>
+          <StatusBadge status={scanStatus} />
+          <div style={{ flex: 1, fontSize: 14, color: C.text }}>
+            {scanStatus === "waiting" && "Waiting for CLI to connect and scan..."}
+            {scanStatus === "scanning" && `Scanning ${totalFiles > 0 ? `${filesScanned} / ${totalFiles} files` : "files"}...`}
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        {scanStatus === "scanning" && totalFiles > 0 && (
+          <div style={{ marginBottom: 32 }}>
+            <div style={{ height: 6, background: C.surface, borderRadius: 99,
+              border: `1px solid ${C.border}`, overflow: "hidden" }}>
+              <div style={{
+                height: "100%", background: C.green, borderRadius: 99,
+                transition: "width 0.4s ease", width: `${progressPct}%`,
+              }} />
+            </div>
+            <div style={{ fontSize: 12, color: C.muted, marginTop: 6, fontFamily: C.mono }}>
+              {filesScanned} / {totalFiles} files ({progressPct}%)
+            </div>
+          </div>
+        )}
+
+        <div style={{ textAlign: "center", padding: "60px 0", color: C.muted, fontSize: 14 }}>
+          {loadError
+            ? "Could not load report. The scan may still be running."
+            : "Run npx unideploy@latest init in your project and enter the code at unideploy.in/connect"}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Report view ─────────────────────────────────────────────────────────────
+
+  const { grade, project_name, framework, files_scanned, total_issues, auto_fixable, findings } = report;
+  const autoFixableList = findings.filter(f => f.auto_fixable);
+
+  return (
+    <div style={{ maxWidth: 800, margin: "0 auto", padding: "40px 24px", fontFamily: C.font }}>
+      {/* Nav */}
+      <nav style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 48 }}>
+        <a href="/" style={{ fontFamily: C.mono, fontSize: 15, fontWeight: 700, color: C.text, textDecoration: "none" }}>
+          unideploy
+        </a>
+        <a href="/connect" style={{ fontSize: 13, color: C.muted, textDecoration: "none" }}>
+          New scan →
+        </a>
+      </nav>
+
+      {/* Header: project + grade */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+        marginBottom: 32, flexWrap: "wrap", gap: 16 }}>
+        <div>
+          <h1 style={{ fontFamily: C.display, fontSize: "clamp(24px,4vw,34px)", fontWeight: 800,
+            color: C.text, letterSpacing: "-0.03em", marginBottom: 6 }}>
+            {project_name || "Security Report"}
+          </h1>
+          <div style={{ display: "flex", gap: 16, fontSize: 13, color: C.muted, flexWrap: "wrap" }}>
+            {framework && <span>Framework: <span style={{ color: C.text }}>{framework}</span></span>}
+            <span>Files scanned: <span style={{ color: C.text }}>{files_scanned}</span></span>
+          </div>
+        </div>
+        <SecurityGrade grade={grade} size="lg" />
+      </div>
+
+      {/* Severity breakdown */}
+      <div style={{ padding: "20px 24px", background: C.surface, border: `1px solid ${C.border}`,
+        borderRadius: 10, marginBottom: 24, display: "flex", gap: 32, alignItems: "center", flexWrap: "wrap" }}>
+        <SeverityBar findings={findings} />
+        <div style={{ marginLeft: "auto", textAlign: "right" }}>
+          <div style={{ fontSize: 13, color: C.muted }}>Auto-fixable</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: C.green, fontFamily: C.display }}>
+            {auto_fixable}
+          </div>
+        </div>
+      </div>
+
+      {/* Fix command hint */}
+      {auto_fixable > 0 && (
+        <div style={{ padding: "12px 16px", background: `${C.green}0D`,
+          border: `1px solid ${C.green}33`, borderRadius: 8, marginBottom: 24,
+          fontFamily: C.mono, fontSize: 13, color: C.green }}>
+          Run <strong>unideploy fix</strong> to apply {auto_fixable} auto-fix{auto_fixable !== 1 ? "es" : ""}
+        </div>
+      )}
+
+      {/* Findings list */}
+      {total_issues === 0 ? (
+        <div style={{ textAlign: "center", padding: "60px 0", color: C.muted }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: C.text }}>No issues found</div>
+          <div style={{ fontSize: 14, marginTop: 8 }}>Your project passes all local security checks.</div>
+        </div>
+      ) : (
+        findings.map(f => (
+          <ReportFindingCard
+            key={f.id}
+            f={f}
+            onFix={f.auto_fixable ? () => {
+              window.open(`/dashboard?session_id=${sessionId}#fix-${f.id}`, "_self");
+            } : undefined}
+          />
+        ))
+      )}
+    </div>
+  );
+}
+
 // ── GitHub Scan Mode ──────────────────────────────────────────────────────────
 
 function GithubScanFlow({ initialScanId }: { initialScanId?: string }) {
@@ -156,9 +440,8 @@ function GithubScanFlow({ initialScanId }: { initialScanId?: string }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [fixing, setFixing] = useState(false);
   const [prResult, setPrResult] = useState<{ pr_url: string | null; error: string | null } | null>(null);
-  const pollRef = useRef<NodeJS.Timeout | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Poll scan status
   useEffect(() => {
     if (!scanId) return;
     const poll = async () => {
@@ -170,13 +453,10 @@ function GithubScanFlow({ initialScanId }: { initialScanId?: string }) {
           if (s.status === "done") {
             const planData = await getScanPlan(scanId).catch(() => null);
             if (planData) setPlans(planData.remediation_plans ?? []);
-            const autoFixable = s.findings.filter(f => f.auto_fixable).map(f => f.id);
-            setSelectedIds(new Set(autoFixable));
+            setSelectedIds(new Set(s.findings.filter(f => f.auto_fixable).map(f => f.id)));
           }
         }
-      } catch {
-        clearInterval(pollRef.current!);
-      }
+      } catch { clearInterval(pollRef.current!); }
     };
     poll();
     pollRef.current = setInterval(poll, 3000);
@@ -198,9 +478,7 @@ function GithubScanFlow({ initialScanId }: { initialScanId?: string }) {
       setPrResult({ pr_url: result.pr_url, error: result.error });
     } catch (e: unknown) {
       setPrResult({ pr_url: null, error: e instanceof Error ? e.message : "Fix failed" });
-    } finally {
-      setFixing(false);
-    }
+    } finally { setFixing(false); }
   };
 
   const planByFindingId = Object.fromEntries(plans.map(p => [p.finding_id, p]));
@@ -208,10 +486,10 @@ function GithubScanFlow({ initialScanId }: { initialScanId?: string }) {
 
   return (
     <div style={{ maxWidth: 800, margin: "0 auto", padding: "40px 24px", fontFamily: C.font }}>
-      {/* Header */}
       <nav style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 48 }}>
-        <a href="/" style={{ fontFamily: C.mono, fontSize: 15, fontWeight: 700,
-          color: C.text, textDecoration: "none" }}>unideploy</a>
+        <a href="/" style={{ fontFamily: C.mono, fontSize: 15, fontWeight: 700, color: C.text, textDecoration: "none" }}>
+          unideploy
+        </a>
         <a href="/connect" style={{ fontSize: 13, color: C.muted, textDecoration: "none" }}>
           CLI session →
         </a>
@@ -222,70 +500,46 @@ function GithubScanFlow({ initialScanId }: { initialScanId?: string }) {
         Security Scanner
       </h1>
       <p style={{ color: C.muted, fontSize: 14, marginBottom: 32 }}>
-        Paste a GitHub repository URL — we'll clone it inside an isolated sandbox and scan for production issues.
+        Paste a GitHub repository URL — we'll scan it inside an isolated sandbox.
       </p>
 
-      {/* Scan input form */}
       {!scanId && (
         <div style={{ display: "flex", gap: 10, marginBottom: 40, flexWrap: "wrap" }}>
-          <input
-            value={githubUrl}
-            onChange={e => setGithubUrl(e.target.value)}
+          <input value={githubUrl} onChange={e => setGithubUrl(e.target.value)}
             onKeyDown={e => e.key === "Enter" && handleStartScan()}
             placeholder="https://github.com/you/your-repo"
-            style={{
-              flex: 1, minWidth: 280, padding: "10px 14px",
-              background: C.surface, border: `1px solid ${C.border}`,
-              borderRadius: 8, color: C.text, fontFamily: C.mono, fontSize: 14,
-              outline: "none",
-            }}
-          />
-          <input
-            value={branch}
-            onChange={e => setBranch(e.target.value)}
-            placeholder="branch"
-            style={{
-              width: 100, padding: "10px 12px",
-              background: C.surface, border: `1px solid ${C.border}`,
-              borderRadius: 8, color: C.text, fontFamily: C.mono, fontSize: 14,
-              outline: "none",
-            }}
-          />
+            style={{ flex: 1, minWidth: 280, padding: "10px 14px", background: C.surface,
+              border: `1px solid ${C.border}`, borderRadius: 8, color: C.text,
+              fontFamily: C.mono, fontSize: 14, outline: "none" }} />
+          <input value={branch} onChange={e => setBranch(e.target.value)} placeholder="branch"
+            style={{ width: 100, padding: "10px 12px", background: C.surface,
+              border: `1px solid ${C.border}`, borderRadius: 8, color: C.text,
+              fontFamily: C.mono, fontSize: 14, outline: "none" }} />
           <button onClick={handleStartScan} disabled={!githubUrl.trim()} style={{
             padding: "10px 24px", background: C.green, color: C.bg, border: "none",
             borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: "pointer",
             fontFamily: C.font, opacity: githubUrl.trim() ? 1 : 0.4,
-          }}>
-            Scan Repo
-          </button>
+          }}>Scan Repo</button>
         </div>
       )}
 
-      {/* Scan status bar */}
       {scan && (
         <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 32,
-          padding: "14px 18px", background: C.surface, border: `1px solid ${C.border}`,
-          borderRadius: 10 }}>
+          padding: "14px 18px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10 }}>
           <StatusBadge status={scan.status} />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 13, color: C.text, fontFamily: C.mono }}>
               {scan.github_url.replace("https://github.com/", "")} @ {scan.branch}
             </div>
-            {scan.framework && (
-              <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
-                framework: {scan.framework}
-              </div>
-            )}
+            {scan.framework && <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>framework: {scan.framework}</div>}
           </div>
           {scan.security_grade && <SecurityGrade grade={scan.security_grade} size="md" />}
         </div>
       )}
 
-      {/* Loading state */}
       {scan && ["queued", "running", "planning"].includes(scan.status) && (
         <div style={{ textAlign: "center", padding: "60px 0", color: C.muted }}>
-          <div style={{ fontSize: 24, marginBottom: 16, animation: "spin 1.5s linear infinite",
-            display: "inline-block" }}>⟳</div>
+          <div style={{ fontSize: 24, marginBottom: 16, animation: "spin 1.5s linear infinite", display: "inline-block" }}>⟳</div>
           <div style={{ fontSize: 14 }}>
             {scan.status === "queued" && "Waiting in queue..."}
             {scan.status === "running" && "Cloning repo and running security checks inside sandbox..."}
@@ -295,18 +549,14 @@ function GithubScanFlow({ initialScanId }: { initialScanId?: string }) {
         </div>
       )}
 
-      {/* Error state */}
       {scan?.status === "failed" && (
-        <div style={{ padding: "20px", background: `${C.red}11`, border: `1px solid ${C.red}33`,
-          borderRadius: 8, color: C.red, fontSize: 14 }}>
+        <div style={{ padding: "20px", background: `${C.red}11`, border: `1px solid ${C.red}33`, borderRadius: 8, color: C.red, fontSize: 14 }}>
           Scan failed: {scan.error ?? "Unknown error"}
         </div>
       )}
 
-      {/* Results */}
       {scan?.status === "done" && (
         <>
-          {/* Summary bar */}
           <div style={{ display: "flex", gap: 20, marginBottom: 24, flexWrap: "wrap" }}>
             {[
               { label: "CRITICAL", count: scan.findings.filter(f => f.severity === "CRITICAL").length, color: C.red },
@@ -321,20 +571,15 @@ function GithubScanFlow({ initialScanId }: { initialScanId?: string }) {
             ))}
           </div>
 
-          {/* PR result */}
           {prResult && (
             <div style={{ padding: "16px 20px", marginBottom: 24, borderRadius: 8,
               background: prResult.pr_url ? `${C.green}11` : `${C.red}11`,
               border: `1px solid ${prResult.pr_url ? C.green : C.red}33` }}>
               {prResult.pr_url ? (
                 <div>
-                  <div style={{ color: C.green, fontWeight: 700, marginBottom: 8 }}>
-                    ✓ Pull Request opened
-                  </div>
+                  <div style={{ color: C.green, fontWeight: 700, marginBottom: 8 }}>✓ Pull Request opened</div>
                   <a href={prResult.pr_url} target="_blank" rel="noopener noreferrer"
-                    style={{ color: C.blue, fontFamily: C.mono, fontSize: 13 }}>
-                    {prResult.pr_url}
-                  </a>
+                    style={{ color: C.blue, fontFamily: C.mono, fontSize: 13 }}>{prResult.pr_url}</a>
                 </div>
               ) : (
                 <div style={{ color: C.red }}>Fix error: {prResult.error}</div>
@@ -342,22 +587,19 @@ function GithubScanFlow({ initialScanId }: { initialScanId?: string }) {
             </div>
           )}
 
-          {/* Apply Fixes bar */}
           {fixableFindings.length > 0 && !prResult && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
               padding: "14px 18px", background: C.surface, border: `1px solid ${C.border}`,
               borderRadius: 10, marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
               <div style={{ fontSize: 13, color: C.text }}>
                 <span style={{ color: C.green, fontWeight: 700 }}>{selectedIds.size}</span> of{" "}
-                {fixableFindings.length} auto-fixable findings selected
+                {fixableFindings.length} auto-fixable selected
               </div>
               <div style={{ display: "flex", gap: 10 }}>
                 <button onClick={() => setSelectedIds(new Set(fixableFindings.map(f => f.id)))}
                   style={{ padding: "7px 14px", background: "transparent", color: C.muted,
                     border: `1px solid ${C.border}`, borderRadius: 6, cursor: "pointer",
-                    fontSize: 12, fontFamily: C.font }}>
-                  Select all
-                </button>
+                    fontSize: 12, fontFamily: C.font }}>Select all</button>
                 <button onClick={handleFix} disabled={selectedIds.size === 0 || fixing}
                   style={{ padding: "7px 18px", background: C.green, color: C.bg, border: "none",
                     borderRadius: 6, cursor: selectedIds.size === 0 || fixing ? "not-allowed" : "pointer",
@@ -369,23 +611,15 @@ function GithubScanFlow({ initialScanId }: { initialScanId?: string }) {
             </div>
           )}
 
-          {/* Findings list */}
           {scan.findings.map(f => (
-            <FindingRow
-              key={f.id}
-              f={f}
-              plan={planByFindingId[f.id]}
+            <FindingRow key={f.id} f={f} plan={planByFindingId[f.id]}
               selected={selectedIds.has(f.id)}
               onToggle={() => {
                 const next = new Set(selectedIds);
-                if (next.has(f.id)) next.delete(f.id);
-                else next.add(f.id);
+                next.has(f.id) ? next.delete(f.id) : next.add(f.id);
                 setSelectedIds(next);
               }}
-              onFix={f.auto_fixable ? () => {
-                setSelectedIds(new Set([f.id]));
-                handleFix();
-              } : undefined}
+              onFix={f.auto_fixable ? () => { setSelectedIds(new Set([f.id])); handleFix(); } : undefined}
             />
           ))}
 
@@ -393,117 +627,9 @@ function GithubScanFlow({ initialScanId }: { initialScanId?: string }) {
             <div style={{ textAlign: "center", padding: "60px 0", color: C.muted }}>
               <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
               <div style={{ fontSize: 16, fontWeight: 600, color: C.text }}>No issues found</div>
-              <div style={{ fontSize: 14, marginTop: 8 }}>Your repo passes all {13} security checks.</div>
             </div>
           )}
         </>
-      )}
-    </div>
-  );
-}
-
-// ── CLI Session Mode (existing WebSocket flow) ────────────────────────────────
-
-function CliSessionFlow({ sessionId, machineProp }: { sessionId: string; machineProp: string | null }) {
-  const [machine, setMachine] = useState(machineProp);
-  const [status, setStatus] = useState<"waiting" | "connected" | "scanning" | "complete">("waiting");
-  const [findings, setFindings] = useState<WSFinding[]>([]);
-  const [summary, setSummary] = useState<ScanSummary | null>(null);
-  const [socket, setSocket] = useState<UniDeploySocket | null>(null);
-
-  useEffect(() => {
-    const ws = new UniDeploySocket(
-      sessionId,
-      (msg: WSMessage) => {
-        if (msg.type === "browser_connected") setStatus("connected");
-        else if (msg.type === "cli_ready") {
-          setStatus("scanning");
-          if (msg.machine_name) setMachine(msg.machine_name);
-        } else if (msg.type === "finding") {
-          setFindings(prev => [...prev, msg.finding]);
-        } else if (msg.type === "scan_complete") {
-          setStatus("complete");
-          setSummary(msg.summary);
-        }
-      }
-    );
-    ws.connect();
-    setSocket(ws);
-    return () => ws.disconnect();
-  }, [sessionId]);
-
-  return (
-    <div style={{ maxWidth: 800, margin: "0 auto", padding: "40px 24px", fontFamily: C.font }}>
-      <nav style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 48 }}>
-        <a href="/" style={{ fontFamily: C.mono, fontSize: 15, fontWeight: 700,
-          color: C.text, textDecoration: "none" }}>unideploy</a>
-        <a href="/dashboard" style={{ fontSize: 13, color: C.muted, textDecoration: "none" }}>
-          Scan GitHub repo →
-        </a>
-      </nav>
-
-      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 40,
-        padding: "14px 18px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10 }}>
-        <StatusBadge status={status} />
-        <div style={{ fontSize: 14, color: C.text }}>{machine ?? "Connecting..."}</div>
-        {summary && <SecurityGrade grade={summary.grade} size="md" />}
-      </div>
-
-      {status === "waiting" && (
-        <div style={{ textAlign: "center", padding: "60px 0", color: C.muted, fontSize: 14 }}>
-          Waiting for CLI to connect...
-          <div style={{ fontFamily: C.mono, fontSize: 12, marginTop: 12, color: C.border }}>
-            Run <span style={{ color: C.green }}>npx unideploy init</span> and enter the code at{" "}
-            <span style={{ color: C.green }}>unideploy.in/connect</span>
-          </div>
-        </div>
-      )}
-
-      {findings.map((f, i) => (
-        <div key={i} style={{ background: C.surface, border: `1px solid ${C.border}`,
-          borderLeft: `3px solid ${severityColor(f.severity)}`, borderRadius: 8,
-          padding: "12px 16px", marginBottom: 10 }}>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: severityColor(f.severity),
-              fontFamily: C.mono }}>{f.severity}</span>
-            <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{f.title}</span>
-          </div>
-          <div style={{ fontSize: 12, color: C.muted, fontFamily: C.mono, marginBottom: 6 }}>
-            {f.file}:{f.line}
-          </div>
-          <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>{f.description}</div>
-          {f.auto_fixable && (
-            <button onClick={() => socket?.sendApplyFix(f.id)} style={{
-              marginTop: 10, background: C.green, color: C.bg, border: "none",
-              padding: "6px 14px", borderRadius: 5, cursor: "pointer",
-              fontWeight: 700, fontSize: 12, fontFamily: C.font,
-            }}>
-              Apply Fix
-            </button>
-          )}
-        </div>
-      ))}
-
-      {summary && (
-        <div style={{ padding: "20px 24px", background: C.surface,
-          border: `1px solid ${C.border}`, borderRadius: 10, marginTop: 16 }}>
-          <div style={{ fontFamily: C.display, fontSize: 18, fontWeight: 700,
-            color: C.text, marginBottom: 12 }}>Scan complete</div>
-          <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-            {[
-              ["Total", summary.total],
-              ["Critical", summary.critical],
-              ["High", summary.high],
-              ["Auto-fixable", summary.auto_fixable],
-            ].map(([l, v]) => (
-              <div key={String(l)}>
-                <div style={{ fontSize: 11, color: C.muted, textTransform: "uppercase",
-                  fontFamily: C.mono, letterSpacing: "0.06em" }}>{l}</div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: C.text }}>{v}</div>
-              </div>
-            ))}
-          </div>
-        </div>
       )}
     </div>
   );
@@ -515,18 +641,15 @@ function DashboardContent() {
   const params = useSearchParams();
   const sessionId = params.get("session_id");
   const scanId = params.get("scan_id");
-  const machine = params.get("machine");
 
-  // CLI session flow
   if (sessionId) {
     return (
       <div style={{ minHeight: "100vh", background: C.bg, color: C.text }}>
-        <CliSessionFlow sessionId={sessionId} machineProp={machine} />
+        <CliReportView sessionId={sessionId} />
       </div>
     );
   }
 
-  // GitHub URL scan flow (new scan or polling existing scan_id)
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text }}>
       <GithubScanFlow initialScanId={scanId ?? undefined} />

@@ -42,9 +42,11 @@ venv/
 .mypy_cache/
 .ruff_cache/
 
-# IDE
+# IDE / local tooling
 .idea/
 .vscode/
+.claude/
+.cursor/
 *.swp
 *.swo
 .DS_Store

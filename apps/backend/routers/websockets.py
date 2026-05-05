@@ -67,6 +67,65 @@ async def run_agent_pipeline(session_code: str, project_manifest: dict):
         if session.get("browser_ws"):
             await session["browser_ws"].send_json(error_msg)
 
+@router.websocket("/ws/session/{session_id}")
+async def session_websocket(websocket: WebSocket, session_id: str):
+    """
+    New CLI-first endpoint. CLI connects here by session_id immediately after
+    POST /auth/session. Waits for session_authenticated event, then relays
+    scan_progress from CLI to browser WebSocket.
+    """
+    session = None
+    session_code = None
+    for code, s in _sessions.items():
+        if s["session_id"] == session_id:
+            session = s
+            session_code = code
+            break
+
+    if not session:
+        await websocket.close(code=4004, reason="Session not found")
+        return
+
+    await websocket.accept()
+    session["cli_ws"] = websocket
+    session["status"] = "cli_connected"
+
+    # Drain queued messages (browser may have verified before CLI connected)
+    for queued_msg in session.get("message_queue", []):
+        try:
+            await websocket.send_json(queued_msg)
+        except Exception:
+            pass
+    session["message_queue"] = []
+
+    try:
+        while True:
+            data = await websocket.receive_json()
+            msg_type = data.get("type")
+
+            if msg_type == "scan_progress":
+                # Relay real-time progress to browser
+                browser_ws = session.get("browser_ws")
+                if browser_ws:
+                    try:
+                        await browser_ws.send_json(data)
+                    except Exception:
+                        pass
+
+            elif msg_type == "fix_applied":
+                browser_ws = session.get("browser_ws")
+                if browser_ws:
+                    try:
+                        await browser_ws.send_json(data)
+                    except Exception:
+                        pass
+
+    except WebSocketDisconnect:
+        session["cli_ws"] = None
+        if session["status"] not in ("complete", "expired"):
+            session["status"] = "pending"
+
+
 @router.websocket("/ws/cli/{session_code}")
 async def cli_websocket(websocket: WebSocket, session_code: str):
     """

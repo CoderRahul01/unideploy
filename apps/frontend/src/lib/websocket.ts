@@ -2,6 +2,8 @@ export type WSMessage =
   | { type: 'cli_ready'; machine_name: string; project_manifest: Record<string, unknown> }
   | { type: 'finding'; finding: Finding }
   | { type: 'scan_complete'; summary: ScanSummary }
+  | { type: 'scan_progress'; files_scanned: number; total_files: number }
+  | { type: 'session_authenticated'; session_id: string }
   | { type: 'browser_connected'; session_id: string }
   | { type: 'fix_applied'; finding_id: string; diff: string }
   | { type: 'error'; message: string }

@@ -2,49 +2,39 @@
 
 import { Command } from "commander";
 import chalk from "chalk";
-import ora from "ora";
 import Table from "cli-table3";
 import WebSocket from "ws";
 import os from "os";
 import fs from "fs";
 import path from "path";
+import { randomUUID } from "crypto";
 
-const API_URL = process.env.UNIDEPLOY_API_URL || "https://api.unideploy.in";
+const API_URL = process.env.UNIDEPLOY_API_URL || "https://unideploy-api-4b25n74mbq-uc.a.run.app";
 const LOCAL_URL = "http://localhost:8000";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Finding {
   id: string;
-  severity: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
-  category: string;
+  file_path: string;
+  line_number: number | null;
+  severity: "critical" | "high" | "medium" | "low";
+  category: "secrets" | "auth" | "rls" | "cors" | "rate_limiting" |
+            "input_validation" | "dependency" | "error_handling" | "other";
   title: string;
-  file: string;
-  line: number | null;
   description: string;
+  fix_guideline: string;
+  evidence: string;
   auto_fixable: boolean;
-}
-
-interface ScanStatus {
-  scan_id: string;
-  status: string;
-  github_url: string;
-  branch: string;
-  framework: string | null;
-  security_grade: string | null;
-  findings_count: number;
-  findings: Finding[];
-  error: string | null;
-  completed_at: string | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function severityColor(s: string): string {
-  if (s === "CRITICAL") return chalk.red.bold(s);
-  if (s === "HIGH")     return chalk.yellow.bold(s);
-  if (s === "MEDIUM")   return chalk.cyan(s);
-  return chalk.gray(s);
+  if (s === "critical") return chalk.red.bold("[CRITICAL]");
+  if (s === "high")     return chalk.yellow.bold("[HIGH]    ");
+  if (s === "medium")   return chalk.white("[MEDIUM]  ");
+  return chalk.gray("[LOW]     ");
 }
 
 function gradeColor(g: string): string {
@@ -67,80 +57,71 @@ async function apiFetch(url: string, opts: RequestInit = {}): Promise<unknown> {
   return res.json();
 }
 
-function printFindingsTable(findings: Finding[]): void {
-  if (findings.length === 0) return;
+// ── Grade calculation (mirrors backend spec) ──────────────────────────────────
 
-  const table = new Table({
-    head: [
-      chalk.white("Severity"),
-      chalk.white("Title"),
-      chalk.white("File"),
-      chalk.white("Fix"),
-    ],
-    style: { head: [], border: ["gray"] },
-    colWidths: [12, 44, 36, 5],
-    wordWrap: true,
-  });
-
-  for (const f of findings) {
-    table.push([
-      severityColor(f.severity),
-      f.title,
-      f.file + (f.line ? `:${f.line}` : ""),
-      f.auto_fixable ? chalk.green("✓") : chalk.gray("—"),
-    ]);
-  }
-
-  console.log(table.toString());
+function computeGrade(findings: Finding[]): "A" | "B" | "C" | "D" | "F" {
+  const critical = findings.filter(f => f.severity === "critical").length;
+  const high = findings.filter(f => f.severity === "high").length;
+  const medium = findings.filter(f => f.severity === "medium").length;
+  if (critical >= 1) return "F";
+  if (high >= 3) return "D";
+  if (high >= 1 || medium >= 5) return "C";
+  if (medium > 0) return "B";
+  return "A";
 }
 
-function printSummary(grade: string, findings: Finding[]): void {
-  const critical = findings.filter(f => f.severity === "CRITICAL").length;
-  const high     = findings.filter(f => f.severity === "HIGH").length;
-  const medium   = findings.filter(f => f.severity === "MEDIUM").length;
-  const low      = findings.filter(f => f.severity === "LOW").length;
-  const fixable  = findings.filter(f => f.auto_fixable).length;
-
-  console.log("");
-  console.log(chalk.bold("─────────────────────────────────────────────────"));
-  console.log(`  Security Grade   ${gradeColor(grade ?? "?")}  `);
-  console.log(chalk.bold("─────────────────────────────────────────────────"));
-  console.log(`  ${chalk.red.bold(String(critical).padStart(3))} CRITICAL   ${chalk.yellow.bold(String(high).padStart(3))} HIGH   ${chalk.cyan(String(medium).padStart(3))} MEDIUM   ${chalk.gray(String(low).padStart(3))} LOW`);
-  console.log(`  ${chalk.green(String(fixable).padStart(3))} auto-fixable`);
-  console.log(chalk.bold("─────────────────────────────────────────────────"));
-  console.log("");
-
-  if (fixable > 0) {
-    console.log(chalk.green(`  → Open ${chalk.underline("https://unideploy.in/dashboard")} to apply fixes and raise a PR`));
-    console.log("");
-  }
-}
-
-// ── File collection (for CLI init / WebSocket flow) ───────────────────────────
+// ── File collection ───────────────────────────────────────────────────────────
 
 const SCAN_EXTENSIONS = new Set([
   ".ts", ".tsx", ".js", ".jsx", ".py", ".json", ".toml",
-  ".yaml", ".yml", ".sql", ".sh", ".env.example",
+  ".yaml", ".yml", ".sql", ".sh",
 ]);
 const SCAN_BASENAMES = new Set([
   "Dockerfile", "docker-compose.yml", "docker-compose.yaml",
   ".env.example", ".env.template", "next.config.js", "next.config.ts",
-  "vite.config.ts", "vite.config.js",
+  "next.config.mjs", "vite.config.ts", "vite.config.js",
+  ".gitignore", ".unideployignore",
 ]);
 const SKIP_DIRS = new Set([
   "node_modules", ".git", "dist", ".next", "__pycache__",
-  "venv", ".venv", "build", "coverage", ".turbo", ".cache",
+  "venv", ".venv", "build", "coverage", ".turbo", ".cache", ".vercel",
 ]);
 const SKIP_FILES = new Set([".env", ".env.local", ".env.production", ".env.development"]);
 
+function loadIgnorePatterns(root: string): string[] {
+  const patterns: string[] = [];
+  for (const name of [".gitignore", ".unideployignore"]) {
+    const p = path.join(root, name);
+    if (fs.existsSync(p)) {
+      fs.readFileSync(p, "utf-8").split("\n").forEach(line => {
+        const t = line.trim();
+        if (t && !t.startsWith("#")) patterns.push(t);
+      });
+    }
+  }
+  return patterns;
+}
+
+function isIgnored(rel: string, patterns: string[]): boolean {
+  const parts = rel.split(path.sep);
+  return patterns.some(p => {
+    const name = p.replace(/^\//, "").replace(/\/$/, "");
+    return parts.includes(name) || rel.startsWith(name);
+  });
+}
+
 function collectFiles(root: string): { path: string; content: string }[] {
   const files: { path: string; content: string }[] = [];
+  const ignorePatterns = loadIgnorePatterns(root);
+
   function walk(dir: string) {
     let entries: string[];
     try { entries = fs.readdirSync(dir); } catch { return; }
     for (const entry of entries) {
       if (SKIP_DIRS.has(entry)) continue;
       const full = path.join(dir, entry);
+      const rel = path.relative(root, full);
+      if (isIgnored(rel, ignorePatterns)) continue;
       let stat: fs.Stats;
       try { stat = fs.statSync(full); } catch { continue; }
       if (stat.isDirectory()) { walk(full); continue; }
@@ -148,7 +129,7 @@ function collectFiles(root: string): { path: string; content: string }[] {
       if (!SCAN_EXTENSIONS.has(path.extname(entry)) && !SCAN_BASENAMES.has(entry)) continue;
       if (stat.size > 100_000) continue;
       try {
-        files.push({ path: path.relative(root, full), content: fs.readFileSync(full, "utf-8") });
+        files.push({ path: rel, content: fs.readFileSync(full, "utf-8") });
       } catch { continue; }
     }
   }
@@ -159,245 +140,636 @@ function collectFiles(root: string): { path: string; content: string }[] {
 function detectFramework(root: string): string {
   const pkg = path.join(root, "package.json");
   const req = path.join(root, "requirements.txt");
+  const pyproj = path.join(root, "pyproject.toml");
   if (fs.existsSync(pkg)) {
     try {
-      const d = { ...JSON.parse(fs.readFileSync(pkg, "utf-8")).dependencies ?? {},
-                  ...JSON.parse(fs.readFileSync(pkg, "utf-8")).devDependencies ?? {} };
-      if (d["next"]) return "nextjs";
-      if (d["@nestjs/core"]) return "nestjs";
-      if (d["express"]) return "express";
-      return "node";
-    } catch { return "node"; }
+      const raw = JSON.parse(fs.readFileSync(pkg, "utf-8"));
+      const deps = { ...raw.dependencies ?? {}, ...raw.devDependencies ?? {} };
+      if (deps["next"]) return "Next.js";
+      if (deps["@nestjs/core"]) return "NestJS";
+      if (deps["express"]) return "Express";
+      if (deps["fastify"]) return "Fastify";
+      return "Node.js";
+    } catch { return "Node.js"; }
   }
-  if (fs.existsSync(req)) {
-    const c = fs.readFileSync(req, "utf-8").toLowerCase();
-    if (c.includes("fastapi")) return "fastapi";
-    if (c.includes("django")) return "django";
-    return "python";
+  if (fs.existsSync(req) || fs.existsSync(pyproj)) {
+    const c = fs.existsSync(req) ? fs.readFileSync(req, "utf-8").toLowerCase() : "";
+    if (c.includes("fastapi")) return "FastAPI";
+    if (c.includes("django")) return "Django";
+    if (c.includes("flask")) return "Flask";
+    return "Python";
   }
-  return "unknown";
+  return "Unknown";
 }
 
-// ── Commands ──────────────────────────────────────────────────────────────────
+// ── Local security heuristics ─────────────────────────────────────────────────
+
+const SECRET_PATTERNS = [
+  /stripe_live_[a-zA-Z0-9_]+/,
+  /sk-proj-[a-zA-Z0-9_-]+/,
+  /AKIA[0-9A-Z]{16}/,
+  /ghp_[a-zA-Z0-9]{36}/,
+  /xoxb-[0-9]+-[0-9]+-[a-zA-Z0-9]+/,
+  /AIza[0-9A-Za-z_-]{35}/,
+];
+const SECRET_NAMES = ["key", "secret", "token", "password"];
+const API_ROUTE_DIRS = ["pages/api", "app/api", "routes", "controllers", "routers"];
+const IS_API_ROUTE = (p: string) =>
+  API_ROUTE_DIRS.some(d => p.replace(/\\/g, "/").includes(d)) ||
+  /\.(route|controller|router)\.(ts|js|py)$/.test(p);
+const IS_ENV_FILE = (p: string) => path.basename(p) === ".env";
+
+function snip(content: string, idx: number): string {
+  const start = Math.max(0, idx - 20);
+  const end = Math.min(content.length, idx + 180);
+  return content.slice(start, end).replace(/\n/g, " ").trim();
+}
+
+function lineNum(content: string, idx: number): number {
+  return content.slice(0, idx).split("\n").length;
+}
+
+function runHeuristics(
+  files: { path: string; content: string }[],
+  root: string,
+  onProgress?: (found: Finding) => void
+): Finding[] {
+  const findings: Finding[] = [];
+  const gitignore = (() => {
+    try { return fs.readFileSync(path.join(root, ".gitignore"), "utf-8"); }
+    catch { return ""; }
+  })();
+
+  function emit(f: Finding) {
+    findings.push(f);
+    onProgress?.(f);
+  }
+
+  const fileMap = new Map(files.map(f => [f.path.replace(/\\/g, "/"), f.content]));
+
+  // ── SECRETS ──────────────────────────────────────────────────────────────
+
+  // 1. Hardcoded API keys
+  for (const { path: fp, content } of files) {
+    for (const pat of SECRET_PATTERNS) {
+      const m = pat.exec(content);
+      if (m) {
+        emit({
+          id: randomUUID(),
+          file_path: fp,
+          line_number: lineNum(content, m.index),
+          severity: "critical",
+          category: "secrets",
+          title: "Hardcoded API key in source",
+          description: `A live API key matching the pattern ${pat.source.slice(0, 20)}... was found in source code. This will be exposed in version control.`,
+          fix_guideline: "Move this key to an environment variable (e.g. process.env.KEY) and add the .env file to .gitignore. Rotate the key immediately.",
+          evidence: snip(content, m.index),
+          auto_fixable: false,
+        });
+      }
+    }
+
+    // 2. NEXT_PUBLIC_ env vars with sensitive names
+    const nextPublicRe = /NEXT_PUBLIC_\w*(key|secret|token|password)\w*\s*=\s*["'][^"']+["']/gi;
+    let nm: RegExpExecArray | null;
+    while ((nm = nextPublicRe.exec(content)) !== null) {
+      emit({
+        id: randomUUID(),
+        file_path: fp,
+        line_number: lineNum(content, nm.index),
+        severity: "critical",
+        category: "secrets",
+        title: "Sensitive value exposed via NEXT_PUBLIC_",
+        description: "NEXT_PUBLIC_ variables are bundled into client-side code and visible to all users.",
+        fix_guideline: "Use a server-side environment variable without the NEXT_PUBLIC_ prefix and proxy through an API route.",
+        evidence: snip(content, nm.index),
+        auto_fixable: false,
+      });
+    }
+
+    // 3. console.log with sensitive names
+    const consoleRe = /console\.log\s*\([^)]*(?:key|token|secret|password)[^)]*\)/gi;
+    let cm: RegExpExecArray | null;
+    while ((cm = consoleRe.exec(content)) !== null) {
+      emit({
+        id: randomUUID(),
+        file_path: fp,
+        line_number: lineNum(content, cm.index),
+        severity: "medium",
+        category: "secrets",
+        title: "Sensitive data logged to console",
+        description: "console.log statements containing key/token/secret/password values may leak credentials to logs.",
+        fix_guideline: "Remove or redact sensitive values from all console.log statements before deploying to production.",
+        evidence: snip(content, cm.index),
+        auto_fixable: true,
+      });
+    }
+
+    // 4. Supabase anon key in client-side fetch
+    if (/fetch\s*\(/.test(content) && /anon[_\-]?key/i.test(content)) {
+      const ix = content.search(/anon[_\-]?key/i);
+      emit({
+        id: randomUUID(),
+        file_path: fp,
+        line_number: lineNum(content, ix),
+        severity: "high",
+        category: "rls",
+        title: "Supabase anon key used in client-side fetch",
+        description: "Using the anon key directly in browser fetch() bypasses Row Level Security if RLS is not enabled on all tables.",
+        fix_guideline: "Ensure RLS is enabled on all Supabase tables. Use authenticated sessions rather than raw anon key requests from the browser.",
+        evidence: snip(content, ix),
+        auto_fixable: false,
+      });
+    }
+  }
+
+  // 5. .env not in .gitignore
+  for (const { path: fp } of files) {
+    if (IS_ENV_FILE(fp) && !gitignore.split("\n").some(l => l.trim() === ".env")) {
+      emit({
+        id: randomUUID(),
+        file_path: fp,
+        line_number: 1,
+        severity: "critical",
+        category: "secrets",
+        title: ".env file not listed in .gitignore",
+        description: "Your .env file is not excluded by .gitignore. It may be committed to version control, exposing all secrets.",
+        fix_guideline: 'Add ".env" to your .gitignore file immediately and rotate any secrets it contains.',
+        evidence: ".env file exists but is absent from .gitignore",
+        auto_fixable: true,
+      });
+    }
+  }
+
+  // ── RLS ──────────────────────────────────────────────────────────────────
+
+  for (const { path: fp, content } of files) {
+    const isSchema = fp.replace(/\\/g, "/").includes("supabase/") &&
+                     (fp.endsWith(".sql") || fp.includes("migration"));
+    if (!isSchema) continue;
+
+    const createTableRe = /create\s+table\s+(?:if\s+not\s+exists\s+)?["'\`]?(\w+)["'\`]?\s*\(/gi;
+    let tm: RegExpExecArray | null;
+    while ((tm = createTableRe.exec(content)) !== null) {
+      const tableName = tm[1];
+      const afterCreate = content.slice(tm.index, tm.index + 3000);
+      if (!/enable\s+row\s+level\s+security/i.test(afterCreate)) {
+        emit({
+          id: randomUUID(),
+          file_path: fp,
+          line_number: lineNum(content, tm.index),
+          severity: "high",
+          category: "rls",
+          title: `RLS disabled on table "${tableName}"`,
+          description: `Table "${tableName}" does not have Row Level Security enabled. Anyone with the anon key can read/write all rows.`,
+          fix_guideline: `Add "ALTER TABLE ${tableName} ENABLE ROW LEVEL SECURITY;" to your migration and create appropriate policies.`,
+          evidence: snip(content, tm.index),
+          auto_fixable: false,
+        });
+      }
+    }
+  }
+
+  // ── AUTH ─────────────────────────────────────────────────────────────────
+
+  const AUTH_KEYWORDS = ["session", "token", "auth", "user", "clerk", "supabase.auth", "getServerSession", "currentUser"];
+
+  for (const { path: fp, content } of files) {
+    if (!IS_API_ROUTE(fp)) continue;
+
+    const hasAuth = AUTH_KEYWORDS.some(kw => content.includes(kw));
+    if (!hasAuth) {
+      emit({
+        id: randomUUID(),
+        file_path: fp,
+        line_number: null,
+        severity: "high",
+        category: "auth",
+        title: "API route missing authentication check",
+        description: "This API route does not appear to check for a session, token, or user. Unauthenticated callers may be able to access it.",
+        fix_guideline: "Add authentication at the top of this route handler. Use getServerSession(), verify a JWT, or check for a Clerk session before processing the request.",
+        evidence: `No auth keywords found in ${fp}`,
+        auto_fixable: false,
+      });
+    }
+
+    // Inverted auth: if(!user) { ... allow ...
+    const invertedRe = /if\s*\(\s*!user\s*\)[\s\S]{0,200}(return|allow|next\(\))/i;
+    const im = invertedRe.exec(content);
+    if (im) {
+      emit({
+        id: randomUUID(),
+        file_path: fp,
+        line_number: lineNum(content, im.index),
+        severity: "high",
+        category: "auth",
+        title: "Inverted authentication check",
+        description: 'Pattern "if(!user) { ... allow }" detected. This may grant access to unauthenticated users instead of denying it.',
+        fix_guideline: "Review this authentication check. The guard should redirect or return 401 when the user is missing, not allow the request through.",
+        evidence: snip(content, im.index),
+        auto_fixable: false,
+      });
+    }
+  }
+
+  // ── RATE LIMITING ─────────────────────────────────────────────────────────
+
+  const RATE_LIMIT_KEYWORDS = ["rateLimit", "slowDown", "limiter", "upstash", "rate-limit", "express-rate-limit"];
+  const EXPRESS_FASTAPI_ROUTE = (p: string) => {
+    const rel = p.replace(/\\/g, "/");
+    return rel.includes("routes/") || rel.includes("routers/") || rel.includes("route.ts") || rel.includes("route.js");
+  };
+
+  for (const { path: fp, content } of files) {
+    if (!EXPRESS_FASTAPI_ROUTE(fp) || !IS_API_ROUTE(fp)) continue;
+    const hasRL = RATE_LIMIT_KEYWORDS.some(kw => content.includes(kw));
+    if (!hasRL) {
+      emit({
+        id: randomUUID(),
+        file_path: fp,
+        line_number: null,
+        severity: "high",
+        category: "rate_limiting",
+        title: "No rate limiting on API route",
+        description: "This route file does not import any rate limiting middleware. Without rate limits, the endpoint is vulnerable to abuse and DoS attacks.",
+        fix_guideline: "Add rate limiting using a library like express-rate-limit, Upstash Ratelimit, or slowapi (Python). Apply limits on auth and sensitive endpoints at minimum.",
+        evidence: `No rate limit keyword found in ${fp}`,
+        auto_fixable: false,
+      });
+    }
+  }
+
+  // ── CORS ─────────────────────────────────────────────────────────────────
+
+  const CORS_WILDCARD = /origin\s*:\s*["']\*["']|cors\s*\(\s*\)/;
+  for (const { path: fp, content } of files) {
+    const m = CORS_WILDCARD.exec(content);
+    if (m) {
+      emit({
+        id: randomUUID(),
+        file_path: fp,
+        line_number: lineNum(content, m.index),
+        severity: "medium",
+        category: "cors",
+        title: "Permissive CORS configuration",
+        description: 'CORS is configured with origin: "*" or called with no options, allowing any domain to make credentialed cross-origin requests.',
+        fix_guideline: "Restrict the allowed origins to your production domain(s). Use ALLOWED_ORIGINS env var to configure per-environment.",
+        evidence: snip(content, m.index),
+        auto_fixable: true,
+      });
+    }
+  }
+
+  // ── INPUT VALIDATION ──────────────────────────────────────────────────────
+
+  const VALIDATION_KEYWORDS = ["zod", "joi", "yup", "pydantic", "ajv", "superstruct", "valibot"];
+  for (const { path: fp, content } of files) {
+    if (!IS_API_ROUTE(fp)) continue;
+    const hasValidation = VALIDATION_KEYWORDS.some(kw => content.toLowerCase().includes(kw));
+    if (!hasValidation) {
+      emit({
+        id: randomUUID(),
+        file_path: fp,
+        line_number: null,
+        severity: "medium",
+        category: "input_validation",
+        title: "API route missing input validation",
+        description: "No schema validation library (Zod, Joi, Pydantic, etc.) was found in this route. Unvalidated input can lead to unexpected behaviour or injection attacks.",
+        fix_guideline: "Add input validation using Zod (TypeScript) or Pydantic (Python) to parse and validate all incoming request bodies.",
+        evidence: `No validation library import found in ${fp}`,
+        auto_fixable: false,
+      });
+    }
+  }
+
+  // ── SECURITY HEADERS ──────────────────────────────────────────────────────
+
+  // next.config.js missing headers() export
+  for (const { path: fp, content } of files) {
+    const base = path.basename(fp);
+    if (/next\.config\.(js|ts|mjs)/.test(base)) {
+      if (!content.includes("headers")) {
+        emit({
+          id: randomUUID(),
+          file_path: fp,
+          line_number: null,
+          severity: "medium",
+          category: "other",
+          title: "Missing security headers configuration",
+          description: "next.config.js does not export a headers() function. Security headers like X-Frame-Options, CSP, and HSTS are not set.",
+          fix_guideline: "Add a headers() async function to next.config.js that returns X-Frame-Options, X-Content-Type-Options, Strict-Transport-Security, and Content-Security-Policy headers.",
+          evidence: `No "headers" export found in ${fp}`,
+          auto_fixable: true,
+        });
+      }
+    }
+  }
+
+  // Express app missing helmet
+  for (const { path: fp, content } of files) {
+    const isMainApp = ["app.js", "app.ts", "server.js", "server.ts", "index.js", "index.ts"].includes(path.basename(fp));
+    if (isMainApp && content.includes("express") && !content.includes("helmet")) {
+      emit({
+        id: randomUUID(),
+        file_path: fp,
+        line_number: null,
+        severity: "medium",
+        category: "other",
+        title: "Express app missing helmet security headers",
+        description: "helmet() middleware is not imported or used. Without it, Express does not set essential security headers.",
+        fix_guideline: 'Install helmet (npm i helmet) and add "app.use(helmet())" near the top of your Express app setup.',
+        evidence: `express() found but no helmet import in ${fp}`,
+        auto_fixable: true,
+      });
+    }
+  }
+
+  // ── DEPENDENCIES ──────────────────────────────────────────────────────────
+
+  const HIGH_RISK_PACKAGES: Record<string, (v: string) => boolean> = {
+    "node-serialize": () => true,
+    "eval": () => true,
+    "serialize-javascript": (v) => {
+      const minor = parseFloat(v.replace(/[^0-9.]/g, ""));
+      return minor < 3.1;
+    },
+  };
+
+  for (const { path: fp, content } of files) {
+    if (path.basename(fp) !== "package.json") continue;
+    try {
+      const pkg = JSON.parse(content);
+      const allDeps = { ...pkg.dependencies ?? {}, ...pkg.devDependencies ?? {} };
+      for (const [pkgName, checkFn] of Object.entries(HIGH_RISK_PACKAGES)) {
+        const version = allDeps[pkgName];
+        if (version && checkFn(String(version))) {
+          emit({
+            id: randomUUID(),
+            file_path: fp,
+            line_number: null,
+            severity: "high",
+            category: "dependency",
+            title: `High-risk dependency: ${pkgName}`,
+            description: `The package "${pkgName}" (version ${version}) is known to have serious security vulnerabilities including potential code execution.`,
+            fix_guideline: `Remove "${pkgName}" from your dependencies. Use safer alternatives: JSON.parse() instead of node-serialize, Function() carefully or avoid eval(), and upgrade serialize-javascript to >=3.1.`,
+            evidence: `"${pkgName}": "${version}" in ${fp}`,
+            auto_fixable: false,
+          });
+        }
+      }
+    } catch { continue; }
+  }
+
+  return findings;
+}
+
+// ── `unideploy scan` — legacy GitHub URL scan ─────────────────────────────────
 
 const program = new Command();
-program.name("unideploy").description("Production-readiness scanner for vibe-coded apps").version("0.1.0");
+program.name("unideploy").description("Production-readiness scanner for vibe-coded apps").version("0.2.0");
 
-// ── `unideploy scan` — GitHub URL scan via backend pipeline ───────────────────
+interface LegacyScanStatus {
+  scan_id: string;
+  status: string;
+  github_url: string;
+  branch: string;
+  framework: string | null;
+  security_grade: string | null;
+  findings_count: number;
+  findings: Finding[];
+  error: string | null;
+  completed_at: string | null;
+}
+
+function printFindingsTable(findings: Finding[]): void {
+  if (findings.length === 0) return;
+  const table = new Table({
+    head: [chalk.white("Severity"), chalk.white("Title"), chalk.white("File"), chalk.white("Fix")],
+    style: { head: [], border: ["gray"] },
+    colWidths: [12, 44, 36, 5],
+    wordWrap: true,
+  });
+  for (const f of findings) {
+    table.push([
+      severityColor(f.severity).trim(),
+      f.title,
+      f.file_path + (f.line_number ? `:${f.line_number}` : ""),
+      f.auto_fixable ? chalk.green("✓") : chalk.gray("—"),
+    ]);
+  }
+  console.log(table.toString());
+}
 
 program
   .command("scan [github_url]")
-  .description("Scan a GitHub repo for production-readiness issues")
+  .description("Scan a GitHub repo for production-readiness issues (legacy GitHub flow)")
   .option("--branch <branch>", "Git branch to scan", "main")
-  .option("--ci", "CI mode: exit 1 if CRITICAL findings found (for GitHub Actions)")
-  .option("--json", "Output findings as JSON (for CI pipelines)")
-  .option("--local", "Hit local backend (localhost:8000) instead of production")
+  .option("--ci", "CI mode: exit 1 if CRITICAL findings")
+  .option("--json", "Output findings as JSON")
+  .option("--local", "Hit local backend")
   .action(async (githubUrl: string | undefined, opts: {
     branch: string; ci: boolean; json: boolean; local: boolean;
   }) => {
     const baseUrl = opts.local ? LOCAL_URL : API_URL;
-
-    // Derive GitHub URL — accept arg, or try git remote of cwd
     let repoUrl = githubUrl;
     if (!repoUrl) {
       try {
-        const remote = require("child_process")
+        repoUrl = require("child_process")
           .execSync("git remote get-url origin", { cwd: process.cwd(), encoding: "utf-8" })
-          .trim()
-          .replace("git@github.com:", "https://github.com/")
-          .replace(/\.git$/, "");
-        repoUrl = remote;
+          .trim().replace("git@github.com:", "https://github.com/").replace(/\.git$/, "");
       } catch {
         console.error(chalk.red("No GitHub URL provided and no git remote found."));
-        console.error(chalk.gray("Usage: unideploy scan https://github.com/user/repo"));
         process.exit(1);
       }
     }
 
-    if (!repoUrl!.includes("github.com")) {
-      console.error(chalk.red("Only GitHub URLs are supported right now."));
-      process.exit(1);
-    }
+    const scanRes = await apiFetch(`${baseUrl}/api/v1/scan`, {
+      method: "POST",
+      body: JSON.stringify({ github_url: repoUrl, branch: opts.branch }),
+    }) as { scan_id: string };
 
-    if (!opts.json) {
-      console.log("");
-      console.log(chalk.bold("  unideploy") + chalk.gray(" — production-readiness scanner"));
-      console.log(chalk.gray(`  Repo   : ${repoUrl}`));
-      console.log(chalk.gray(`  Branch : ${opts.branch}`));
-      console.log("");
-    }
-
-    // 1. Queue the scan
-    const spinner = opts.json ? null : ora("Queuing scan...").start();
-    let scanId: string;
-    try {
-      const res = await apiFetch(`${baseUrl}/api/v1/scan`, {
-        method: "POST",
-        body: JSON.stringify({ github_url: repoUrl, branch: opts.branch }),
-      }) as { scan_id: string };
-      scanId = res.scan_id;
-      spinner?.succeed(`Scan queued — ID: ${chalk.cyan(scanId)}`);
-    } catch (err) {
-      spinner?.fail(`Failed to queue scan: ${err}`);
-      process.exit(1);
-    }
-
-    // 2. Poll until done
-    const pollSpinner = opts.json ? null : ora("Waiting for worker...").start();
-    let scan: ScanStatus | null = null;
-    const statusLabels: Record<string, string> = {
-      queued: "Waiting in queue...",
-      running: "Cloning repo and running security checks inside sandbox...",
-      planning: "Generating remediation plan...",
-    };
-
-    for (let attempt = 0; attempt < 120; attempt++) {
+    let scan: LegacyScanStatus | null = null;
+    for (let i = 0; i < 120; i++) {
       await new Promise(r => setTimeout(r, 3000));
-      try {
-        scan = await apiFetch(`${baseUrl}/api/v1/scan/${scanId}`) as ScanStatus;
-        if (pollSpinner && statusLabels[scan.status]) {
-          pollSpinner.text = statusLabels[scan.status];
-        }
-        if (scan.status === "done" || scan.status === "failed") break;
-      } catch {
-        // transient network error — keep polling
-      }
+      scan = await apiFetch(`${baseUrl}/api/v1/scan/${scanRes.scan_id}`) as LegacyScanStatus;
+      if (scan.status === "done" || scan.status === "failed") break;
     }
-
-    pollSpinner?.stop();
-
-    if (!scan || scan.status === "failed") {
-      console.error(chalk.red(`\n  Scan failed: ${scan?.error ?? "timeout"}`));
+    if (!scan || scan.status !== "done") {
+      console.error(chalk.red(`Scan failed: ${scan?.error ?? "timeout"}`));
       process.exit(1);
     }
-
     const findings = scan.findings ?? [];
-    const grade = scan.security_grade ?? "?";
-
-    // 3. Output results
-    if (opts.json) {
-      console.log(JSON.stringify({
-        scan_id: scanId,
-        security_grade: grade,
-        framework: scan.framework,
-        findings_count: findings.length,
-        findings,
-        severity_counts: {
-          critical: findings.filter(f => f.severity === "CRITICAL").length,
-          high:     findings.filter(f => f.severity === "HIGH").length,
-          medium:   findings.filter(f => f.severity === "MEDIUM").length,
-          low:      findings.filter(f => f.severity === "LOW").length,
-        },
-      }, null, 2));
-    } else {
-      if (scan.framework) {
-        console.log(chalk.gray(`  Framework detected: ${scan.framework}\n`));
-      }
-      if (findings.length > 0) {
-        printFindingsTable(findings);
-      }
-      printSummary(grade, findings);
-      if (findings.length === 0) {
-        console.log(chalk.green("  ✓ No issues found — your repo passes all security checks.\n"));
-      }
-    }
-
-    // 4. CI mode — exit 1 on CRITICAL
-    if (opts.ci) {
-      const critical = findings.filter(f => f.severity === "CRITICAL").length;
-      if (critical > 0) {
-        if (!opts.json) {
-          console.error(chalk.red.bold(`  ✗ CI check failed: ${critical} CRITICAL finding(s)\n`));
-        }
-        process.exit(1);
-      }
-      if (!opts.json) {
-        console.log(chalk.green("  ✓ CI check passed — no CRITICAL findings\n"));
-      }
-    }
+    if (opts.json) { console.log(JSON.stringify({ scan_id: scanRes.scan_id, findings }, null, 2)); return; }
+    printFindingsTable(findings);
+    if (opts.ci && findings.some(f => f.severity === "critical")) process.exit(1);
   });
 
-// ── `unideploy init` — WebSocket CLI session (pair with browser) ──────────────
+// ── `unideploy init` — CLI-first local scan ───────────────────────────────────
 
 program
   .command("init")
-  .description("Start an interactive scan session paired with the dashboard")
+  .description("Scan local project and pair with UniDeploy dashboard")
   .option("--local", "Hit local backend (localhost:8000)")
   .action(async (opts: { local: boolean }) => {
     const baseUrl = opts.local ? LOCAL_URL : API_URL;
+    const cwd = process.cwd();
+    const projectName = path.basename(cwd);
 
-    console.log("");
-    console.log(chalk.bold("  unideploy init") + chalk.gray(" — pairing with dashboard"));
-    console.log("");
+    // ── Step 1: Create session ─────────────────────────────────────────────
 
-    const spinner = ora("Creating session...").start();
-    let session: { session_code: string; websocket_url: string };
-
+    let session: { session_id: string; session_code: string; websocket_url: string };
     try {
-      session = await apiFetch(`${baseUrl}/api/v1/sessions/create`, {
+      session = await apiFetch(`${baseUrl}/auth/session`, {
         method: "POST",
-        body: JSON.stringify({
-          cli_version: "0.1.0",
-          machine_name: os.hostname(),
-          project_path: process.cwd(),
-        }),
       }) as typeof session;
-      spinner.stop();
     } catch (err) {
-      spinner.fail(`Failed to create session: ${err}`);
+      console.error(chalk.red(`Failed to create session: ${err}`));
       process.exit(1);
     }
 
+    const code = session.session_code;
+    const formatted = `${code.slice(0, 3)}-${code.slice(3)}`;
+    const framework = detectFramework(cwd);
+
+    // ── Step 2: Print terminal output ─────────────────────────────────────
+
     console.log("");
-    console.log(chalk.bold("  ┌────────────────────────────────────────────┐"));
-    console.log(chalk.bold("  │  Session Code: ") + chalk.green.bold(session.session_code.padEnd(28)) + chalk.bold("│"));
-    console.log(chalk.bold("  └────────────────────────────────────────────┘"));
+    console.log(chalk.bold("● UniDeploy agent running"));
+
+    // Collect files to get count
+    const files = collectFiles(cwd);
+
+    console.log(chalk.gray(`  Framework: ${framework} detected`));
+    console.log(chalk.gray(`  Scanning ${files.length} files...`));
     console.log("");
-    console.log(chalk.gray(`  → Open ${chalk.underline("https://unideploy.in/connect")} and enter this code`));
+    console.log(chalk.white(`  Your session code: `) + chalk.green.bold(formatted));
+    console.log(chalk.gray(`  Open https://unideploy.in/connect and enter this code.`));
     console.log("");
 
-    const ws = new WebSocket(session.websocket_url);
+    // ── Step 3: Connect WebSocket and wait for session_authenticated ───────
 
-    ws.on("message", (raw: Buffer | string) => {
-      const msg = JSON.parse(raw.toString());
+    const wsUrl = session.websocket_url.replace(/^https?:\/\//, (m) =>
+      m.startsWith("https") ? "wss://" : "ws://"
+    );
 
-      if (msg.type === "browser_connected") {
-        console.log(chalk.green("  ✓ Browser connected! Collecting project files..."));
-        const files = collectFiles(process.cwd());
-        const framework = detectFramework(process.cwd());
-        console.log(chalk.gray(`  Found ${files.length} files — framework: ${framework}`));
-        console.log(chalk.gray("  Sending to AnalyzerAgent..."));
-        ws.send(JSON.stringify({
-          type: "cli_ready",
-          machine_name: os.hostname(),
-          project_manifest: { framework, file_count: files.length, files },
-        }));
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(wsUrl);
+      let authenticated = false;
 
-      } else if (msg.type === "finding") {
-        const f: Finding = msg.finding;
-        const icon = f.severity === "CRITICAL" ? "🔴" : f.severity === "HIGH" ? "🟠" : f.severity === "MEDIUM" ? "🟡" : "🔵";
-        console.log(`  ${icon} ${severityColor(f.severity)} ${chalk.white(f.title)} ${chalk.gray(f.file)}`);
+      ws.on("open", () => {
+        // Connection established — just wait
+      });
 
-      } else if (msg.type === "scan_complete") {
-        const s = msg.summary;
-        printSummary(s.grade, new Array(s.total).fill({ severity: "LOW", auto_fixable: false }));
-        ws.close();
-        process.exit(0);
+      ws.on("message", async (raw: Buffer | string) => {
+        let msg: { type: string; [k: string]: unknown };
+        try { msg = JSON.parse(raw.toString()); }
+        catch { return; }
 
-      } else if (msg.type === "apply_fix") {
-        console.log(chalk.yellow(`  🛠  Applying fix for: ${msg.finding_id}`));
-        setTimeout(() => {
-          ws.send(JSON.stringify({ type: "fix_applied", finding_id: msg.finding_id, diff: "patched" }));
-          console.log(chalk.green(`  ✓ Fix applied: ${msg.finding_id}`));
-        }, 800);
+        if (msg.type === "session_authenticated") {
+          authenticated = true;
 
-      } else if (msg.type === "error") {
-        console.error(chalk.red(`  ✗ ${msg.message}`));
-      }
+          // ── Step 4: Run local scan ────────────────────────────────────────
+
+          console.log(chalk.green("  ✓ Authenticated — scanning..."));
+          console.log("");
+
+          const findings: Finding[] = [];
+          let scannedCount = 0;
+
+          const onFinding = (f: Finding) => {
+            const col = severityColor(f.severity);
+            const loc = f.file_path + (f.line_number ? `:${f.line_number}` : "");
+            console.log(`  ${col} ${chalk.white(f.title.padEnd(36).slice(0, 36))} ${chalk.gray(loc)}`);
+            findings.push(f);
+          };
+
+          // Run heuristics and stream progress via WebSocket
+          const allFindings = runHeuristics(files, cwd, onFinding);
+          scannedCount = files.length;
+
+          ws.send(JSON.stringify({
+            type: "scan_progress",
+            files_scanned: scannedCount,
+            total_files: files.length,
+          }));
+
+          const grade = computeGrade(allFindings);
+          const autoFixable = allFindings.filter(f => f.auto_fixable).length;
+
+          console.log("");
+          console.log(
+            `  Grade: ${gradeColor(grade)}  |  ${allFindings.length} issues  |  ${autoFixable} auto-fixable`
+          );
+          console.log("");
+          console.log(chalk.green("  ✓ Dashboard ready → https://unideploy.in/dashboard"));
+          if (autoFixable > 0) {
+            console.log(chalk.gray(`  Run 'unideploy fix' to apply ${autoFixable} auto-fixes`));
+          }
+          console.log("");
+
+          // ── Step 5: POST findings to backend ───────────────────────────────
+
+          const payload = {
+            session_id: session.session_id,
+            project_name: projectName,
+            framework,
+            scanned_at: new Date().toISOString(),
+            files_scanned: scannedCount,
+            total_issues: allFindings.length,
+            auto_fixable: autoFixable,
+            grade,
+            findings: allFindings,
+          };
+
+          try {
+            await apiFetch(`${baseUrl}/scans/${session.session_id}/results`, {
+              method: "POST",
+              body: JSON.stringify(payload),
+            });
+          } catch (err) {
+            console.error(chalk.yellow(`  Warning: could not send results to backend: ${err}`));
+          }
+
+          ws.close();
+          resolve();
+        }
+      });
+
+      ws.on("error", (err) => {
+        if (!authenticated) reject(err);
+      });
+
+      ws.on("close", () => {
+        if (!authenticated) {
+          reject(new Error("WebSocket closed before authentication"));
+        }
+      });
+
+      // Timeout after 10 minutes (session expiry)
+      setTimeout(() => {
+        if (!authenticated) {
+          ws.close();
+          reject(new Error("Session timed out — code expired after 10 minutes"));
+        }
+      }, 600_000);
+    }).catch(err => {
+      console.error(chalk.red(`\n  ✗ ${err.message}`));
+      process.exit(1);
     });
 
-    ws.on("close", () => { process.exit(0); });
-    ws.on("error", (err) => { console.error(chalk.red(`WebSocket error: ${err.message}`)); process.exit(1); });
+    process.exit(0);
+  });
+
+// ── `unideploy fix` — apply auto-fixable findings ────────────────────────────
+
+program
+  .command("fix")
+  .description("Apply auto-fixable findings from last scan")
+  .option("--local", "Hit local backend")
+  .action(async (_opts: { local: boolean }) => {
+    console.log(chalk.yellow("  Auto-fix via 'unideploy fix' requires the UniDeploy Indie plan."));
+    console.log(chalk.gray("  → Use the 'Fix with AI' button in the dashboard to apply fixes."));
+    console.log(chalk.gray("  → https://unideploy.in/dashboard"));
   });
 
 program.parse();

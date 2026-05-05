@@ -36,13 +36,15 @@ export interface ScanStatus {
   github_url: string;
   branch: string;
   framework: string | null;
-  security_grade: string | null;
+  security_grade: SecurityGrade | null;
   findings_count: number;
   findings: Finding[];
   error: string | null;
   created_at: string;
   completed_at: string | null;
 }
+
+export type SecurityGrade = "A" | "B" | "C" | "D" | "F";
 
 export interface ScanPlan {
   scan_id: string;
@@ -103,6 +105,56 @@ export async function triggerFix(scanId: string, findingIds?: string[]): Promise
     method: "POST",
     body: JSON.stringify({ finding_ids: findingIds ?? null }),
   });
+}
+
+// ── CLI-first session flow ────────────────────────────────────────────────────
+
+export interface AuthSession {
+  session_id: string;
+  session_code: string;
+  expires_in: number;
+  websocket_url: string;
+}
+
+export interface VerifyResult {
+  session_id: string;
+  status: string;
+}
+
+export interface ScanReport {
+  session_id: string;
+  project_name: string;
+  framework: string;
+  scanned_at: string;
+  files_scanned: number;
+  total_issues: number;
+  auto_fixable: number;
+  grade: "A" | "B" | "C" | "D" | "F";
+  findings: ReportFinding[];
+}
+
+export interface ReportFinding {
+  id: string;
+  file_path: string;
+  line_number: number | null;
+  severity: "critical" | "high" | "medium" | "low";
+  category: string;
+  title: string;
+  description: string;
+  fix_guideline: string;
+  evidence: string;
+  auto_fixable: boolean;
+}
+
+export async function verifySession(session_code: string): Promise<VerifyResult> {
+  return request("/auth/verify", {
+    method: "POST",
+    body: JSON.stringify({ session_code }),
+  });
+}
+
+export async function getScanReport(sessionId: string): Promise<ScanReport> {
+  return request(`/scans/${sessionId}/report`);
 }
 
 // ── General ───────────────────────────────────────────────────────────────────

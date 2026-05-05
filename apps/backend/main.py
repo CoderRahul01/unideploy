@@ -71,11 +71,13 @@ app.add_middleware(
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 
-from routers import sessions, websockets, scans, webhooks
+from routers import sessions, websockets, scans, webhooks, auth, scan_results
 
+app.include_router(auth.router)
 app.include_router(sessions.router)
 app.include_router(websockets.router)
 app.include_router(scans.router)
+app.include_router(scan_results.router)
 app.include_router(webhooks.router)
 # from routers import metrics  # uncomment when metrics endpoint is ready
 

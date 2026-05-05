@@ -35,8 +35,8 @@ export default function OTPInput({
 
   const handleChange = useCallback(
     (index: number, char: string) => {
-      // Allow only alphanumeric
-      const sanitized = char.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+      // Allow only digits — codes are always 6-digit numeric
+      const sanitized = char.replace(/[^0-9]/g, "");
       if (!sanitized) return;
 
       const next = [...values];
@@ -90,8 +90,7 @@ export default function OTPInput({
       const pasted = e.clipboardData
         .getData("text")
         .replace(/[-\s]/g, "")
-        .replace(/[^a-zA-Z0-9]/g, "")
-        .toUpperCase()
+        .replace(/[^0-9]/g, "")
         .slice(0, 6);
 
       if (pasted.length === 6) {
@@ -152,7 +151,7 @@ export default function OTPInput({
           <input
             ref={(el) => { inputsRef.current[i] = el; }}
             type="text"
-            inputMode="text"
+            inputMode="numeric"
             maxLength={1}
             value={val}
             onChange={(e) => handleChange(i, e.target.value)}
