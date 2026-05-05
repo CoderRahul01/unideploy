@@ -20,9 +20,10 @@ slowapi>=0.1.9
 httpx>=0.28.1,<1.0.0
 python-multipart==0.0.9
 
-# Google Gemini ADK + direct Gemini client
+# Google Gemini ADK + direct Gemini client + Vertex AI (Agent Engine caller)
 google-adk>=1.0.0
 google-genai>=1.0.0
+google-cloud-aiplatform>=1.60.0
 
 # E2B sandbox — code runs inside VM, never on Cloud Run disk
 e2b>=1.0.0

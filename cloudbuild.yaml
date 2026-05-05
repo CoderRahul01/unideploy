@@ -38,6 +38,7 @@ steps:
       - --set-env-vars=FRONTEND_URL=https://www.unideploy.in
       - --set-env-vars=^@^ALLOWED_ORIGINS=https://www.unideploy.in,https://unideploy.vercel.app
       - --set-env-vars=BASE_URL=https://api.unideploy.in
+      - --set-env-vars=AGENT_ENGINE_RESOURCE_NAME=${_AGENT_ENGINE_RESOURCE_NAME}
       - --set-secrets=INSFORGE_API_KEY=insforge-api-key:latest
       - --set-secrets=INSFORGE_PROJECT_ID=insforge-project-id:latest
       - --set-secrets=GEMINI_API_KEY=gemini-api-key:latest
