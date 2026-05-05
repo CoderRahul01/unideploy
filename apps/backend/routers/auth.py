@@ -56,6 +56,7 @@ async def create_auth_session():
 
     try:
         await db_insert("scans", {
+            "id": session_id,
             "session_id": session_id,
             "status": "pending",
             "created_at": datetime.utcnow().isoformat(),

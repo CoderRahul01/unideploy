@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import OTPInput from "@/components/OTPInput";
-import { verifySession } from "@/lib/api";
+import { verifySession, getScanReport } from "@/lib/api";
 
 const C = {
   bg: "#0F1410",
@@ -69,6 +69,27 @@ export default function ConnectPage() {
       wsRef.current = null;
     };
   }, [sessionId, router]);
+
+  // Polling fallback — covers WS race condition and Cloud Run multi-instance routing
+  useEffect(() => {
+    if (!sessionId || pageState !== "waiting") return;
+
+    const interval = setInterval(async () => {
+      try {
+        await getScanReport(sessionId);
+        // Report exists — scan is complete
+        clearInterval(interval);
+        setPageState("complete");
+        setTimeout(() => {
+          router.push(`/dashboard?session_id=${sessionId}`);
+        }, 800);
+      } catch {
+        // 404 = scan not done yet — keep polling
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [sessionId, pageState, router]);
 
   const connectSession = async (code: string) => {
     setLoading(true);
