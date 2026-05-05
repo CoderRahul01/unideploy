@@ -9,6 +9,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from contextlib import asynccontextmanager
 from datetime import datetime
+import asyncio
 import os, logging
 
 from dotenv import load_dotenv
@@ -21,9 +22,20 @@ logger = logging.getLogger("unideploy")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(f"UniDeploy API starting — env={os.getenv('APP_ENV', 'development')}")
-    logger.info(f"InsForge project: {os.getenv('INSFORGE_PROJECT_ID', 'not set')}")
     logger.info(f"Gemini project: {os.getenv('GOOGLE_CLOUD_PROJECT', 'not set')}")
+    logger.info(f"E2B configured: {bool(os.getenv('E2B_API_KEY'))}")
+
+    # Start background scan worker
+    from workers.scan_worker import worker_loop
+    worker_task = asyncio.create_task(worker_loop())
+
     yield
+
+    worker_task.cancel()
+    try:
+        await worker_task
+    except asyncio.CancelledError:
+        pass
     logger.info("UniDeploy API shutting down")
 
 
@@ -59,10 +71,13 @@ app.add_middleware(
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 
-from routers import sessions, websockets
+from routers import sessions, websockets, scans, webhooks
 
 app.include_router(sessions.router)
 app.include_router(websockets.router)
+app.include_router(scans.router)
+app.include_router(webhooks.router)
+# from routers import metrics  # uncomment when metrics endpoint is ready
 
 # ── Health ────────────────────────────────────────────────────────────────────
 

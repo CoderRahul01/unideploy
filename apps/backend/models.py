@@ -51,11 +51,11 @@ class User(Base):
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
     # Relationships
-    api_keys = relationship("ApiKey", back_populates="user")
+    api_keys = relationship("UserApiKey", back_populates="user")
     projects = relationship("Project", back_populates="owner")
 
 
-class ApiKey(Base):
+class UserApiKey(Base):
     __tablename__ = "api_keys"
 
     id = Column(Integer, primary_key=True, index=True)

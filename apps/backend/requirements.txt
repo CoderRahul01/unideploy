@@ -20,9 +20,18 @@ slowapi>=0.1.9
 httpx>=0.28.1,<1.0.0
 python-multipart==0.0.9
 
-# Google Gemini ADK (pulls in websockets + httpx compatible versions)
+# Google Gemini ADK + direct Gemini client
 google-adk>=1.0.0
 google-genai>=1.0.0
+
+# E2B sandbox — code runs inside VM, never on Cloud Run disk
+e2b>=1.0.0
+
+# Composio — GitHub PR creation for FixAgent
+composio-core>=0.7.0
+
+# Observability (import commented out in main.py until metrics router is wired)
+prometheus-client>=0.17.0
 
 # Testing
 pytest>=8.0.0

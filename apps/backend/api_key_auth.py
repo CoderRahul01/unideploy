@@ -41,7 +41,7 @@ def _build_api_key_context(
     api_key = (
         db.query(models.UserApiKey)
         .filter(
-            models.UserApiKey.api_key == token,
+            models.UserApiKey.key == token,
             models.UserApiKey.is_active.is_(True),
         )
         .first()
@@ -49,14 +49,15 @@ def _build_api_key_context(
     if not api_key:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
+    user = api_key.user
     return ApiKeyContext(
         api_key_id=api_key.id,
-        api_key=api_key.api_key,
+        api_key=api_key.key,
         user_id=api_key.user_id,
-        auth_id=api_key.user.clerk_id if api_key.user else None,
-        plan_tier=api_key.plan_tier,
-        scans_used_this_month=api_key.scans_used_this_month,
-        scans_limit=api_key.scans_limit,
+        auth_id=user.clerk_id if user else None,
+        plan_tier=user.plan_tier if user else "free",
+        scans_used_this_month=user.scans_used_this_month if user else 0,
+        scans_limit=user.scans_limit if user else 5,
         record=api_key,
     )
 
@@ -101,11 +102,15 @@ def increment_scan_usage(db: Session, context: ApiKeyContext) -> models.UserApiK
     if not record:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
-    record.scans_used_this_month += 1
-    record.last_scan_at = datetime.utcnow()
+    user = record.user
+    if user:
+        user.scans_used_this_month += 1
+        db.add(user)
+    record.last_used_at = datetime.utcnow()
     db.add(record)
     db.commit()
     db.refresh(record)
-    context.scans_used_this_month = record.scans_used_this_month
+    if user:
+        context.scans_used_this_month = user.scans_used_this_month
     context.record = record
     return record
