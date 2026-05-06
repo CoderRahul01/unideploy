@@ -454,7 +454,7 @@ function runHeuristics(
         severity: "medium",
         category: "cors",
         title: "Permissive CORS configuration",
-        description: 'CORS is configured with origin: "*" or called with no options, allowing any domain to make credentialed cross-origin requests.',
+        description: 'CORS is configured with origin: (process.env.ALLOWED_ORIGINS ?? "").split(",").filter(Boolean) or called with no options, allowing any domain to make credentialed cross-origin requests.',
         fix_guideline: "Restrict the allowed origins to your production domain(s). Use ALLOWED_ORIGINS env var to configure per-environment.",
         evidence: snip(content, m.index),
         auto_fixable: true,
