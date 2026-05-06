@@ -749,9 +749,6 @@ program
           );
           console.log("");
           console.log(chalk.green("  ✓ Dashboard ready → https://unideploy.in/dashboard"));
-          if (autoFixable > 0) {
-            console.log(chalk.gray(`  Run 'unideploy fix' to apply ${autoFixable} auto-fixes`));
-          }
           console.log("");
 
           // ── Step 5: POST findings to backend ───────────────────────────────
@@ -775,6 +772,23 @@ program
             });
           } catch (err) {
             console.error(chalk.yellow(`  Warning: could not send results to backend: ${err}`));
+          }
+
+          // ── Step 6: Save state for `unideploy fix` ─────────────────────────
+          try {
+            const stateDir = path.join(os.homedir(), ".unideploy");
+            if (!fs.existsSync(stateDir)) fs.mkdirSync(stateDir, { recursive: true });
+            fs.writeFileSync(path.join(stateDir, "last-scan.json"), JSON.stringify({
+              session_id: session.session_id,
+              project_root: cwd,
+              grade,
+              scanned_at: new Date().toISOString(),
+              findings: allFindings,
+            }, null, 2));
+          } catch { /* best-effort */ }
+
+          if (autoFixable > 0) {
+            console.log(chalk.gray(`  Run 'npx unideploy fix' to apply ${autoFixable} auto-fixes`));
           }
 
           ws.close();
@@ -807,16 +821,145 @@ program
     process.exit(0);
   });
 
+// ── Fix engine — applies auto-fixable findings locally ───────────────────────
+
+function applyFix(finding: Finding, projectRoot: string): { applied: boolean; message: string } {
+  const fullPath = path.join(projectRoot, finding.file_path);
+  let content: string;
+  try { content = fs.readFileSync(fullPath, "utf-8"); } catch {
+    return { applied: false, message: `Could not read ${finding.file_path}` };
+  }
+
+  // ── CORS wildcard ─────────────────────────────────────────────────────────
+  if (finding.category === "cors") {
+    const fixed = content
+      .replace(/origin\s*:\s*["']\*["']/g,
+        `origin: (process.env.ALLOWED_ORIGINS ?? "").split(",").filter(Boolean)`)
+      .replace(/cors\s*\(\s*\)/g,
+        `cors({ origin: (process.env.ALLOWED_ORIGINS ?? "").split(",").filter(Boolean) })`);
+    if (fixed !== content) {
+      try {
+        fs.writeFileSync(fullPath, fixed, "utf-8");
+        return { applied: true, message: `Restricted CORS origin to ALLOWED_ORIGINS env var in ${finding.file_path}` };
+      } catch { return { applied: false, message: `Could not write ${finding.file_path}` }; }
+    }
+    return { applied: false, message: `CORS pattern not found in ${finding.file_path} — may already be fixed` };
+  }
+
+  // ── Missing security headers (Next.js config) ─────────────────────────────
+  if (finding.category === "other" && finding.title.toLowerCase().includes("security headers")) {
+    const headersBlock = `
+async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Frame-Options",           value: "DENY" },
+          { key: "X-Content-Type-Options",    value: "nosniff" },
+          { key: "X-XSS-Protection",          value: "1; mode=block" },
+          { key: "Referrer-Policy",           value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy",        value: "camera=(), microphone=(), geolocation=()" },
+          { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+        ],
+      },
+    ];
+  },`;
+    if (content.includes("headers()")) {
+      return { applied: false, message: `Security headers already present in ${finding.file_path}` };
+    }
+    // Insert before closing brace of the config object
+    const fixed = content.replace(
+      /^(const nextConfig[^=]+=\s*\{)([\s\S]*?)(\}\s*;?\s*export default)/m,
+      (_m, open, body, close) => `${open}${body}${headersBlock}\n${close}`
+    );
+    if (fixed !== content) {
+      try {
+        fs.writeFileSync(fullPath, fixed, "utf-8");
+        return { applied: true, message: `Added security headers to ${finding.file_path}` };
+      } catch { return { applied: false, message: `Could not write ${finding.file_path}` }; }
+    }
+    return { applied: false, message: `Could not locate config object in ${finding.file_path}` };
+  }
+
+  // ── console.log with sensitive data ──────────────────────────────────────
+  if (finding.category === "secrets" && finding.title.toLowerCase().includes("logged")) {
+    const line = finding.line_number;
+    if (!line) return { applied: false, message: "No line number to target" };
+    const lines = content.split("\n");
+    const idx = line - 1;
+    if (lines[idx]?.includes("console.log")) {
+      lines[idx] = lines[idx].replace(/console\.log/, "// console.log /* removed by unideploy fix */");
+      try {
+        fs.writeFileSync(fullPath, lines.join("\n"), "utf-8");
+        return { applied: true, message: `Disabled console.log at ${finding.file_path}:${line}` };
+      } catch { return { applied: false, message: `Could not write ${finding.file_path}` }; }
+    }
+  }
+
+  return { applied: false, message: `No auto-fix rule for category "${finding.category}"` };
+}
+
 // ── `unideploy fix` — apply auto-fixable findings ────────────────────────────
 
 program
   .command("fix")
   .description("Apply auto-fixable findings from last scan")
-  .option("--local", "Hit local backend")
-  .action(async (_opts: { local: boolean }) => {
-    console.log(chalk.yellow("  Auto-fix via 'unideploy fix' requires the UniDeploy Indie plan."));
-    console.log(chalk.gray("  → Use the 'Fix with AI' button in the dashboard to apply fixes."));
-    console.log(chalk.gray("  → https://unideploy.in/dashboard"));
+  .option("--dry-run", "Show what would change without writing files")
+  .action(async (opts: { dryRun: boolean }) => {
+    const stateFile = path.join(os.homedir(), ".unideploy", "last-scan.json");
+
+    let state: { session_id: string; project_root: string; grade: string; findings: Finding[] };
+    try {
+      state = JSON.parse(fs.readFileSync(stateFile, "utf-8"));
+    } catch {
+      console.log(chalk.red("  ✗ No scan found. Run 'npx unideploy init' first."));
+      process.exit(1);
+    }
+
+    const fixable = state.findings.filter(f => f.auto_fixable);
+    if (fixable.length === 0) {
+      console.log(chalk.green("  ✓ No auto-fixable issues from last scan."));
+      process.exit(0);
+    }
+
+    console.log("");
+    console.log(chalk.bold(`● UniDeploy Fix — ${fixable.length} auto-fixable issue${fixable.length > 1 ? "s" : ""}`));
+    console.log(chalk.gray(`  Project: ${state.project_root}`));
+    if (opts.dryRun) console.log(chalk.yellow("  (dry run — no files will be modified)"));
+    console.log("");
+
+    let applied = 0;
+    let skipped = 0;
+
+    for (const finding of fixable) {
+      const label = `${severityColor(finding.severity)} ${finding.title.slice(0, 40).padEnd(40)} ${chalk.gray(finding.file_path)}`;
+      if (opts.dryRun) {
+        console.log(`  ${label}`);
+        console.log(chalk.gray(`    Would apply: ${finding.fix_guideline.slice(0, 80)}`));
+        console.log("");
+        continue;
+      }
+      const result = applyFix(finding, state.project_root);
+      if (result.applied) {
+        console.log(`  ${chalk.green("✓")} ${label}`);
+        console.log(chalk.gray(`    ${result.message}`));
+        applied++;
+      } else {
+        console.log(`  ${chalk.gray("–")} ${label}`);
+        console.log(chalk.gray(`    Skipped: ${result.message}`));
+        skipped++;
+      }
+      console.log("");
+    }
+
+    if (!opts.dryRun) {
+      console.log(`  ${chalk.green(`✓ ${applied} fix${applied !== 1 ? "es" : ""} applied`)}, ${skipped} skipped`);
+      if (applied > 0) {
+        console.log(chalk.gray("  Review the changes, then commit: git diff"));
+      }
+    }
+    console.log("");
+    process.exit(0);
   });
 
 program.parse();

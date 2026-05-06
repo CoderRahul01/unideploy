@@ -1,6 +1,6 @@
 {
   "name": "unideploy",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Production-readiness scanner for vibe-coded apps",
   "bin": {
     "unideploy": "dist/index.js"
