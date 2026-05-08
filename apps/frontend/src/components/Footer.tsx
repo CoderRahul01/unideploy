@@ -129,7 +129,7 @@ export default function Footer() {
               <Twitter size={15} strokeWidth={1.5} />
             </a>
             <a
-              href="https://linkedin.com/in/rahulpandey187"
+              href="https://www.linkedin.com/company/unideployai/"
               target="_blank"
               rel="noopener noreferrer"
               style={{ color: "#4a5a3a" }}

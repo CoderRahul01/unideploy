@@ -78,3 +78,22 @@ htmlcov/
 # CLI/MCP build output
 apps/cli/dist/
 apps/mcp/dist/
+
+# InsForge & AI agent skills
+.insforge
+.agent
+.agents
+.augment
+.claude
+.cline
+.github/copilot*
+.kilocode
+.qoder
+.qwen
+.roo
+.trae
+.windsurf
+
+# test-vulnerable-app — demo target, intentional misconfigs
+# Exclude the .env from git even though the app itself doesn't gitignore it
+test-vulnerable-app/.env

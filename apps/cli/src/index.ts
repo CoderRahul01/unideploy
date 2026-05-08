@@ -23,8 +23,9 @@ interface Finding {
             "input_validation" | "dependency" | "error_handling" | "other";
   title: string;
   description: string;
-  fix_guideline: string;
-  evidence: string;
+  fix_hint: string;
+  snippet: string;
+  cve_ref?: string;
   auto_fixable: boolean;
 }
 
@@ -68,6 +69,14 @@ function computeGrade(findings: Finding[]): "A" | "B" | "C" | "D" | "F" {
   if (high >= 1 || medium >= 5) return "C";
   if (medium > 0) return "B";
   return "A";
+}
+
+function computeRiskScore(findings: Finding[]): number {
+  const critical = findings.filter(f => f.severity === "critical").length;
+  const high = findings.filter(f => f.severity === "high").length;
+  const medium = findings.filter(f => f.severity === "medium").length;
+  const low = findings.filter(f => f.severity === "low").length;
+  return Math.min(100, critical * 40 + high * 15 + medium * 5 + low * 1);
 }
 
 // ── File collection ───────────────────────────────────────────────────────────
@@ -264,8 +273,8 @@ function runHeuristics(
           category: "secrets",
           title: "Hardcoded API key in source",
           description: `A live API key matching the pattern ${pat.source.slice(0, 20)}... was found in source code. This will be exposed in version control.`,
-          fix_guideline: "Move this key to an environment variable (e.g. process.env.KEY) and add the .env file to .gitignore. Rotate the key immediately.",
-          evidence: snip(content, m.index),
+          fix_hint: "Move this key to an environment variable (e.g. process.env.KEY) and add the .env file to .gitignore. Rotate the key immediately.",
+          snippet: snip(content, m.index),
           auto_fixable: false,
         });
       }
@@ -283,8 +292,8 @@ function runHeuristics(
         category: "secrets",
         title: "Sensitive value exposed via NEXT_PUBLIC_",
         description: "NEXT_PUBLIC_ variables are bundled into client-side code and visible to all users.",
-        fix_guideline: "Use a server-side environment variable without the NEXT_PUBLIC_ prefix and proxy through an API route.",
-        evidence: snip(content, nm.index),
+        fix_hint: "Use a server-side environment variable without the NEXT_PUBLIC_ prefix and proxy through an API route.",
+        snippet: snip(content, nm.index),
         auto_fixable: false,
       });
     }
@@ -301,8 +310,8 @@ function runHeuristics(
         category: "secrets",
         title: "Sensitive data logged to console",
         description: "console.log statements containing key/token/secret/password values may leak credentials to logs.",
-        fix_guideline: "Remove or redact sensitive values from all console.log statements before deploying to production.",
-        evidence: snip(content, cm.index),
+        fix_hint: "Remove or redact sensitive values from all console.log statements before deploying to production.",
+        snippet: snip(content, cm.index),
         auto_fixable: true,
       });
     }
@@ -318,26 +327,30 @@ function runHeuristics(
         category: "rls",
         title: "Supabase anon key used in client-side fetch",
         description: "Using the anon key directly in browser fetch() bypasses Row Level Security if RLS is not enabled on all tables.",
-        fix_guideline: "Ensure RLS is enabled on all Supabase tables. Use authenticated sessions rather than raw anon key requests from the browser.",
-        evidence: snip(content, ix),
+        fix_hint: "Ensure RLS is enabled on all Supabase tables. Use authenticated sessions rather than raw anon key requests from the browser.",
+        snippet: snip(content, ix),
         auto_fixable: false,
       });
     }
   }
 
-  // 5. .env not in .gitignore
-  for (const { path: fp } of files) {
-    if (IS_ENV_FILE(fp) && !gitignore.split("\n").some(l => l.trim() === ".env")) {
+  // 5. .env not in .gitignore (direct filesystem check — .env is excluded from content scanning)
+  if (fs.existsSync(path.join(root, ".env"))) {
+    const envIgnored = gitignore.split("\n").some(l => {
+      const t = l.trim();
+      return t === ".env" || t === ".env*";
+    });
+    if (!envIgnored) {
       emit({
         id: randomUUID(),
-        file_path: fp,
+        file_path: ".env",
         line_number: 1,
         severity: "critical",
         category: "secrets",
         title: ".env file not listed in .gitignore",
         description: "Your .env file is not excluded by .gitignore. It may be committed to version control, exposing all secrets.",
-        fix_guideline: 'Add ".env" to your .gitignore file immediately and rotate any secrets it contains.',
-        evidence: ".env file exists but is absent from .gitignore",
+        fix_hint: 'Add ".env" to your .gitignore file immediately and rotate any secrets it contains.',
+        snippet: ".env file exists but is absent from .gitignore",
         auto_fixable: true,
       });
     }
@@ -364,8 +377,8 @@ function runHeuristics(
           category: "rls",
           title: `RLS disabled on table "${tableName}"`,
           description: `Table "${tableName}" does not have Row Level Security enabled. Anyone with the anon key can read/write all rows.`,
-          fix_guideline: `Add "ALTER TABLE ${tableName} ENABLE ROW LEVEL SECURITY;" to your migration and create appropriate policies.`,
-          evidence: snip(content, tm.index),
+          fix_hint: `Add "ALTER TABLE ${tableName} ENABLE ROW LEVEL SECURITY;" to your migration and create appropriate policies.`,
+          snippet: snip(content, tm.index),
           auto_fixable: false,
         });
       }
@@ -389,8 +402,8 @@ function runHeuristics(
         category: "auth",
         title: "API route missing authentication check",
         description: "This API route does not appear to check for a session, token, or user. Unauthenticated callers may be able to access it.",
-        fix_guideline: "Add authentication at the top of this route handler. Use getServerSession(), verify a JWT, or check for a Clerk session before processing the request.",
-        evidence: `No auth keywords found in ${fp}`,
+        fix_hint: "Add authentication at the top of this route handler. Use getServerSession(), verify a JWT, or check for a Clerk session before processing the request.",
+        snippet: `No auth keywords found in ${fp}`,
         auto_fixable: false,
       });
     }
@@ -407,8 +420,8 @@ function runHeuristics(
         category: "auth",
         title: "Inverted authentication check",
         description: 'Pattern "if(!user) { ... allow }" detected. This may grant access to unauthenticated users instead of denying it.',
-        fix_guideline: "Review this authentication check. The guard should redirect or return 401 when the user is missing, not allow the request through.",
-        evidence: snip(content, im.index),
+        fix_hint: "Review this authentication check. The guard should redirect or return 401 when the user is missing, not allow the request through.",
+        snippet: snip(content, im.index),
         auto_fixable: false,
       });
     }
@@ -434,8 +447,8 @@ function runHeuristics(
         category: "rate_limiting",
         title: "No rate limiting on API route",
         description: "This route file does not import any rate limiting middleware. Without rate limits, the endpoint is vulnerable to abuse and DoS attacks.",
-        fix_guideline: "Add rate limiting using a library like express-rate-limit, Upstash Ratelimit, or slowapi (Python). Apply limits on auth and sensitive endpoints at minimum.",
-        evidence: `No rate limit keyword found in ${fp}`,
+        fix_hint: "Add rate limiting using a library like express-rate-limit, Upstash Ratelimit, or slowapi (Python). Apply limits on auth and sensitive endpoints at minimum.",
+        snippet: `No rate limit keyword found in ${fp}`,
         auto_fixable: false,
       });
     }
@@ -455,8 +468,8 @@ function runHeuristics(
         category: "cors",
         title: "Permissive CORS configuration",
         description: 'CORS is configured with origin: (process.env.ALLOWED_ORIGINS ?? "").split(",").filter(Boolean) or called with no options, allowing any domain to make credentialed cross-origin requests.',
-        fix_guideline: "Restrict the allowed origins to your production domain(s). Use ALLOWED_ORIGINS env var to configure per-environment.",
-        evidence: snip(content, m.index),
+        fix_hint: "Restrict the allowed origins to your production domain(s). Use ALLOWED_ORIGINS env var to configure per-environment.",
+        snippet: snip(content, m.index),
         auto_fixable: true,
       });
     }
@@ -477,8 +490,8 @@ function runHeuristics(
         category: "input_validation",
         title: "API route missing input validation",
         description: "No schema validation library (Zod, Joi, Pydantic, etc.) was found in this route. Unvalidated input can lead to unexpected behaviour or injection attacks.",
-        fix_guideline: "Add input validation using Zod (TypeScript) or Pydantic (Python) to parse and validate all incoming request bodies.",
-        evidence: `No validation library import found in ${fp}`,
+        fix_hint: "Add input validation using Zod (TypeScript) or Pydantic (Python) to parse and validate all incoming request bodies.",
+        snippet: `No validation library import found in ${fp}`,
         auto_fixable: false,
       });
     }
@@ -499,8 +512,8 @@ function runHeuristics(
           category: "other",
           title: "Missing security headers configuration",
           description: "next.config.js does not export a headers() function. Security headers like X-Frame-Options, CSP, and HSTS are not set.",
-          fix_guideline: "Add a headers() async function to next.config.js that returns X-Frame-Options, X-Content-Type-Options, Strict-Transport-Security, and Content-Security-Policy headers.",
-          evidence: `No "headers" export found in ${fp}`,
+          fix_hint: "Add a headers() async function to next.config.js that returns X-Frame-Options, X-Content-Type-Options, Strict-Transport-Security, and Content-Security-Policy headers.",
+          snippet: `No "headers" export found in ${fp}`,
           auto_fixable: true,
         });
       }
@@ -519,8 +532,8 @@ function runHeuristics(
         category: "other",
         title: "Express app missing helmet security headers",
         description: "helmet() middleware is not imported or used. Without it, Express does not set essential security headers.",
-        fix_guideline: 'Install helmet (npm i helmet) and add "app.use(helmet())" near the top of your Express app setup.',
-        evidence: `express() found but no helmet import in ${fp}`,
+        fix_hint: 'Install helmet (npm i helmet) and add "app.use(helmet())" near the top of your Express app setup.',
+        snippet: `express() found but no helmet import in ${fp}`,
         auto_fixable: true,
       });
     }
@@ -553,13 +566,60 @@ function runHeuristics(
             category: "dependency",
             title: `High-risk dependency: ${pkgName}`,
             description: `The package "${pkgName}" (version ${version}) is known to have serious security vulnerabilities including potential code execution.`,
-            fix_guideline: `Remove "${pkgName}" from your dependencies. Use safer alternatives: JSON.parse() instead of node-serialize, Function() carefully or avoid eval(), and upgrade serialize-javascript to >=3.1.`,
-            evidence: `"${pkgName}": "${version}" in ${fp}`,
+            fix_hint: `Remove "${pkgName}" from your dependencies. Use safer alternatives: JSON.parse() instead of node-serialize, Function() carefully or avoid eval(), and upgrade serialize-javascript to >=3.1.`,
+            snippet: `"${pkgName}": "${version}" in ${fp}`,
             auto_fixable: false,
           });
         }
       }
     } catch { continue; }
+  }
+
+  // ── DEBUG MODE IN PRODUCTION ──────────────────────────────────────────────
+
+  const DEBUG_FILES = [".env.example", ".env.template", ".env.sample"];
+  for (const { path: fp, content } of files) {
+    const base = path.basename(fp);
+    if (!DEBUG_FILES.includes(base)) continue;
+    const debugRe = /^(DEBUG\s*=\s*(true|1)|NODE_ENV\s*=\s*development)/m;
+    const dm = debugRe.exec(content);
+    if (dm) {
+      emit({
+        id: randomUUID(),
+        file_path: fp,
+        line_number: lineNum(content, dm.index),
+        severity: "medium",
+        category: "other",
+        title: "Debug mode committed to version control",
+        description: `${base} contains ${dm[0].trim()} — if this is copied to production .env, debug output and verbose logging will be enabled.`,
+        fix_hint: `Set DEBUG=false and NODE_ENV=production in your production environment. Never commit debug=true to template files.`,
+        snippet: snip(content, dm.index),
+        auto_fixable: false,
+      });
+    }
+  }
+
+  // ── EXPOSED STACK TRACES ──────────────────────────────────────────────────
+
+  for (const { path: fp, content } of files) {
+    if (!IS_API_ROUTE(fp)) continue;
+    const stackRe = /\.stack\b|err\.stack|error\.stack|e\.stack/;
+    const resWithStackRe = /res\.(json|send|status\(\d+\)\.json)\s*\([^)]*(?:err|error|e)\b/;
+    if (stackRe.test(content) && resWithStackRe.test(content)) {
+      const ix = content.search(stackRe);
+      emit({
+        id: randomUUID(),
+        file_path: fp,
+        line_number: lineNum(content, ix),
+        severity: "high",
+        category: "error_handling",
+        title: "Stack trace exposed in HTTP error response",
+        description: "Error stack traces are sent in HTTP responses. This leaks internal file paths, function names, and framework versions to attackers.",
+        fix_hint: "Catch errors server-side, log them internally (e.g. console.error), and return only a generic message to the client: res.status(500).json({ error: 'Internal server error' })",
+        snippet: snip(content, ix),
+        auto_fixable: false,
+      });
+    }
   }
 
   return findings;
@@ -641,7 +701,24 @@ program
       process.exit(1);
     }
     const findings = scan.findings ?? [];
-    if (opts.json) { console.log(JSON.stringify({ scan_id: scanRes.scan_id, findings }, null, 2)); return; }
+    if (opts.json) {
+      const grade = computeGrade(findings);
+      const riskScore = computeRiskScore(findings);
+      console.log(JSON.stringify({
+        project_meta: { github_url: repoUrl, scan_id: scanRes.scan_id },
+        findings,
+        summary: {
+          total: findings.length,
+          critical: findings.filter(f => f.severity === "critical").length,
+          high: findings.filter(f => f.severity === "high").length,
+          medium: findings.filter(f => f.severity === "medium").length,
+          low: findings.filter(f => f.severity === "low").length,
+          grade,
+          risk_score: riskScore,
+        },
+      }, null, 2));
+      return;
+    }
     printFindingsTable(findings);
     if (opts.ci && findings.some(f => f.severity === "critical")) process.exit(1);
   });
@@ -652,10 +729,43 @@ program
   .command("init")
   .description("Scan local project and pair with UniDeploy dashboard")
   .option("--local", "Hit local backend (localhost:8000)")
-  .action(async (opts: { local: boolean }) => {
+  .option("--json", "Output results as JSON (skips interactive mode)")
+  .option("--ci", "CI mode: exit 1 if CRITICAL findings")
+  .action(async (opts: { local: boolean; json: boolean; ci: boolean }) => {
     const baseUrl = opts.local ? LOCAL_URL : API_URL;
     const cwd = process.cwd();
     const projectName = path.basename(cwd);
+    const scanStart = Date.now();
+
+    // ── JSON / CI mode — offline local scan, no session needed ────────────
+    if (opts.json || opts.ci) {
+      const framework = detectFramework(cwd);
+      const files = collectFiles(cwd);
+      const allFindings = runHeuristics(files, cwd);
+      const grade = computeGrade(allFindings);
+      const riskScore = computeRiskScore(allFindings);
+      const scanDurationMs = Date.now() - scanStart;
+      if (opts.json) {
+        console.log(JSON.stringify({
+          project_meta: { framework, file_count: files.length, scan_duration_ms: scanDurationMs },
+          findings: allFindings,
+          summary: {
+            total: allFindings.length,
+            critical: allFindings.filter(f => f.severity === "critical").length,
+            high: allFindings.filter(f => f.severity === "high").length,
+            medium: allFindings.filter(f => f.severity === "medium").length,
+            low: allFindings.filter(f => f.severity === "low").length,
+            grade,
+            risk_score: riskScore,
+          },
+        }, null, 2));
+      } else {
+        printFindingsTable(allFindings);
+        console.log(`\nGrade: ${grade}  |  Risk Score: ${riskScore}/100  |  ${allFindings.length} issues`);
+      }
+      if (opts.ci && allFindings.some(f => f.severity === "critical")) process.exit(1);
+      process.exit(0);
+    }
 
     // ── Step 1: Create session ─────────────────────────────────────────────
 
@@ -741,11 +851,12 @@ program
           }));
 
           const grade = computeGrade(allFindings);
+          const riskScore = computeRiskScore(allFindings);
           const autoFixable = allFindings.filter(f => f.auto_fixable).length;
 
           console.log("");
           console.log(
-            `  Grade: ${gradeColor(grade)}  |  ${allFindings.length} issues  |  ${autoFixable} auto-fixable`
+            `  Grade: ${gradeColor(grade)}  |  Risk Score: ${riskScore}/100  |  ${allFindings.length} issues  |  ${autoFixable} auto-fixable`
           );
           console.log("");
           console.log(chalk.green("  ✓ Dashboard ready → https://unideploy.in/dashboard"));
@@ -762,6 +873,7 @@ program
             total_issues: allFindings.length,
             auto_fixable: autoFixable,
             grade,
+            risk_score: riskScore,
             findings: allFindings,
           };
 
@@ -935,7 +1047,7 @@ program
       const label = `${severityColor(finding.severity)} ${finding.title.slice(0, 40).padEnd(40)} ${chalk.gray(finding.file_path)}`;
       if (opts.dryRun) {
         console.log(`  ${label}`);
-        console.log(chalk.gray(`    Would apply: ${finding.fix_guideline.slice(0, 80)}`));
+        console.log(chalk.gray(`    Would apply: ${finding.fix_hint.slice(0, 80)}`));
         console.log("");
         continue;
       }
