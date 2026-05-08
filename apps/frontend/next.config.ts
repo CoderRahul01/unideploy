@@ -7,11 +7,11 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/docs",
-        destination: "https://unideploy.mintlify.app/docs",
+        destination: "https://unideploy.mintlify.app/",
       },
       {
         source: "/docs/:path*",
-        destination: "https://unideploy.mintlify.app/docs/:path*",
+        destination: "https://unideploy.mintlify.app/:path*",
       },
     ];
   },

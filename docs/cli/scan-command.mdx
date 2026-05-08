@@ -1,6 +1,6 @@
 ---
 title: "scan"
-description: "Full reference for the unideploy scan command."
+description: "Scan a GitHub repository by URL (remote scan mode)."
 ---
 
 ## Usage
@@ -9,23 +9,28 @@ description: "Full reference for the unideploy scan command."
 unideploy scan [github_url] [flags]
 ```
 
-If `github_url` is omitted, UniDeploy attempts to detect the remote URL from your local git configuration (`git remote get-url origin`).
+If `github_url` is omitted, UniDeploy reads the remote URL from your local git config (`git remote get-url origin`).
+
+<Note>
+For scanning **local files** with a live dashboard session, use [`unideploy init`](/cli/init-command) instead. The `scan` command triggers a remote GitHub scan via the UniDeploy backend.
+</Note>
 
 ## Flags
 
 | Flag | Description |
 |------|-------------|
-| `--ci` | Exit with code `1` if any CRITICAL findings are found. Use in CI pipelines to gate merges. |
-| `--json` | Output results as structured JSON instead of a table. Pipe to `jq` or save to a file. |
-| `--local` | Point at `localhost:8000` instead of the production API. Useful when running the backend locally. |
+| `--branch <branch>` | Branch to scan. Defaults to `main`. |
+| `--ci` | Exit with code `1` if any CRITICAL findings are found. |
+| `--json` | Output results as structured JSON. |
+| `--local` | Point at `localhost:8000` instead of the production API. |
 
 ## Exit codes
 
 | Code | Meaning |
 |------|---------|
 | `0` | Scan completed, no CRITICAL findings. |
-| `1` | Scan completed, one or more CRITICAL findings present (only when `--ci` is used). |
-| `2` | Scan failed — network error, authentication error, or API error. |
+| `1` | CRITICAL findings present (only when `--ci` is used). |
+| `2` | Scan failed — network or API error. |
 
 ## JSON output format
 
@@ -35,17 +40,21 @@ unideploy scan https://github.com/your/repo --json
 
 ```json
 {
-  "scan_id": "sc_abc123",
-  "grade": "D",
+  "project_meta": {
+    "github_url": "https://github.com/your/repo",
+    "scan_id": "sc_abc123"
+  },
   "findings": [
     {
-      "rule_id": "SEC-001",
-      "severity": "CRITICAL",
-      "title": "Hardcoded service role key",
-      "file": "src/lib/supabase.ts",
-      "line": 3,
-      "description": "A Supabase service role key is present in a client-side file.",
-      "auto_fixable": true
+      "id": "uuid",
+      "severity": "critical",
+      "category": "secrets",
+      "title": "Hardcoded API key in source",
+      "file_path": "src/lib/stripe.ts",
+      "line_number": 3,
+      "snippet": "const STRIPE_KEY = \"sk_live_...",
+      "fix_hint": "Move this key to an environment variable and rotate it immediately.",
+      "auto_fixable": false
     }
   ],
   "summary": {
@@ -53,42 +62,9 @@ unideploy scan https://github.com/your/repo --json
     "critical": 1,
     "high": 2,
     "medium": 1,
-    "auto_fixable": 3
+    "low": 0,
+    "grade": "D",
+    "risk_score": 75
   }
 }
 ```
-
-## CI/CD example
-
-```yaml
-# .github/workflows/security.yml
-name: Security scan
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-
-jobs:
-  scan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install UniDeploy
-        run: npm install -g unideploy
-
-      - name: Run security scan
-        env:
-          UNIDEPLOY_API_KEY: ${{ secrets.UNIDEPLOY_API_KEY }}
-        run: unideploy scan --ci --json > scan-report.json
-
-      - name: Upload report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: security-report
-          path: scan-report.json
-```
-
-The `--ci` flag causes the job to fail (exit code 1) if CRITICAL findings are present, blocking the merge.

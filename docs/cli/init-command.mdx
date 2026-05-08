@@ -1,46 +1,97 @@
 ---
 title: "init"
-description: "Start an interactive WebSocket session to scan your local project."
+description: "Scan your local project and stream findings to the UniDeploy dashboard."
 ---
 
 ## Usage
 
 ```bash
-unideploy init
+unideploy init [flags]
 ```
 
 ## What it does
 
-`unideploy init` starts an interactive scanning session for your local project. Unlike `unideploy scan`, which scans a remote GitHub repository by URL, `init` runs the agent pipeline on the files in your current working directory.
+`unideploy init` runs UniDeploy's 15-rule security checker on the files in your current working directory and streams findings to the dashboard in real time.
 
-When you run `unideploy init`:
+1. The CLI creates a session and prints a 6-digit code.
+2. Open [unideploy.in/connect](https://unideploy.in/connect) and enter the code.
+3. Findings stream to both your terminal and the dashboard simultaneously.
 
-1. The CLI creates a session and receives a 6-digit session code.
-2. The session code is displayed in a box in your terminal.
-3. Open the dashboard at [unideploy.vercel.app/connect](https://unideploy.vercel.app/connect) and enter the code.
-4. The browser and CLI connect via WebSocket.
-5. Findings are streamed to both your terminal and the browser dashboard in real time.
+## Flags
 
-## Example session
+| Flag | Description |
+|------|-------------|
+| `--json` | Output results as structured JSON, skip the interactive session. |
+| `--ci` | Exit with code `1` on any CRITICAL findings. Skips the interactive session. |
+| `--local` | Point at `localhost:8000` instead of the production API. |
 
-```
+## Interactive session
+
+```bash
 $ unideploy init
 
-  ┌─────────────────────────┐
-  │                         │
-  │   Session code:  847291 │
-  │                         │
-  └─────────────────────────┘
+● UniDeploy agent running
+  Framework: Next.js detected
+  Scanning 84 files...
 
-  Open unideploy.vercel.app/connect and enter the code above.
-  Waiting for browser connection...
+  Your session code: 847-291
+  Open https://unideploy.in/connect and enter this code.
 
-  ● Browser connected
-  ● Scanning project files...
-  [CRITICAL] SEC-001  src/lib/stripe.ts:3
-  [HIGH]     RLS-001  supabase/schema.sql:12
-  [MEDIUM]   HDR-001  next.config.js
-  ● Scan complete — grade: D
+  ✓ Authenticated — scanning...
+
+  [CRITICAL] .env file not listed in .gitignore                  .env
+  [HIGH    ] RLS disabled on table "users"                       supabase/migrations/001_init.sql:4
+  [HIGH    ] No rate limiting on API route                       app/api/users/route.ts
+  [MEDIUM  ] Missing security headers configuration              next.config.js
+  [MEDIUM  ] Debug mode committed to version control             .env.example:4
+
+  Grade: F  |  Risk Score: 100/100  |  14 issues  |  2 auto-fixable
+
+  ✓ Dashboard ready → https://unideploy.in/dashboard
+
+  Run 'npx unideploy fix' to apply 2 auto-fixes
+```
+
+## JSON / CI mode
+
+When `--json` or `--ci` is passed, the session is skipped entirely — scan runs offline and exits immediately.
+
+```bash
+unideploy init --json
+```
+
+```json
+{
+  "project_meta": {
+    "framework": "Next.js",
+    "file_count": 84,
+    "scan_duration_ms": 312
+  },
+  "findings": [...],
+  "summary": {
+    "total": 14,
+    "critical": 1,
+    "high": 8,
+    "medium": 5,
+    "low": 0,
+    "grade": "F",
+    "risk_score": 100
+  }
+}
+```
+
+## Apply auto-fixes
+
+After any scan, run:
+
+```bash
+unideploy fix
+```
+
+UniDeploy rewrites the flagged lines in-place. Use `--dry-run` to preview changes without writing files:
+
+```bash
+unideploy fix --dry-run
 ```
 
 ## When to use init vs scan
@@ -48,6 +99,7 @@ $ unideploy init
 | | `unideploy init` | `unideploy scan` |
 |-|-----------------|-----------------|
 | Source | Local files | GitHub URL |
-| Output | Terminal + browser dashboard | Terminal |
-| Private repos | Yes (local) | Requires repo access |
-| CI/CD | Not suitable | Recommended |
+| Output | Terminal + dashboard | Terminal |
+| Private repos | Yes | Requires repo access |
+| CI/CD | `--ci` flag | `--ci` flag |
+| Speed | Instant (local) | ~30s (remote clone) |

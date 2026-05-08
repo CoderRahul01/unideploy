@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  console.log("Creating user with token:", body.token);
-  console.log("User password:", body.password);
+  // console.log /* removed by unideploy fix */("Creating user with token:", body.token);
+  // console.log /* removed by unideploy fix */("User password:", body.password);
   return NextResponse.json({ created: true, id: Math.random() });
 }

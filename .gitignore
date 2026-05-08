@@ -97,3 +97,15 @@ apps/mcp/dist/
 # test-vulnerable-app — demo target, intentional misconfigs
 # Exclude the .env from git even though the app itself doesn't gitignore it
 test-vulnerable-app/.env
+
+# Internal planning docs — not for public repo
+docs/project_management/
+
+# Network-mounted stale files (unreadable on this machine)
+apps/frontend/src/components/Login.tsx
+apps/frontend/src/lib/auth.ts
+scripts/deploy_agent.py
+
+# Binary assets that belong outside version control
+*.pdf
+image.png

@@ -7,12 +7,12 @@ const PRODUCT_LINKS = [
   { label: "Pricing", href: "/pricing" },
   { label: "Book a demo", href: "/demo" },
   { label: "Changelog", href: "/changelog" },
-  { label: "Docs", href: "https://docs.unideploy.in" },
+  { label: "Docs", href: "/docs" },
 ];
 
 const RESOURCE_LINKS = [
-  { label: "Documentation", href: "https://docs.unideploy.in" },
-  { label: "CLI reference", href: "https://docs.unideploy.in/cli/scan-command" },
+  { label: "Documentation", href: "/docs" },
+  { label: "CLI reference", href: "/docs/cli/init-command" },
   { label: "Security", href: "/security" },
   { label: "Changelog", href: "/changelog" },
 ];

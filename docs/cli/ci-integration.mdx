@@ -1,11 +1,11 @@
 ---
 title: "CI/CD Integration"
-description: "Gate pull requests on security findings with GitHub Actions."
+description: "Gate pull requests on security findings using unideploy init --ci."
 ---
 
 ## Overview
 
-UniDeploy integrates with any CI system that can run shell commands. The `--ci` flag causes the scan to exit with code `1` if CRITICAL findings are present, blocking the merge.
+UniDeploy's `--ci` flag exits with code `1` if any CRITICAL findings are present, blocking the merge. The scan runs fully offline — no session, no dashboard connection.
 
 ## GitHub Actions
 
@@ -29,12 +29,17 @@ jobs:
 
       - name: Run scan
         id: scan
-        env:
-          UNIDEPLOY_API_KEY: ${{ secrets.UNIDEPLOY_API_KEY }}
         run: |
-          unideploy scan --ci --json > report.json || EXIT=$?
-          cat report.json | jq '{grade: .grade, total: .summary.total, critical: .summary.critical}' >> $GITHUB_STEP_SUMMARY
+          unideploy init --ci --json > report.json || EXIT=$?
+          cat report.json | jq '{grade: .summary.grade, total: .summary.total, critical: .summary.critical, risk_score: .summary.risk_score}' >> $GITHUB_STEP_SUMMARY
           exit ${EXIT:-0}
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: report.json
 
       - name: Comment on PR
         if: github.event_name == 'pull_request' && always()
@@ -43,15 +48,10 @@ jobs:
           script: |
             const fs = require('fs');
             const report = JSON.parse(fs.readFileSync('report.json', 'utf8'));
-            const body = `## UniDeploy Security Scan\n\nGrade: **${report.grade}**\nFindings: ${report.summary.total} (${report.summary.critical} critical)\n\n[View full report](${report.dashboard_url})`;
+            const s = report.summary;
+            const body = `## UniDeploy Security Scan\n\nGrade: **${s.grade}** | Risk Score: **${s.risk_score}/100**\nFindings: ${s.total} (${s.critical} critical, ${s.high} high)\n\nView the full report in the uploaded artifact.`;
             github.rest.issues.createComment({ issue_number: context.issue.number, owner: context.repo.owner, repo: context.repo.repo, body });
 ```
-
-## Adding UNIDEPLOY_API_KEY to your repo
-
-1. Go to your GitHub repository → Settings → Secrets and variables → Actions
-2. Click **New repository secret**
-3. Name: `UNIDEPLOY_API_KEY`, Value: your key from the UniDeploy dashboard
 
 ## GitLab CI
 
@@ -60,7 +60,7 @@ security-scan:
   image: node:20
   script:
     - npm install -g unideploy
-    - unideploy scan --ci --json > report.json
+    - unideploy init --ci --json > report.json
   artifacts:
     paths:
       - report.json
@@ -77,5 +77,12 @@ pipelines:
         image: node:20
         script:
           - npm install -g unideploy
-          - unideploy scan --ci
+          - unideploy init --ci
 ```
+
+## Exit codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | Scan completed, no CRITICAL findings. |
+| `1` | CRITICAL findings present — pipeline should fail. |

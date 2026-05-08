@@ -13,46 +13,92 @@ Requires Node.js 18 or higher. Verify the installation:
 
 ```bash
 unideploy --version
-# unideploy/0.1.0
+# unideploy/0.2.3
 ```
 
 ## Run a scan
 
-Pass any public or private GitHub repository URL:
+Navigate to your project root and run:
 
 ```bash
-unideploy scan https://github.com/your-org/your-repo
+cd your-project
+unideploy init
 ```
 
-UniDeploy fetches your code, runs the 13-rule security checker, and prints a findings table:
+UniDeploy runs 15 security rules across your local files and opens a live session on the dashboard:
 
 ```
-Scanning https://github.com/your-org/your-repo...
+● UniDeploy agent running
+  Framework: Next.js detected
+  Scanning 84 files...
 
-  Rule       Severity   File                        Line
-  ─────────────────────────────────────────────────────
-  SEC-001    CRITICAL   src/lib/stripe.ts           3
-  RLS-001    CRITICAL   supabase/schema.sql         12
-  RLS-001    CRITICAL   supabase/schema.sql         34
-  HDR-001    MEDIUM     next.config.js              —
+  Your session code: 847-291
+  Open https://unideploy.in/connect and enter this code.
 
-Grade: D  |  4 issues  |  3 auto-fixable
+  ✓ Authenticated — scanning...
 
-Dashboard: https://unideploy.vercel.app/dashboard?scan_id=sc_abc123
+  [CRITICAL] .env file not listed in .gitignore                   .env
+  [HIGH    ] Supabase anon key used in client-side fetch          lib/db.ts:2
+  [HIGH    ] RLS disabled on table "users"                        supabase/migrations/001_init.sql:4
+  [HIGH    ] No rate limiting on API route                        app/api/users/route.ts
+  [MEDIUM  ] Missing security headers configuration               next.config.js
+  [MEDIUM  ] Debug mode committed to version control              .env.example:4
+
+  Grade: F  |  Risk Score: 100/100  |  14 issues  |  2 auto-fixable
+
+  ✓ Dashboard ready → https://unideploy.in/dashboard
 ```
+
+## Apply auto-fixes
+
+```bash
+unideploy fix
+```
+
+UniDeploy rewrites the flagged lines in-place — CORS wildcards, missing security headers, console.log leaks. Review the diff before committing.
 
 ## Reading the output
 
 | Field | Meaning |
 |-------|---------|
-| Rule | The rule ID that fired. See the full list in [Understanding Severity](/dashboard/understanding-severity). |
-| Severity | `CRITICAL`, `HIGH`, or `MEDIUM`. CRITICAL findings indicate issues that could result in immediate data exposure or account takeover. |
-| File | The file where the issue was found. |
-| Line | The line number, where applicable. |
-| Grade | A–F. Any CRITICAL finding results in grade D or lower. |
+| `[CRITICAL]` | Immediate data exposure risk — hardcoded secret, .env committed to git |
+| `[HIGH]` | Exploitable without authentication — missing RLS, no auth on API routes |
+| `[MEDIUM]` | Best-practice gaps — missing headers, unvalidated input, debug mode |
+| Grade | A–F. Any CRITICAL finding → grade F. |
+| Risk Score | 0–100. `CRITICAL × 40 + HIGH × 15 + MEDIUM × 5 + LOW × 1`, capped at 100. |
+
+## CI / offline mode
+
+Skip the interactive session and get structured JSON output:
+
+```bash
+unideploy init --json
+```
+
+```json
+{
+  "project_meta": { "framework": "Next.js", "file_count": 84, "scan_duration_ms": 312 },
+  "findings": [...],
+  "summary": {
+    "total": 14,
+    "critical": 1,
+    "high": 8,
+    "medium": 5,
+    "low": 0,
+    "grade": "F",
+    "risk_score": 100
+  }
+}
+```
+
+Use `--ci` to exit with code `1` on any CRITICAL finding — gate your merges:
+
+```bash
+unideploy init --ci
+```
 
 ## Next steps
 
-- [Full CLI reference →](/cli/scan-command)
-- [Set up CI/CD to gate merges on findings →](/cli/ci-integration)
+- [Full CLI reference →](/cli/init-command)
+- [Set up CI/CD to block merges on findings →](/cli/ci-integration)
 - [Understand what each rule checks →](/dashboard/understanding-severity)
