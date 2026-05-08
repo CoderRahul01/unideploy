@@ -209,58 +209,34 @@ export default function LandingPage() {
         title="Terminal — zsh"
         animated={true}
         lines={[
-          { text: "$ npx unideploy init", color: "#C8D8B0", delay: 600 },
+          { text: "$ npx unideploy@latest init", color: "#C8D8B0", delay: 600 },
           { text: "● UniDeploy agent running", color: "#6DB84A", delay: 500 },
-          {
-            text: "Framework: Next.js 14 + Supabase detected",
-            color: "#C8D8B0",
-            delay: 400,
-          },
-          { text: "Scanning 847 files...", color: "#C8D8B0", delay: 800 },
-          { text: "", delay: 300 },
-          { text: "---", delay: 200 },
-          {
-            text: "[CRITICAL] Stripe live key in source    src/lib/stripe.ts:3",
-            color: "#FF6B6B",
-            delay: 350,
-          },
-          {
-            text: "[HIGH]     RLS disabled on 4 tables     supabase/schema.sql",
-            color: "#F0A830",
-            delay: 300,
-          },
-          {
-            text: "[HIGH]     No rate limiting on /api     routes/auth.ts:12",
-            color: "#F0A830",
-            delay: 300,
-          },
-          {
-            text: "[MEDIUM]   Missing security headers     next.config.js",
-            color: "#8A9070",
-            delay: 300,
-          },
-          { text: "---", delay: 200 },
+          { text: "  Detected: Next.js 14 + FastAPI + Supabase", color: "#C8D8B0", delay: 400 },
+          { text: "  Scanning 847 files...", color: "#C8D8B0", delay: 800 },
           { text: "", delay: 200 },
-          {
-            text: "Grade: D  |  12 issues  |  8 auto-fixable",
-            color: "#FF6B6B",
-            bold: true,
-            delay: 400,
-          },
+          { text: "  [CRITICAL] Stripe live key in source    src/lib/stripe.ts:3", color: "#FF6B6B", delay: 350 },
+          { text: "  [HIGH]     RLS disabled on 4 tables     supabase/schema.sql", color: "#F0A830", delay: 300 },
+          { text: "  [HIGH]     No rate limiting on /api     routes/auth.ts:12", color: "#F0A830", delay: 300 },
+          { text: "  [MEDIUM]   Missing security headers     next.config.js", color: "#8A9070", delay: 300 },
           { text: "", delay: 200 },
-          { text: "---", delay: 100 },
-          {
-            text: "✓ Dashboard ready → unideploy.in/dashboard",
-            color: "#6DB84A",
-            delay: 400,
-          },
-          {
-            text: 'Run `unideploy fix` to apply 8 auto-fixes',
-            color: "#C8D8B0",
-            delay: 300,
-          },
+          { text: "  Grade: D  |  12 issues  |  8 auto-fixable", color: "#FF6B6B", bold: true, delay: 400 },
+          { text: "  ✓ Dashboard ready → unideploy.in/dashboard", color: "#6DB84A", delay: 400 },
+          { text: "", delay: 600 },
+          { text: "$ unideploy fix", color: "#C8D8B0", delay: 400 },
+          { text: "● UniDeploy FixAgent — patching 8 issues...", color: "#6DB84A", delay: 500 },
+          { text: "  ✓ [CRITICAL] Stripe key moved to env var", color: "#6DB84A", delay: 350 },
+          { text: "  ✓ [HIGH]     RLS policies added to 4 tables", color: "#6DB84A", delay: 350 },
+          { text: "  ✓ 8 patches applied  |  Grade: B", color: "#6DB84A", bold: true, delay: 400 },
+          { text: "", delay: 600 },
+          { text: "$ unideploy deploy", color: "#C8D8B0", delay: 400 },
+          { text: "● UniDeploy DeployAgent", color: "#6DB84A", delay: 500 },
+          { text: "  Detected: Next.js → Vercel + FastAPI → Cloud Run", color: "#C8D8B0", delay: 400 },
+          { text: "  ✓ vercel.json — Vercel deployment config", color: "#6DB84A", delay: 350 },
+          { text: "  ✓ cloudbuild.yaml — GCP Cloud Build pipeline", color: "#6DB84A", delay: 350 },
+          { text: "  ✓ Dockerfile — production container", color: "#6DB84A", delay: 350 },
+          { text: "  ✓ 3 config files generated", color: "#6DB84A", bold: true, delay: 400 },
         ]}
-        style={{ minHeight: 320, marginBottom: 80 }}
+        style={{ minHeight: 400, marginBottom: 80 }}
       />
       {/* Blinking cursor after terminal */}
       <div style={{ marginTop: -64, marginBottom: 64, textAlign: "center" }}>
@@ -300,18 +276,27 @@ export default function LandingPage() {
             num: "01",
             title: "Install the scanner",
             desc: "One command installs UniDeploy globally. Works with any project — Next.js, FastAPI, Django, Express, Vite, or mixed stack. No dependencies. No config files.",
+            cmd: "npx unideploy@latest init",
           },
           {
             num: "02",
             title: "Get your security grade",
-            desc: "UniDeploy detects your framework automatically and scans across 13 production-readiness categories — secrets, auth, RLS, rate limiting, dependencies, and more. You get a grade from A to F with every issue listed by file and line number.",
+            desc: "UniDeploy detects your framework and scans across 13 production-readiness categories — secrets, auth, RLS, rate limiting, dependencies, and more. You get a grade from A to F with every issue listed by file and line number.",
+            cmd: "unideploy scan",
           },
           {
             num: "03",
-            title: "Fix and ship",
-            desc: "Accept auto-fixes with one command. UniDeploy opens a GitHub PR with all patches applied via Composio. Or apply locally. Ship with confidence.",
+            title: "Fix and generate deployment configs",
+            desc: "AI patches your local files directly. Then generate platform-aware deployment configs for Vercel, Cloud Run, Railway, AWS, or Cloudflare — with live docs fetched at runtime. Or run it all in one command.",
+            cmd: "unideploy fix  &&  unideploy deploy",
           },
-        ].map(({ num, title, desc }) => (
+          {
+            num: "04",
+            title: "One command does it all",
+            desc: "unideploy run orchestrates the full pipeline — scan, AI fix, and deployment config generation — in a single command. Built for CI/CD and power users.",
+            cmd: "unideploy run",
+          },
+        ].map(({ num, title, desc, cmd }) => (
           <div
             key={num}
             style={{
@@ -346,10 +331,22 @@ export default function LandingPage() {
                 color: "var(--text-secondary)",
                 lineHeight: 1.65,
                 maxWidth: 480,
+                marginBottom: 14,
               }}
             >
               {desc}
             </p>
+            <code style={{
+              fontFamily: "var(--font-mono), JetBrains Mono, monospace",
+              fontSize: 13,
+              color: "var(--accent-green)",
+              background: "rgba(109,184,74,0.08)",
+              border: "1px solid rgba(109,184,74,0.2)",
+              borderRadius: 6,
+              padding: "4px 10px",
+            }}>
+              $ {cmd}
+            </code>
           </div>
         ))}
       </section>
@@ -381,6 +378,7 @@ export default function LandingPage() {
           {[
             { name: "Composio", desc: "tool actions" },
             { name: "Gemini", desc: "agent reasoning" },
+            { name: "Tinyfish", desc: "live platform docs" },
             { name: "Dodo Payments", desc: "billing" },
             { name: "Supermemory", desc: "project memory" },
             { name: "AutoSend", desc: "notifications" },

@@ -19,6 +19,10 @@ python -c "from adk_app import root_agent; print(f'Agent: {root_agent.name}')" |
   exit 1
 }
 
+# Enable observability (Telemetry + Prompt logging)
+export GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY=true
+export OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true
+
 # Deploy to Agent Runtime
 # Agents become visible in Agent Studio:
 # console.cloud.google.com -> Vertex AI -> Agent Builder -> Agents
@@ -27,6 +31,7 @@ adk deploy agent_engine \
   --region=$REGION \
   --display_name="UniDeploy Scanner" \
   --description="Production-readiness scanner for vibe-coded apps — AnalyzerAgent + AutoFixAgent" \
+  --otel_to_cloud \
   .
 
 echo ""

@@ -24,16 +24,23 @@ async def lifespan(app: FastAPI):
     logger.info(f"UniDeploy API starting — env={os.getenv('APP_ENV', 'development')}")
     logger.info(f"Gemini project: {os.getenv('GOOGLE_CLOUD_PROJECT', 'not set')}")
     logger.info(f"E2B configured: {bool(os.getenv('E2B_API_KEY'))}")
+    logger.info(f"Tinyfish configured: {bool(os.getenv('TINYFISH_API_KEY'))}")
 
     # Start background scan worker
     from workers.scan_worker import worker_loop
     worker_task = asyncio.create_task(worker_loop())
 
+    # Start A2A agent message bus
+    from agents.orchestrator_agent import setup_a2a_agents
+    a2a_tasks = await setup_a2a_agents()
+
     yield
 
+    for t in a2a_tasks:
+        t.cancel()
     worker_task.cancel()
     try:
-        await worker_task
+        await asyncio.gather(worker_task, *a2a_tasks, return_exceptions=True)
     except asyncio.CancelledError:
         pass
     logger.info("UniDeploy API shutting down")
@@ -71,7 +78,7 @@ app.add_middleware(
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 
-from routers import sessions, websockets, scans, webhooks, auth, scan_results
+from routers import sessions, websockets, scans, webhooks, auth, scan_results, ai, deploy
 
 app.include_router(auth.router)
 app.include_router(sessions.router)
@@ -79,6 +86,8 @@ app.include_router(websockets.router)
 app.include_router(scans.router)
 app.include_router(scan_results.router)
 app.include_router(webhooks.router)
+app.include_router(ai.router)
+app.include_router(deploy.router)
 # from routers import metrics  # uncomment when metrics endpoint is ready
 
 # ── Health ────────────────────────────────────────────────────────────────────

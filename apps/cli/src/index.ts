@@ -627,8 +627,11 @@ function runHeuristics(
 
 // ── `unideploy scan` — legacy GitHub URL scan ─────────────────────────────────
 
+import { applyAIPatches, rescanAfterFix, ApplyFixMessage } from "./fix-handler";
+import { runDeploy } from "./deploy-handler";
+
 const program = new Command();
-program.name("unideploy").description("Production-readiness scanner for vibe-coded apps").version("0.2.0");
+program.name("unideploy").description("Production-readiness scanner for vibe-coded apps").version("0.3.0");
 
 interface LegacyScanStatus {
   scan_id: string;
@@ -809,6 +812,8 @@ program
       m.startsWith("https") ? "wss://" : "ws://"
     );
 
+    let sessionFindings: Finding[] = [];
+
     await new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(wsUrl);
       let authenticated = false;
@@ -830,18 +835,15 @@ program
           console.log(chalk.green("  ✓ Authenticated — scanning..."));
           console.log("");
 
-          const findings: Finding[] = [];
-          let scannedCount = 0;
-
           const onFinding = (f: Finding) => {
             const col = severityColor(f.severity);
             const loc = f.file_path + (f.line_number ? `:${f.line_number}` : "");
             console.log(`  ${col} ${chalk.white(f.title.padEnd(36).slice(0, 36))} ${chalk.gray(loc)}`);
-            findings.push(f);
           };
 
           // Run heuristics and stream progress via WebSocket
           const allFindings = runHeuristics(files, cwd, onFinding);
+          sessionFindings = allFindings;
           scannedCount = files.length;
 
           ws.send(JSON.stringify({
@@ -900,11 +902,52 @@ program
           } catch { /* best-effort */ }
 
           if (autoFixable > 0) {
-            console.log(chalk.gray(`  Run 'npx unideploy fix' to apply ${autoFixable} auto-fixes`));
+            console.log(chalk.gray(`  Run 'npx unideploy fix' to apply ${autoFixable} auto-fixes locally,`));
+            console.log(chalk.gray(`  or click 'Fix with AI' on the dashboard for AI-powered patches.`));
+          }
+          console.log(chalk.gray(`  Session active — waiting for AI fix commands from dashboard...`));
+          console.log(chalk.gray(`  Press Ctrl+C to exit when done.\n`));
+
+          // Stay connected — resolve but do NOT close WebSocket
+          resolve();
+
+        } else if (msg.type === "apply_fix") {
+          // Dashboard triggered "Fix with AI" — apply AI patches locally
+          const fixMsg = msg as unknown as ApplyFixMessage;
+          const result = await applyAIPatches(fixMsg, cwd, baseUrl);
+
+          // Re-scan changed files
+          const changedPaths = fixMsg.findings
+            .filter(f => result.fixed_ids.includes(f.id))
+            .map(f => f.file_path);
+
+          const updatedFindings = await rescanAfterFix(
+            changedPaths, cwd, sessionFindings, runHeuristics
+          );
+          sessionFindings = updatedFindings as Finding[];
+
+          // Report fix-complete to backend
+          try {
+            await apiFetch(`${baseUrl}/scans/${session.session_id}/fix-complete`, {
+              method: "POST",
+              body: JSON.stringify({
+                session_id: session.session_id,
+                fixed_ids: result.fixed_ids,
+                diff_summaries: result.diff_summaries,
+                updated_findings: updatedFindings,
+              }),
+            });
+          } catch (err) {
+            console.error(chalk.yellow(`  Warning: could not report fix status to backend: ${err}`));
           }
 
-          ws.close();
-          resolve();
+          // Send fix_applied over WS for immediate browser feedback
+          ws.send(JSON.stringify({
+            type: "fix_applied",
+            fixed_ids: result.fixed_ids,
+            failed_ids: result.failed_ids,
+            diff_summaries: result.diff_summaries,
+          }));
         }
       });
 
@@ -918,13 +961,16 @@ program
         }
       });
 
-      // Timeout after 10 minutes (session expiry)
+      // Timeout after 30 minutes of inactivity (3× the session code expiry)
       setTimeout(() => {
         if (!authenticated) {
           ws.close();
           reject(new Error("Session timed out — code expired after 10 minutes"));
+        } else {
+          console.log(chalk.gray("\n  Session timed out after 30 minutes."));
+          ws.close();
         }
-      }, 600_000);
+      }, 1_800_000);
     }).catch(err => {
       console.error(chalk.red(`\n  ✗ ${err.message}`));
       process.exit(1);
@@ -1070,6 +1116,146 @@ program
         console.log(chalk.gray("  Review the changes, then commit: git diff"));
       }
     }
+    console.log("");
+    process.exit(0);
+  });
+
+// ── `unideploy deploy` — generate platform deployment configs ─────────────────
+
+program
+  .command("deploy")
+  .description("Generate production deployment configs for your stack")
+  .option("--local", "Hit local backend (localhost:8000)")
+  .option("--dry-run", "Print configs without writing files")
+  .option("--platform <platform>", "Force a target platform (vercel|gcp|aws|cloudflare|railway)")
+  .action(async (opts: { local: boolean; dryRun: boolean; platform?: string }) => {
+    const baseUrl = opts.local ? LOCAL_URL : API_URL;
+    const cwd = process.cwd();
+
+    const files = collectFiles(cwd);
+    const framework = detectFramework(cwd);
+    const fileMap: Record<string, string> = Object.fromEntries(files.map(f => [f.path, f.content]));
+
+    await runDeploy({
+      local: opts.local,
+      dryRun: opts.dryRun,
+      platform: opts.platform,
+      manifest: { framework, file_count: files.length, files: fileMap },
+      apiBaseUrl: baseUrl,
+    });
+
+    process.exit(0);
+  });
+
+// ── `unideploy run` — scan + fix + deploy in one command ─────────────────────
+
+program
+  .command("run")
+  .description("Scan, fix, and generate deployment configs in one command")
+  .option("--local", "Hit local backend (localhost:8000)")
+  .option("--ci", "CI mode: exit 1 on CRITICAL findings (skips interactive prompts)")
+  .option("--skip-fix", "Skip the auto-fix step")
+  .option("--skip-deploy", "Skip the deployment config generation step")
+  .action(async (opts: { local: boolean; ci: boolean; skipFix: boolean; skipDeploy: boolean }) => {
+    const baseUrl = opts.local ? LOCAL_URL : API_URL;
+    const cwd = process.cwd();
+
+    console.log("");
+    console.log(chalk.bold("● UniDeploy — scan · fix · deploy"));
+    console.log("");
+
+    // ── Phase 1: Scan (run init inline) ──────────────────────────────────────
+
+    const framework = detectFramework(cwd);
+    const files = collectFiles(cwd);
+
+    console.log(chalk.gray(`  Framework: ${framework} detected`));
+    console.log(chalk.gray(`  Scanning ${files.length} files...`));
+    console.log("");
+
+    const allFindings = runHeuristics(files, cwd, (f) => {
+      const col = severityColor(f.severity);
+      const loc = f.file_path + (f.line_number ? `:${f.line_number}` : "");
+      console.log(`  ${col} ${chalk.white(f.title.padEnd(36).slice(0, 36))} ${chalk.gray(loc)}`);
+    });
+
+    const grade = computeGrade(allFindings);
+    const riskScore = computeRiskScore(allFindings);
+    const autoFixable = allFindings.filter(f => f.auto_fixable);
+
+    console.log("");
+    console.log(
+      `  Grade: ${gradeColor(grade)}  |  Risk Score: ${riskScore}/100  |  ${allFindings.length} issues  |  ${autoFixable.length} auto-fixable`
+    );
+    console.log("");
+
+    if (opts.ci && allFindings.some(f => f.severity === "critical")) {
+      console.error(chalk.red("  ✗ CRITICAL findings — exiting with code 1 (CI mode)"));
+      process.exit(1);
+    }
+
+    // ── Phase 2: Fix ─────────────────────────────────────────────────────────
+
+    let remainingFindings = allFindings;
+
+    if (!opts.skipFix && autoFixable.length > 0 && !opts.ci) {
+      const rl = (await import("readline")).createInterface({ input: process.stdin, output: process.stdout });
+      const answer = await new Promise<string>(resolve =>
+        rl.question(
+          chalk.white(`  Fix ${autoFixable.length} auto-fixable issue${autoFixable.length !== 1 ? "s" : ""} with AI now? `) +
+          chalk.gray("[Y/n]: "),
+          (a) => { rl.close(); resolve(a.trim().toLowerCase()); }
+        )
+      );
+
+      if (!answer || answer === "y" || answer === "yes") {
+        const fixMsg = {
+          type: "apply_fix" as const,
+          findings: autoFixable,
+          session_id: "run-command",
+        };
+        const result = await applyAIPatches(fixMsg, cwd, baseUrl);
+
+        const changedPaths = autoFixable
+          .filter(f => result.fixed_ids.includes(f.id))
+          .map(f => f.file_path);
+
+        remainingFindings = await rescanAfterFix(
+          changedPaths, cwd, allFindings, runHeuristics
+        ) as Finding[];
+
+        const newGrade = computeGrade(remainingFindings);
+        console.log(chalk.gray(`  Grade after fixes: ${gradeColor(newGrade)}`));
+        console.log("");
+      }
+    }
+
+    // ── Phase 3: Deploy configs ───────────────────────────────────────────────
+
+    if (!opts.skipDeploy && !opts.ci) {
+      const rl = (await import("readline")).createInterface({ input: process.stdin, output: process.stdout });
+      const answer = await new Promise<string>(resolve =>
+        rl.question(
+          chalk.white("  Generate deployment config files? ") + chalk.gray("[Y/n]: "),
+          (a) => { rl.close(); resolve(a.trim().toLowerCase()); }
+        )
+      );
+
+      if (!answer || answer === "y" || answer === "yes") {
+        const fileMap: Record<string, string> = Object.fromEntries(files.map(f => [f.path, f.content]));
+        await runDeploy({
+          local: opts.local,
+          dryRun: false,
+          manifest: { framework, file_count: files.length, files: fileMap },
+          apiBaseUrl: baseUrl,
+        });
+      }
+    }
+
+    // ── Summary ───────────────────────────────────────────────────────────────
+
+    const finalGrade = computeGrade(remainingFindings);
+    console.log(chalk.bold(`  ✓ Done — final grade: ${gradeColor(finalGrade)}`));
     console.log("");
     process.exit(0);
   });

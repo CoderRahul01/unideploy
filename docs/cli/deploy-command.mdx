@@ -1,0 +1,97 @@
+---
+title: "deploy"
+description: "Generate production deployment configs for your stack — platform-aware, powered by live documentation."
+---
+
+## Usage
+
+```bash
+unideploy deploy [flags]
+```
+
+UniDeploy inspects your project, detects your stack, and generates all the deployment config files you need — `vercel.json`, `cloudbuild.yaml`, `Dockerfile`, GitHub Actions workflows, `railway.toml`, and more. Only files relevant to your detected stack are generated.
+
+<Note>
+Run this from the root of your project. UniDeploy reads your `package.json`, `requirements.txt`, config files, and directory structure to detect the stack automatically.
+</Note>
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--dry-run` | Print generated configs to the terminal without writing any files. |
+| `--platform <platform>` | Force a target platform instead of auto-detection. See supported platforms below. |
+| `--local` | Point at `localhost:8000` instead of the production API. |
+
+## Supported platforms
+
+| Value | Platform |
+|-------|----------|
+| `vercel` | Vercel (Next.js, SvelteKit, Nuxt, static) |
+| `gcp` | Google Cloud Run + Cloud Build |
+| `aws` | AWS (ECS, Lambda, Amplify) |
+| `cloudflare` | Cloudflare Workers / Pages |
+| `railway` | Railway |
+
+## How it works
+
+1. **Stack detection** — UniDeploy reads your dependencies, config files, and directory structure to determine: frontend framework, backend runtime, database, and deployment targets.
+2. **Clarifying questions** — Only asks what cannot be inferred. For example, your GCP project ID or which DB to use if both Supabase and Postgres are detected. Never asks "Are you using Next.js?" if it's already in `package.json`.
+3. **Live doc fetch** — The DeployAgent searches live platform documentation via Tinyfish AI to ensure generated configs follow current best practices, not stale training data.
+4. **Config generation** — Gemini 2.5 Pro generates all config files with your exact stack as context.
+5. **File write** — Each file is written to your project root. Use `--dry-run` to preview first.
+
+## Example output
+
+```bash
+$ unideploy deploy
+
+● UniDeploy DeployAgent
+
+  Detected: Next.js 14 + FastAPI + Supabase → Vercel + Cloud Run
+
+  ✓ vercel.json               — Vercel deployment config
+  ✓ cloudbuild.yaml           — GCP Cloud Build pipeline
+  ✓ Dockerfile                — Production FastAPI container
+  ✓ .github/workflows/deploy.yml — CI/CD pipeline
+
+  ✓ 4 config files generated
+  Review and commit:
+    git add vercel.json cloudbuild.yaml Dockerfile .github/workflows/deploy.yml
+    git commit -m 'chore: add deployment configs'
+```
+
+## Dry-run mode
+
+Preview all generated files without writing anything to disk:
+
+```bash
+unideploy deploy --dry-run
+```
+
+Each file is printed with its path and a description. Useful for reviewing before committing.
+
+## Force a platform
+
+```bash
+unideploy deploy --platform vercel
+unideploy deploy --platform gcp
+unideploy deploy --platform railway
+```
+
+When `--platform` is set, UniDeploy skips the auto-detection step for targets and skips any clarifying question about which platform to deploy to.
+
+## Generated files by platform
+
+| Platform | Files generated |
+|----------|----------------|
+| Vercel | `vercel.json` |
+| GCP Cloud Run | `cloudbuild.yaml`, `Dockerfile` |
+| AWS | `.github/workflows/deploy.yml` (ECS or Lambda variant) |
+| Cloudflare | `wrangler.toml` |
+| Railway | `railway.toml`, `Dockerfile` |
+| All | `.github/workflows/deploy.yml` (CI/CD) |
+
+<Tip>
+For the full scan → fix → deploy pipeline in one command, use [`unideploy run`](/cli/run-command).
+</Tip>

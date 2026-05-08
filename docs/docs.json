@@ -31,8 +31,10 @@
       "group": "CLI",
       "pages": [
         "cli/installation",
-        "cli/scan-command",
         "cli/init-command",
+        "cli/scan-command",
+        "cli/deploy-command",
+        "cli/run-command",
         "cli/ci-integration"
       ]
     },

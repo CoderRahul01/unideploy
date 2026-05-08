@@ -142,6 +142,20 @@ async def generate_patches(
     return patches
 
 
+async def generate_patch_for_cli(finding: dict, file_content: str) -> dict | None:
+    """
+    Generate a patch for a single finding using file content provided by the CLI.
+    No Composio / GitHub PR involved — returns raw patch for local application.
+    Returns: { file_path, new_content, change_summary } or None if unsafe to patch.
+    """
+    plan = {
+        "summary": finding.get("fix_guideline") or finding.get("fix_hint") or "Fix the security issue described in the finding.",
+        "steps": [],
+    }
+    patch = await asyncio.to_thread(_generate_patch_sync, finding, plan, file_content)
+    return patch
+
+
 async def raise_github_pr(
     github_url: str,
     fix_branch: str,

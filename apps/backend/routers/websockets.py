@@ -113,7 +113,8 @@ async def session_websocket(websocket: WebSocket, session_id: str):
                     except Exception:
                         pass
 
-            elif msg_type == "fix_applied":
+            elif msg_type in ("fix_applied", "rescan_done", "pipeline_progress", "deploy_configs_ready"):
+                # Relay agent progress messages to browser
                 browser_ws = session.get("browser_ws")
                 if browser_ws:
                     try:
@@ -207,8 +208,8 @@ async def cli_websocket(websocket: WebSocket, session_code: str):
                     "completed_at": datetime.utcnow().isoformat(),
                 })
             
-            elif msg_type == "fix_applied":
-                # CLI applied a fix — notify browser
+            elif msg_type in ("fix_applied", "rescan_done", "pipeline_progress", "deploy_configs_ready"):
+                # CLI agent progress — relay to browser
                 if session.get("browser_ws"):
                     await session["browser_ws"].send_json(data)
     
@@ -275,15 +276,45 @@ async def browser_websocket(websocket: WebSocket, session_id: str):
             msg_type = data.get("type")
             
             if msg_type == "apply_fix":
-                # User clicked "Apply Fix" in dashboard — relay to CLI
                 cli_ws = session.get("cli_ws")
-                if cli_ws:
-                    await cli_ws.send_json(data)
-                else:
+                if not cli_ws:
                     await websocket.send_json({
                         "type": "error",
-                        "message": "CLI is no longer connected"
+                        "message": "CLI is no longer connected. Run 'unideploy init' again in your terminal.",
                     })
+                    continue
+
+                # Resolve full finding objects from session by ID
+                finding_ids: list[str] = data.get("finding_ids") or (
+                    [data["finding_id"]] if data.get("finding_id") else []
+                )
+                session_findings: list[dict] = session.get("findings", [])
+                ids_lower = {fid.lower() for fid in finding_ids}
+                findings_to_fix = [
+                    f for f in session_findings
+                    if f.get("id", "").lower() in ids_lower
+                ]
+
+                if not findings_to_fix:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "No matching findings in this session. The session may have expired.",
+                    })
+                    continue
+
+                # Acknowledge to browser immediately
+                await websocket.send_json({
+                    "type": "fix_started",
+                    "finding_ids": finding_ids,
+                    "count": len(findings_to_fix),
+                })
+
+                # Send enriched apply_fix to CLI with full finding objects
+                await cli_ws.send_json({
+                    "type": "apply_fix",
+                    "findings": findings_to_fix,
+                    "session_id": session.get("session_id"),
+                })
     
     except WebSocketDisconnect:
         session["browser_ws"] = None

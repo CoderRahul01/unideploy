@@ -1,0 +1,127 @@
+---
+title: "run"
+description: "Scan, fix, and generate deployment configs in one orchestrated command."
+---
+
+## Usage
+
+```bash
+unideploy run [flags]
+```
+
+`unideploy run` orchestrates the full production-readiness pipeline in a single command:
+
+1. **Scan** — runs the same local heuristic scanner as `unideploy init`
+2. **Fix** — applies AI-generated patches to local files (optional, prompts before applying)
+3. **Deploy** — generates platform-aware deployment configs via `unideploy deploy` (optional)
+
+<Note>
+All three phases run in your local environment. No code is pushed or deployed — `unideploy run` prepares your project, it does not deploy it.
+</Note>
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--skip-fix` | Skip the AI fix step. |
+| `--skip-deploy` | Skip deployment config generation. |
+| `--ci` | Exit with code `1` if CRITICAL findings remain after scanning. Suppresses interactive prompts. |
+| `--local` | Point at `localhost:8000` instead of the production API. |
+
+## Example: full pipeline
+
+```bash
+$ unideploy run
+
+● UniDeploy RunAgent
+
+  Phase 1: Scan
+  Detected: Next.js 14 + FastAPI + Supabase
+  Scanning 847 files...
+
+  [CRITICAL] Stripe live key in source    src/lib/stripe.ts:3
+  [HIGH]     RLS disabled on 4 tables     supabase/schema.sql
+  [HIGH]     No rate limiting on /api     routes/auth.ts:12
+  [MEDIUM]   Missing security headers     next.config.js
+
+  Grade: D  |  12 issues  |  8 auto-fixable
+
+  ──────────────────────────────────────────────────────────
+  Phase 2: Fix
+  Fix 8 auto-fixable issues? [Y/n]: y
+
+  ● UniDeploy FixAgent — patching 8 issues...
+  ✓ [CRITICAL] Stripe key moved to environment variable
+  ✓ [HIGH]     RLS policies added to users and orders tables
+  ✓ [HIGH]     Rate limiting middleware added to /api/auth
+  ✓ 8 patches applied
+
+  Grade updated: D → B
+
+  ──────────────────────────────────────────────────────────
+  Phase 3: Deploy
+  Generate deployment configs? [Y/n]: y
+
+  ● UniDeploy DeployAgent
+  Detected: Next.js → Vercel + FastAPI → Cloud Run
+  ✓ vercel.json
+  ✓ cloudbuild.yaml
+  ✓ Dockerfile
+  ✓ 3 config files generated
+
+  ──────────────────────────────────────────────────────────
+  ✓ Run complete — Grade: B  |  4 issues remaining
+  Review patches: git diff
+  Commit configs: git add vercel.json cloudbuild.yaml Dockerfile
+```
+
+## CI/CD usage
+
+In CI mode, prompts are suppressed and all steps run automatically:
+
+```bash
+unideploy run --ci --skip-deploy
+```
+
+Exits with code `1` if any CRITICAL findings remain after the fix step.
+
+```yaml
+# .github/workflows/unideploy.yml
+- name: Security scan + fix
+  run: npx unideploy@latest run --ci --skip-deploy
+  env:
+    UNIDEPLOY_API_KEY: ${{ secrets.UNIDEPLOY_API_KEY }}
+```
+
+## Skipping phases
+
+```bash
+# Scan + fix only (no deployment configs)
+unideploy run --skip-deploy
+
+# Scan + deploy only (no AI fixes)
+unideploy run --skip-fix
+
+# Scan only
+unideploy run --skip-fix --skip-deploy
+```
+
+## How the AI fix step works
+
+When you accept fixes, UniDeploy:
+
+1. Reads each affected local file
+2. Calls the FixAgent (Gemini 2.5 Pro) for a targeted patch
+3. Writes the patched file to disk, saving a `.unideploy.bak` backup alongside
+4. Re-runs the local scanner on changed files to verify fixes resolved the findings
+5. Updates the grade based on the new finding count
+
+Backups are saved as `<filename>.unideploy.bak` next to each patched file. Review changes with `git diff` before committing.
+
+## A2A agent coordination
+
+`unideploy run` uses an A2A (Agent-to-Agent) message bus under the hood. The OrchestratorAgent coordinates ScanAgent, FixAgent, and DeployAgent using JSON-RPC 2.0 messages following the [Google A2A protocol](https://a2a-protocol.org). Each agent is independently addressable and the bus handles retries and timeouts.
+
+<Tip>
+See [How Agents Work](/agents/how-agents-work) for details on the A2A bus architecture.
+</Tip>

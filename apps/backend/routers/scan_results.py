@@ -195,6 +195,76 @@ async def post_scan_results(session_id: str, req: ScanResultsRequest):
     return {"accepted": True, "session_id": session_id, "grade": grade}
 
 
+class FixCompleteRequest(BaseModel):
+    session_id: str
+    fixed_ids: list[str]
+    diff_summaries: list[str]
+    updated_findings: list[FindingItem]
+
+
+@router.post("/{session_id}/fix-complete", status_code=200)
+async def post_fix_complete(session_id: str, req: FixCompleteRequest):
+    """
+    Called by CLI after applying AI-generated patches and re-scanning.
+    Updates the in-memory report and emits rescan_done to the browser WebSocket.
+    """
+    if req.session_id != session_id:
+        raise HTTPException(400, "session_id mismatch in body vs URL")
+
+    session = _find_session(session_id)
+    if not session:
+        raise HTTPException(404, "Session not found")
+
+    findings_dicts = [f.model_dump() for f in req.updated_findings]
+    grade = compute_grade(findings_dicts)
+
+    report = session.get("report") or {}
+    report["findings"] = findings_dicts
+    report["total_issues"] = len(findings_dicts)
+    report["auto_fixable"] = sum(1 for f in findings_dicts if f.get("auto_fixable"))
+    report["grade"] = grade
+    session["report"] = report
+    session["findings"] = findings_dicts
+    session["security_grade"] = grade
+
+    critical = sum(1 for f in findings_dicts if f.get("severity", "").upper() == "CRITICAL")
+    high = sum(1 for f in findings_dicts if f.get("severity", "").upper() == "HIGH")
+    medium = sum(1 for f in findings_dicts if f.get("severity", "").upper() == "MEDIUM")
+
+    rescan_msg = {
+        "type": "rescan_done",
+        "grade": grade,
+        "total_issues": len(findings_dicts),
+        "auto_fixable": report["auto_fixable"],
+        "critical": critical,
+        "high": high,
+        "medium": medium,
+        "low": len(findings_dicts) - critical - high - medium,
+        "fixed_ids": req.fixed_ids,
+        "diff_summaries": req.diff_summaries,
+        "findings": findings_dicts,
+    }
+
+    browser_ws = session.get("browser_ws")
+    if browser_ws:
+        try:
+            await browser_ws.send_json(rescan_msg)
+        except Exception:
+            pass
+
+    try:
+        await db_update("scans", session_id, {
+            "grade": grade,
+            "total_issues": len(findings_dicts),
+            "auto_fixable": report["auto_fixable"],
+        })
+    except Exception:
+        pass
+
+    logger.info(f"fix-complete: session={session_id} fixed={len(req.fixed_ids)} remaining={len(findings_dicts)} grade={grade}")
+    return {"ok": True, "grade": grade, "total_issues": len(findings_dicts)}
+
+
 @router.get("/{session_id}/report")
 async def get_scan_report(session_id: str):
     """

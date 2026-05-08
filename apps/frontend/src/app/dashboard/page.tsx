@@ -265,8 +265,13 @@ function CliReportView({ sessionId }: { sessionId: string }) {
   const [scanStatus, setScanStatus] = useState<"waiting" | "scanning" | "complete">("waiting");
   const [filesScanned, setFilesScanned] = useState(0);
   const [totalFiles, setTotalFiles] = useState(0);
+  const [fixPhase, setFixPhase] = useState<"idle" | "patching" | "done">("idle");
+  const [fixedIds, setFixedIds] = useState<string[]>([]);
+  const [fixToast, setFixToast] = useState<string | null>(null);
+  const [wsActive, setWsActive] = useState(false);
   const socketRef = useRef<UniDeploySocket | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load report immediately (session might already be complete)
   useEffect(() => {
@@ -275,17 +280,16 @@ function CliReportView({ sessionId }: { sessionId: string }) {
       .catch(() => setScanStatus("waiting"));
   }, [sessionId]);
 
-  // Connect browser WebSocket to receive live progress + scan_complete
+  // Connect browser WebSocket to receive live progress + scan_complete + fix events
   useEffect(() => {
     const ws = new UniDeploySocket(
       sessionId,
       (msg: WSMessage) => {
-        if (msg.type === "scan_progress" as string) {
-          const m = msg as unknown as { type: string; files_scanned: number; total_files: number };
+        if (msg.type === "scan_progress") {
           setScanStatus("scanning");
-          setFilesScanned(m.files_scanned ?? 0);
-          setTotalFiles(m.total_files ?? 0);
-        } else if (msg.type === "scan_complete" as string) {
+          setFilesScanned(msg.files_scanned ?? 0);
+          setTotalFiles(msg.total_files ?? 0);
+        } else if (msg.type === "scan_complete") {
           setScanStatus("complete");
           // Poll until report is available
           pollRef.current = setInterval(async () => {
@@ -295,14 +299,34 @@ function CliReportView({ sessionId }: { sessionId: string }) {
               clearInterval(pollRef.current!);
             } catch { /* keep polling */ }
           }, 1500);
+        } else if (msg.type === "fix_started") {
+          setFixPhase("patching");
+        } else if (msg.type === "rescan_done") {
+          setReport(prev => prev ? {
+            ...prev,
+            grade: msg.grade as ScanReport["grade"],
+            total_issues: msg.total_issues,
+            auto_fixable: msg.auto_fixable,
+            findings: msg.findings as ReportFinding[],
+          } : null);
+          setFixedIds(prev => [...prev, ...msg.fixed_ids]);
+          setFixPhase("done");
+          const count = msg.fixed_ids.length;
+          const toastText = `${count} issue${count !== 1 ? "s" : ""} fixed — grade updated to ${msg.grade}`;
+          setFixToast(toastText);
+          if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+          toastTimerRef.current = setTimeout(() => setFixToast(null), 6000);
         }
-      }
+      },
+      () => setWsActive(true),
+      () => setWsActive(false),
     );
     ws.connect();
     socketRef.current = ws;
     return () => {
       ws.disconnect();
       if (pollRef.current) clearInterval(pollRef.current);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     };
   }, [sessionId]);
 
@@ -355,7 +379,6 @@ function CliReportView({ sessionId }: { sessionId: string }) {
   // ── Report view ─────────────────────────────────────────────────────────────
 
   const { grade, project_name, framework, files_scanned, total_issues, auto_fixable, findings } = report;
-  const autoFixableList = findings.filter(f => f.auto_fixable);
 
   return (
     <div style={{ maxWidth: 800, margin: "0 auto", padding: "40px 24px", fontFamily: C.font }}>
@@ -397,12 +420,61 @@ function CliReportView({ sessionId }: { sessionId: string }) {
         </div>
       </div>
 
-      {/* Fix command hint */}
-      {auto_fixable > 0 && (
-        <div style={{ padding: "12px 16px", background: `${C.green}0D`,
+      {/* Fix toast */}
+      {fixToast && (
+        <div style={{
+          padding: "12px 16px", background: `${C.green}1A`,
+          border: `1px solid ${C.green}66`, borderRadius: 8, marginBottom: 16,
+          fontFamily: C.mono, fontSize: 13, color: C.green,
+          display: "flex", alignItems: "center", gap: 10,
+        }}>
+          <span>✓</span> {fixToast}
+        </div>
+      )}
+
+      {/* Fix status — patching in progress */}
+      {fixPhase === "patching" && (
+        <div style={{
+          padding: "12px 16px", background: `${C.amber}0D`,
+          border: `1px solid ${C.amber}33`, borderRadius: 8, marginBottom: 16,
+          fontFamily: C.mono, fontSize: 13, color: C.amber,
+          display: "flex", alignItems: "center", gap: 10,
+        }}>
+          <span style={{ animation: "spin 1.2s linear infinite", display: "inline-block" }}>⟳</span>
+          FixAgent patching local files…
+          <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
+
+      {/* Fix with AI button + CLI hint */}
+      {auto_fixable > 0 && fixPhase === "idle" && (
+        <div style={{
+          padding: "12px 16px", background: `${C.green}0D`,
           border: `1px solid ${C.green}33`, borderRadius: 8, marginBottom: 24,
-          fontFamily: C.mono, fontSize: 13, color: C.green }}>
-          Run <strong>unideploy fix</strong> to apply {auto_fixable} auto-fix{auto_fixable !== 1 ? "es" : ""}
+          display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12,
+        }}>
+          <span style={{ fontFamily: C.mono, fontSize: 13, color: C.green }}>
+            {auto_fixable} auto-fix{auto_fixable !== 1 ? "es" : ""} available
+          </span>
+          {wsActive ? (
+            <button
+              onClick={() => {
+                const ids = findings.filter(f => f.auto_fixable).map(f => f.id);
+                socketRef.current?.sendApplyFix(ids);
+              }}
+              style={{
+                background: C.green, color: C.bg, border: "none",
+                padding: "7px 18px", borderRadius: 6, cursor: "pointer",
+                fontWeight: 700, fontSize: 13, fontFamily: C.font,
+              }}
+            >
+              Fix all with AI
+            </button>
+          ) : (
+            <span style={{ fontFamily: C.mono, fontSize: 12, color: C.muted }}>
+              Run <strong style={{ color: C.text }}>unideploy fix</strong> in your terminal to apply
+            </span>
+          )}
         </div>
       )}
 
@@ -414,15 +486,34 @@ function CliReportView({ sessionId }: { sessionId: string }) {
           <div style={{ fontSize: 14, marginTop: 8 }}>Your project passes all local security checks.</div>
         </div>
       ) : (
-        findings.map(f => (
-          <ReportFindingCard
-            key={f.id}
-            f={f}
-            onFix={f.auto_fixable ? () => {
-              window.open(`/dashboard?session_id=${sessionId}#fix-${f.id}`, "_self");
-            } : undefined}
-          />
-        ))
+        findings.map(f => {
+          const wasFixed = fixedIds.includes(f.id);
+          return (
+            <div key={f.id} style={{
+              opacity: wasFixed ? 0.4 : 1,
+              transition: "opacity 0.4s ease",
+              position: "relative",
+            }}>
+              {wasFixed && (
+                <div style={{
+                  position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  zIndex: 1, pointerEvents: "none",
+                }}>
+                  <span style={{ color: C.green, fontFamily: C.mono, fontSize: 13, fontWeight: 700 }}>
+                    ✓ Fixed
+                  </span>
+                </div>
+              )}
+              <ReportFindingCard
+                f={f}
+                onFix={f.auto_fixable && wsActive && fixPhase === "idle" ? () => {
+                  socketRef.current?.sendApplyFix([f.id]);
+                } : undefined}
+              />
+            </div>
+          );
+        })
       )}
     </div>
   );
