@@ -1,0 +1,72 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "UniDeploy",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#1D9E75",
+    "light": "#2DBF8E",
+    "dark": "#14754F"
+  },
+  "topbarLinks": [
+    {
+      "name": "Dashboard",
+      "url": "https://unideploy.vercel.app"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Book a demo",
+    "url": "https://cal.com/rahulpandey187/unideploy-demo"
+  },
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": ["introduction", "quickstart"]
+    },
+    {
+      "group": "CLI",
+      "pages": [
+        "cli/installation",
+        "cli/scan-command",
+        "cli/init-command",
+        "cli/ci-integration"
+      ]
+    },
+    {
+      "group": "Dashboard",
+      "pages": [
+        "dashboard/overview",
+        "dashboard/reading-scan-results",
+        "dashboard/understanding-severity"
+      ]
+    },
+    {
+      "group": "Agents",
+      "pages": [
+        "agents/how-agents-work",
+        "agents/orchestrator",
+        "agents/scan-agent",
+        "agents/fix-agent"
+      ]
+    },
+    {
+      "group": "Integrations",
+      "pages": [
+        "integrations/github",
+        "integrations/cloud-run",
+        "integrations/railway"
+      ]
+    },
+    {
+      "group": "Reference",
+      "pages": ["changelog"]
+    }
+  ],
+  "footerSocials": {
+    "x": "https://x.com/rahulpandey187",
+    "linkedin": "https://linkedin.com/in/rahulpandey187"
+  }
+}

@@ -267,6 +267,9 @@ export default function LandingPage() {
         <span className="cursor-blink" style={{ color: "var(--accent-live)", fontSize: 16, fontFamily: "var(--font-mono), JetBrains Mono, monospace" }}>▊</span>
       </div>
 
+      {/* ── Demo Section ───────────────────────────────────────────────── */}
+      <DemoSection />
+
       {/* ── Section 6: How It Works ────────────────────────────────────── */}
       <section id="how-it-works" style={{ marginBottom: 80 }}>
         <h2
@@ -474,5 +477,92 @@ export default function LandingPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+function DemoSection() {
+  return (
+    <section
+      style={{
+        marginBottom: 80,
+        border: "0.5px solid rgba(90,120,60,0.3)",
+        borderRadius: 12,
+        padding: "48px 40px",
+        background: "rgba(0,0,0,0.04)",
+      }}
+    >
+      <p
+        style={{
+          fontFamily: "var(--font-mono), JetBrains Mono, monospace",
+          fontSize: 11,
+          color: "var(--accent-green)",
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          marginBottom: 14,
+        }}
+      >
+        Free security audit
+      </p>
+      <h2
+        style={{
+          fontFamily: "var(--font-display), Sora, sans-serif",
+          fontSize: 28,
+          fontWeight: 700,
+          color: "var(--text-primary)",
+          lineHeight: 1.25,
+          marginBottom: 12,
+        }}
+      >
+        See UniDeploy scan your app live
+      </h2>
+      <p
+        style={{
+          fontSize: 15,
+          color: "var(--text-secondary)",
+          lineHeight: 1.7,
+          marginBottom: 24,
+          maxWidth: 460,
+        }}
+      >
+        Bring your project. We run a live scan on the call and show you exactly
+        what&apos;s exposed.
+      </p>
+      <div
+        style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 28 }}
+      >
+        {["30 minutes", "Google Meet", "Free security audit included"].map((item) => (
+          <div key={item} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span
+              style={{
+                width: 5,
+                height: 5,
+                borderRadius: "50%",
+                background: "var(--accent-green)",
+                flexShrink: 0,
+              }}
+            />
+            <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>{item}</span>
+          </div>
+        ))}
+      </div>
+      <button
+        data-cal-link="rahulpandey187/unideploy-demo"
+        data-cal-namespace="unideploy-demo"
+        data-cal-config='{"layout":"month_view"}'
+        style={{
+          background: "var(--text-primary)",
+          color: "var(--bg-primary)",
+          border: "none",
+          borderRadius: "var(--radius-pill)",
+          padding: "12px 28px",
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: "pointer",
+          fontFamily: "var(--font-body), DM Sans, sans-serif",
+        }}
+      >
+        Book a demo — it&apos;s free
+      </button>
+    </section>
   );
 }

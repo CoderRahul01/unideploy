@@ -1,0 +1,10 @@
+---
+title: "Orchestrator"
+description: "The root agent that coordinates the UniDeploy pipeline."
+---
+
+The Orchestrator is the entry point for every scan. It receives a project manifest from the CLI or dashboard and routes work to the AnalyzerAgent and FixAgent.
+
+It runs on `gemini-2.5-flash` and is optimised for fast routing decisions — it does not perform deep analysis itself.
+
+For a full explanation of the pipeline, see [How agents work](/agents/how-agents-work).

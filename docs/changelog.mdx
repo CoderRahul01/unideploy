@@ -1,0 +1,19 @@
+---
+title: "Changelog"
+description: "Release history for UniDeploy."
+---
+
+## v0.1.0 — May 2026
+
+Initial release.
+
+- CLI published to npm — `npm install -g unideploy`
+- 13-rule security scanner live (RLS, secrets, auth logic, headers, BOLA)
+- GitHub URL scan flow — submit any public or private repo URL
+- WebSocket CLI session pairing via `unideploy init`
+- Gemini-powered remediation plans per finding
+- Auto-fix PR creation via GitHub integration (Builder plan and above)
+- Dashboard live at [unideploy.vercel.app](https://unideploy.vercel.app)
+- GitHub Actions CI integration — gates merges on CRITICAL findings
+- MCP tools for IDE-level scan access
+- Agent Engine deployed on Vertex AI (Orchestrator → Analyzer + AutoFix)

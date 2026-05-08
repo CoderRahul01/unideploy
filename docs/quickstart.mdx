@@ -1,0 +1,58 @@
+---
+title: "Quickstart"
+description: "Install UniDeploy and run your first security scan in under two minutes."
+---
+
+## Install
+
+```bash
+npm install -g unideploy
+```
+
+Requires Node.js 18 or higher. Verify the installation:
+
+```bash
+unideploy --version
+# unideploy/0.1.0
+```
+
+## Run a scan
+
+Pass any public or private GitHub repository URL:
+
+```bash
+unideploy scan https://github.com/your-org/your-repo
+```
+
+UniDeploy fetches your code, runs the 13-rule security checker, and prints a findings table:
+
+```
+Scanning https://github.com/your-org/your-repo...
+
+  Rule       Severity   File                        Line
+  ─────────────────────────────────────────────────────
+  SEC-001    CRITICAL   src/lib/stripe.ts           3
+  RLS-001    CRITICAL   supabase/schema.sql         12
+  RLS-001    CRITICAL   supabase/schema.sql         34
+  HDR-001    MEDIUM     next.config.js              —
+
+Grade: D  |  4 issues  |  3 auto-fixable
+
+Dashboard: https://unideploy.vercel.app/dashboard?scan_id=sc_abc123
+```
+
+## Reading the output
+
+| Field | Meaning |
+|-------|---------|
+| Rule | The rule ID that fired. See the full list in [Understanding Severity](/dashboard/understanding-severity). |
+| Severity | `CRITICAL`, `HIGH`, or `MEDIUM`. CRITICAL findings indicate issues that could result in immediate data exposure or account takeover. |
+| File | The file where the issue was found. |
+| Line | The line number, where applicable. |
+| Grade | A–F. Any CRITICAL finding results in grade D or lower. |
+
+## Next steps
+
+- [Full CLI reference →](/cli/scan-command)
+- [Set up CI/CD to gate merges on findings →](/cli/ci-integration)
+- [Understand what each rule checks →](/dashboard/understanding-severity)

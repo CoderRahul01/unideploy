@@ -1,0 +1,81 @@
+---
+title: "CI/CD Integration"
+description: "Gate pull requests on security findings with GitHub Actions."
+---
+
+## Overview
+
+UniDeploy integrates with any CI system that can run shell commands. The `--ci` flag causes the scan to exit with code `1` if CRITICAL findings are present, blocking the merge.
+
+## GitHub Actions
+
+```yaml
+# .github/workflows/unideploy.yml
+name: UniDeploy security scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install UniDeploy CLI
+        run: npm install -g unideploy
+
+      - name: Run scan
+        id: scan
+        env:
+          UNIDEPLOY_API_KEY: ${{ secrets.UNIDEPLOY_API_KEY }}
+        run: |
+          unideploy scan --ci --json > report.json || EXIT=$?
+          cat report.json | jq '{grade: .grade, total: .summary.total, critical: .summary.critical}' >> $GITHUB_STEP_SUMMARY
+          exit ${EXIT:-0}
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('report.json', 'utf8'));
+            const body = `## UniDeploy Security Scan\n\nGrade: **${report.grade}**\nFindings: ${report.summary.total} (${report.summary.critical} critical)\n\n[View full report](${report.dashboard_url})`;
+            github.rest.issues.createComment({ issue_number: context.issue.number, owner: context.repo.owner, repo: context.repo.repo, body });
+```
+
+## Adding UNIDEPLOY_API_KEY to your repo
+
+1. Go to your GitHub repository → Settings → Secrets and variables → Actions
+2. Click **New repository secret**
+3. Name: `UNIDEPLOY_API_KEY`, Value: your key from the UniDeploy dashboard
+
+## GitLab CI
+
+```yaml
+security-scan:
+  image: node:20
+  script:
+    - npm install -g unideploy
+    - unideploy scan --ci --json > report.json
+  artifacts:
+    paths:
+      - report.json
+    when: always
+```
+
+## Bitbucket Pipelines
+
+```yaml
+pipelines:
+  default:
+    - step:
+        name: Security scan
+        image: node:20
+        script:
+          - npm install -g unideploy
+          - unideploy scan --ci
+```

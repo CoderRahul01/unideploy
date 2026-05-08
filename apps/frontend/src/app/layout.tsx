@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
 import { Sora, DM_Sans, JetBrains_Mono } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
+import AnnouncementBar from "@/components/AnnouncementBar";
+import FloatingDemoButton from "@/components/FloatingDemoButton";
+import CalScript from "@/components/CalScript";
+import Footer from "@/components/Footer";
 import "./globals.css";
 
 const sora = Sora({
@@ -32,10 +37,10 @@ export const metadata: Metadata = {
     "vibe coding",
     "production readiness",
     "AI code review",
-    "Lovable",
-    "Bolt",
-    "Cursor",
-    "Claude Code",
+    "AI-generated apps",
+    "RLS checker",
+    "Next.js security",
+    "secrets detection",
   ],
   openGraph: {
     title: "UniDeploy — Production-readiness for vibe-coded apps",
@@ -58,7 +63,13 @@ export default function RootLayout({
         className={`${sora.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}
         style={{ background: "var(--bg-primary)" }}
       >
-        {children}
+        <ClerkProvider>
+          <AnnouncementBar />
+          {children}
+          <Footer />
+          <FloatingDemoButton />
+          <CalScript />
+        </ClerkProvider>
       </body>
     </html>
   );

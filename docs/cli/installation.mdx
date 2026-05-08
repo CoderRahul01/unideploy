@@ -1,0 +1,52 @@
+---
+title: "Installation"
+description: "Install the UniDeploy CLI and authenticate with your API key."
+---
+
+## Requirements
+
+- Node.js 18 or higher
+- npm 8 or higher
+
+## Install
+
+```bash
+npm install -g unideploy
+```
+
+Verify the installation:
+
+```bash
+unideploy --version
+```
+
+## Authenticate
+
+UniDeploy uses an API key for authentication. Get your key from the [dashboard](https://unideploy.vercel.app) under Settings → API Keys.
+
+Set it as an environment variable:
+
+```bash
+export UNIDEPLOY_API_KEY=ud_live_...
+```
+
+To persist it across sessions, add it to your shell profile (`~/.zshrc`, `~/.bashrc`, etc.):
+
+```bash
+echo 'export UNIDEPLOY_API_KEY=ud_live_...' >> ~/.zshrc
+source ~/.zshrc
+```
+
+## Verify authentication
+
+```bash
+unideploy scan --local
+```
+
+If authentication is configured correctly, the CLI will detect your project and begin scanning.
+
+## Updating
+
+```bash
+npm update -g unideploy
+```

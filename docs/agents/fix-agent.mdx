@@ -1,0 +1,33 @@
+---
+title: "FixAgent"
+description: "The agent that generates patches and opens GitHub pull requests."
+---
+
+The FixAgent takes findings from the AnalyzerAgent and produces code patches. It runs on `gemini-2.5-pro` and is invoked only when you explicitly request fixes.
+
+## What it does
+
+1. For each `auto_fixable` finding, the FixAgent generates a file patch using a context-aware language model.
+2. Patches are applied to a sandboxed clone of your repository.
+3. A GitHub pull request is opened with the changes via the Composio GitHub integration.
+4. The PR URL is returned to you in the dashboard.
+
+## What it does not do
+
+- It does not push directly to your main branch.
+- It does not modify non-auto-fixable findings.
+- It does not access any environment outside the sandbox.
+
+## Triggering a fix
+
+From the dashboard, click **Apply fixes** on any scan result. From the CLI:
+
+```bash
+# Not yet available in v0.1.0 — coming in v0.2.0
+unideploy fix --scan-id sc_abc123
+```
+
+## Requirements
+
+- A GitHub account connected via the dashboard
+- Builder plan or higher

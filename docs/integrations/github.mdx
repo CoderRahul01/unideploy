@@ -1,0 +1,33 @@
+---
+title: "GitHub"
+description: "Connect your GitHub account to enable auto-fix pull requests."
+---
+
+## What the GitHub integration does
+
+When you trigger a fix from the dashboard, UniDeploy:
+
+1. Clones your repository into an isolated sandbox
+2. Applies patches for all auto-fixable findings
+3. Commits the changes with a clear commit message per fix
+4. Opens a pull request against your default branch
+
+You review and merge the PR. UniDeploy never pushes directly to main.
+
+## Connect your account
+
+From the dashboard, go to Settings → Integrations → GitHub and follow the OAuth flow. You will be asked to grant repository access — you can restrict this to specific repositories.
+
+## Scan private repositories
+
+Once connected, you can scan private repositories by URL:
+
+```bash
+unideploy scan https://github.com/your-org/private-repo
+```
+
+The CLI uses your authenticated session to fetch repository contents.
+
+## CI/CD integration
+
+See [CI/CD Integration →](/cli/ci-integration) for GitHub Actions setup.

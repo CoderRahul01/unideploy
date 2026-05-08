@@ -1,0 +1,94 @@
+---
+title: "scan"
+description: "Full reference for the unideploy scan command."
+---
+
+## Usage
+
+```bash
+unideploy scan [github_url] [flags]
+```
+
+If `github_url` is omitted, UniDeploy attempts to detect the remote URL from your local git configuration (`git remote get-url origin`).
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--ci` | Exit with code `1` if any CRITICAL findings are found. Use in CI pipelines to gate merges. |
+| `--json` | Output results as structured JSON instead of a table. Pipe to `jq` or save to a file. |
+| `--local` | Point at `localhost:8000` instead of the production API. Useful when running the backend locally. |
+
+## Exit codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | Scan completed, no CRITICAL findings. |
+| `1` | Scan completed, one or more CRITICAL findings present (only when `--ci` is used). |
+| `2` | Scan failed — network error, authentication error, or API error. |
+
+## JSON output format
+
+```bash
+unideploy scan https://github.com/your/repo --json
+```
+
+```json
+{
+  "scan_id": "sc_abc123",
+  "grade": "D",
+  "findings": [
+    {
+      "rule_id": "SEC-001",
+      "severity": "CRITICAL",
+      "title": "Hardcoded service role key",
+      "file": "src/lib/supabase.ts",
+      "line": 3,
+      "description": "A Supabase service role key is present in a client-side file.",
+      "auto_fixable": true
+    }
+  ],
+  "summary": {
+    "total": 4,
+    "critical": 1,
+    "high": 2,
+    "medium": 1,
+    "auto_fixable": 3
+  }
+}
+```
+
+## CI/CD example
+
+```yaml
+# .github/workflows/security.yml
+name: Security scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install UniDeploy
+        run: npm install -g unideploy
+
+      - name: Run security scan
+        env:
+          UNIDEPLOY_API_KEY: ${{ secrets.UNIDEPLOY_API_KEY }}
+        run: unideploy scan --ci --json > scan-report.json
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: scan-report.json
+```
+
+The `--ci` flag causes the job to fail (exit code 1) if CRITICAL findings are present, blocking the merge.

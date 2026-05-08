@@ -1,0 +1,38 @@
+---
+title: "AnalyzerAgent"
+description: "The agent that runs security rules and grades your repository."
+---
+
+The AnalyzerAgent executes UniDeploy's 13 security rules against your codebase and produces a graded findings report.
+
+## Rules
+
+| Rule ID | Severity | What it checks |
+|---------|----------|----------------|
+| RLS-001 | CRITICAL | Supabase table without RLS enabled |
+| RLS-002 | HIGH | RLS enabled but no policies defined |
+| RLS-003 | CRITICAL | RLS policy with `USING (true)` |
+| RLS-004 | HIGH | UPDATE policy missing `WITH CHECK` |
+| SEC-001 | CRITICAL | Service role key in a client-side file |
+| SEC-002 | CRITICAL | Hardcoded API key (entropy + regex) |
+| SEC-003 | HIGH | Supabase anon JWT in fetch/axios URL |
+| AUTH-001 | HIGH | `createBrowserClient` in a server component |
+| AUTH-002 | CRITICAL | Inverted auth guard |
+| AUTH-003 | HIGH | API route returning data without an auth check |
+| PAY-001 | HIGH | Stripe checkout with no server webhook |
+| HDR-001 | MEDIUM | Missing Content-Security-Policy header |
+| BOLA-001 | HIGH | Data query without a `user_id` filter |
+
+## Grading
+
+| Grade | Condition |
+|-------|-----------|
+| F | Any CRITICAL finding |
+| D | 3 or more HIGH findings |
+| C | 1–2 HIGH findings, or 5+ MEDIUM |
+| B | MEDIUM findings only |
+| A | No findings |
+
+## Auto-fixable rules
+
+Rules marked `auto_fixable: true` can be patched by the FixAgent without manual intervention: RLS-001, RLS-003, RLS-004, SEC-001, AUTH-003, HDR-001, SEC-002.

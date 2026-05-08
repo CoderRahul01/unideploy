@@ -1,0 +1,22 @@
+---
+title: "Cloud Run"
+description: "Deploy configuration guidance for Google Cloud Run (Pro plan)."
+---
+
+On the Pro plan, UniDeploy includes Cloud Run deploy configuration as part of its remediation output. When it detects a backend service suitable for containerised deployment, it generates a `Dockerfile` and a `cloudbuild.yaml` tailored to your project.
+
+## What is generated
+
+- `Dockerfile` — multi-stage build optimised for your detected framework
+- `cloudbuild.yaml` — build, push, and deploy pipeline for Cloud Run
+- Secret Manager setup instructions for environment variables
+
+## Requirements
+
+- Pro plan
+- Google Cloud project with Cloud Run API enabled
+- Service account with `roles/run.admin` and `roles/storage.admin`
+
+## Applying the configuration
+
+The generated files are included in the auto-fix pull request. Review them before merging — in particular, verify that all environment variable names match your Secret Manager secrets.

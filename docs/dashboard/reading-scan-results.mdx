@@ -1,0 +1,33 @@
+---
+title: "Reading scan results"
+description: "How to interpret the findings table and remediation plans."
+---
+
+## The findings table
+
+Each row in the findings table represents one rule that fired. Columns:
+
+| Column | Description |
+|--------|-------------|
+| Rule ID | The specific rule that detected the issue (e.g. `SEC-001`). |
+| Severity | `CRITICAL`, `HIGH`, or `MEDIUM`. |
+| Title | A short description of the issue. |
+| File | The file where the issue was found. |
+| Line | The line number, where determinable. |
+| Auto-fixable | Whether the FixAgent can patch this automatically. |
+
+## Remediation plans
+
+On paid plans, each finding includes a remediation plan: a plain-English explanation of the issue, why it matters in production, and a code example showing how to fix it. The plan is generated specifically for your codebase, not generic documentation.
+
+## The security grade
+
+The grade (A–F) summarises the overall risk level:
+
+- **A** — No findings
+- **B** — Medium findings only
+- **C** — 1–2 HIGH findings
+- **D** — 3+ HIGH findings
+- **F** — Any CRITICAL finding
+
+A CRITICAL finding means the issue could result in data exposure or account takeover with minimal effort from an attacker. Ship with a CRITICAL finding at your own risk.

@@ -1,0 +1,53 @@
+---
+title: "init"
+description: "Start an interactive WebSocket session to scan your local project."
+---
+
+## Usage
+
+```bash
+unideploy init
+```
+
+## What it does
+
+`unideploy init` starts an interactive scanning session for your local project. Unlike `unideploy scan`, which scans a remote GitHub repository by URL, `init` runs the agent pipeline on the files in your current working directory.
+
+When you run `unideploy init`:
+
+1. The CLI creates a session and receives a 6-digit session code.
+2. The session code is displayed in a box in your terminal.
+3. Open the dashboard at [unideploy.vercel.app/connect](https://unideploy.vercel.app/connect) and enter the code.
+4. The browser and CLI connect via WebSocket.
+5. Findings are streamed to both your terminal and the browser dashboard in real time.
+
+## Example session
+
+```
+$ unideploy init
+
+  ┌─────────────────────────┐
+  │                         │
+  │   Session code:  847291 │
+  │                         │
+  └─────────────────────────┘
+
+  Open unideploy.vercel.app/connect and enter the code above.
+  Waiting for browser connection...
+
+  ● Browser connected
+  ● Scanning project files...
+  [CRITICAL] SEC-001  src/lib/stripe.ts:3
+  [HIGH]     RLS-001  supabase/schema.sql:12
+  [MEDIUM]   HDR-001  next.config.js
+  ● Scan complete — grade: D
+```
+
+## When to use init vs scan
+
+| | `unideploy init` | `unideploy scan` |
+|-|-----------------|-----------------|
+| Source | Local files | GitHub URL |
+| Output | Terminal + browser dashboard | Terminal |
+| Private repos | Yes (local) | Requires repo access |
+| CI/CD | Not suitable | Recommended |

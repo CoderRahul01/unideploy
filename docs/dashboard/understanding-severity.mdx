@@ -1,0 +1,39 @@
+---
+title: "Understanding severity"
+description: "What CRITICAL, HIGH, and MEDIUM mean in practice."
+---
+
+## Severity levels
+
+### CRITICAL
+
+An issue that can be exploited immediately with no special access. Examples:
+
+- A live API key committed to the repository and accessible via the GitHub API
+- An auth guard that is inverted (`if (user)` → redirect instead of `if (!user)` → redirect)
+- A Supabase service role key used in client-side code
+
+**Action required before shipping.** A CRITICAL finding gives a grade of F. Do not go live.
+
+### HIGH
+
+An issue that significantly increases the attack surface but requires some specific conditions to exploit. Examples:
+
+- Row-level security enabled on a table but no policies defined (effectively open to anyone with the anon key)
+- An API route that returns user data without checking authentication
+- A `createBrowserClient` call inside a Next.js server component (leaks session data)
+
+**Should be fixed before shipping.** Three or more HIGH findings gives a grade of D.
+
+### MEDIUM
+
+An issue that represents a defence-in-depth gap. The app may not be immediately exploitable but is not following best practices. Examples:
+
+- Missing `Content-Security-Policy` header
+- A Stripe checkout flow without a server-side webhook for payment verification
+
+**Fix before launch if possible.** MEDIUM-only results give a grade of B.
+
+## Rule reference
+
+Full rule list: [AnalyzerAgent →](/agents/scan-agent)

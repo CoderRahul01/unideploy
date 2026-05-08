@@ -1,0 +1,19 @@
+---
+title: "Railway"
+description: "Deploy configuration guidance for Railway."
+---
+
+UniDeploy can generate Railway-compatible deploy configuration as part of its remediation output when it detects a project suitable for Railway deployment.
+
+## What is generated
+
+- `railway.json` — service configuration
+- Environment variable checklist — variables that must be set in the Railway dashboard before deployment
+
+## Applying the configuration
+
+Generated files are included in the auto-fix pull request. Review before merging and ensure all environment variables are set in your Railway project settings.
+
+## Note
+
+Railway integration is available on Builder plan and above.
