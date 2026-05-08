@@ -4,18 +4,19 @@ interface ProgramBadgeProps {
   program: "e2b" | "devlabs";
 }
 
-/* TODO: verify Devlabs brand colour at https://devlabs.in */
+// E2B brand: pure black/white monochrome with orange accent — e2b.dev
+// Devlabs brand: dark bg, warm orange fox — devlabs.club
 const BADGE_CONFIG = {
   e2b: {
     label: "E2B Startup Program",
-    borderColor: "#1D9E75",   // teal-adjacent, matches E2B's terminal aesthetic
-    textColor: "#a8b89a",
+    borderColor: "#FF8C00",
+    textColor: "#b0a090",
     animationName: "pulseBorderE2b",
   },
   devlabs: {
     label: "Devlabs Momentum Program",
-    borderColor: "#6B5CE7",   // TODO: replace with verified Devlabs brand colour
-    textColor: "#a8a0d0",
+    borderColor: "#F07B2C",
+    textColor: "#b09070",
     animationName: "pulseBorderDevlabs",
   },
 } as const;

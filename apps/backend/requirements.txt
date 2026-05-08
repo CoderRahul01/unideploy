@@ -28,5 +28,8 @@ composio-core>=0.7.0
 # Observability (import commented out in main.py until metrics router is wired)
 prometheus-client>=0.17.0
 
+# JWT verification (Clerk backend token validation)
+PyJWT[crypto]>=2.9.0
+
 # Testing
 pytest>=8.0.0
