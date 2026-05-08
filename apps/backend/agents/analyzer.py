@@ -121,11 +121,16 @@ async def run_analysis(project_manifest: dict) -> list[dict]:
 
 
 def compute_grade(findings: list[dict]) -> str:
-    critical = sum(1 for f in findings if f.get("severity") == "CRITICAL")
-    high     = sum(1 for f in findings if f.get("severity") == "HIGH")
-    if critical >= 3: return "F"
-    if critical >= 1: return "D"
-    if high >= 5:     return "D"
-    if high >= 3:     return "C"
-    if high >= 1:     return "B"
+    critical = sum(1 for f in findings if f.get("severity", "").upper() == "CRITICAL")
+    high     = sum(1 for f in findings if f.get("severity", "").upper() == "HIGH")
+    medium   = sum(1 for f in findings if f.get("severity", "").upper() == "MEDIUM")
+
+    if critical >= 1:
+        return "F"
+    if high >= 3:
+        return "D"
+    if high >= 1 or medium >= 5:
+        return "C"
+    if medium > 0:
+        return "B"
     return "A"

@@ -13,6 +13,7 @@ import logging
 
 from core.database import db_insert, db_update, db_select
 from routers.sessions import _sessions
+from agents.analyzer import compute_grade
 
 logger = logging.getLogger("unideploy.scan_results")
 
@@ -49,21 +50,6 @@ def _find_session(session_id: str) -> Optional[dict]:
         if s["session_id"] == session_id:
             return s
     return None
-
-
-def _grade_from_findings(findings: list[dict]) -> str:
-    critical = sum(1 for f in findings if f.get("severity", "").lower() == "critical")
-    high = sum(1 for f in findings if f.get("severity", "").lower() == "high")
-    medium = sum(1 for f in findings if f.get("severity", "").lower() == "medium")
-    if critical >= 1:
-        return "F"
-    if high >= 3:
-        return "D"
-    if high >= 1 or medium >= 5:
-        return "C"
-    if medium > 0:
-        return "B"
-    return "A"
 
 
 async def _forward_to_orchestrator(session_id: str, payload: dict):
@@ -117,7 +103,7 @@ async def post_scan_results(session_id: str, req: ScanResultsRequest):
         raise HTTPException(404, "Session not found")
 
     findings_dicts = [f.model_dump() for f in req.findings]
-    grade = req.grade or _grade_from_findings(findings_dicts)
+    grade = req.grade or compute_grade(findings_dicts)
 
     report = {
         "session_id": session_id,
@@ -172,9 +158,9 @@ async def post_scan_results(session_id: str, req: ScanResultsRequest):
             pass
 
     # Emit scan_complete to browser WebSocket
-    critical = sum(1 for f in findings_dicts if f.get("severity", "").lower() == "critical")
-    high = sum(1 for f in findings_dicts if f.get("severity", "").lower() == "high")
-    medium = sum(1 for f in findings_dicts if f.get("severity", "").lower() == "medium")
+    critical = sum(1 for f in findings_dicts if f.get("severity", "").upper() == "CRITICAL")
+    high = sum(1 for f in findings_dicts if f.get("severity", "").upper() == "HIGH")
+    medium = sum(1 for f in findings_dicts if f.get("severity", "").upper() == "MEDIUM")
 
     complete_msg = {
         "type": "scan_complete",

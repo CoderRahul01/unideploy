@@ -71,13 +71,15 @@ async def create_session(
     }
     
     try:
-        await db_insert("scan_sessions", {
+        await db_insert("scans", {
             "id": session_id,
+            "session_id": session_id,  # session_id column is required in setup_insforge.py
             "code": code,
             "status": "pending",
             "machine_name": request.machine_name,
             "project_path": request.project_path,
             "expires_at": expiry.isoformat(),
+            "created_at": datetime.utcnow().isoformat(),
         })
     except Exception:
         pass  # InsForge persistence is best-effort; session still works locally
@@ -116,7 +118,7 @@ async def connect_session(
     session["user_id"] = user["user_id"] if user else None
     
     try:
-        await db_update("scan_sessions", session["session_id"], {
+        await db_update("scans", session["session_id"], {
             "status": "browser_connected",
             "browser_connected_at": datetime.utcnow().isoformat(),
         })

@@ -30,9 +30,9 @@ async def run_agent_pipeline(session_code: str, project_manifest: dict):
         session["security_grade"] = grade
         session["status"] = "complete"
 
-        critical = sum(1 for f in findings if f.get("severity") == "CRITICAL")
-        high = sum(1 for f in findings if f.get("severity") == "HIGH")
-        medium = sum(1 for f in findings if f.get("severity") == "MEDIUM")
+        critical = sum(1 for f in findings if f.get("severity", "").upper() == "CRITICAL")
+        high = sum(1 for f in findings if f.get("severity", "").upper() == "HIGH")
+        medium = sum(1 for f in findings if f.get("severity", "").upper() == "MEDIUM")
         auto_fixable = sum(1 for f in findings if f.get("auto_fixable"))
 
         summary = {
@@ -51,10 +51,11 @@ async def run_agent_pipeline(session_code: str, project_manifest: dict):
             await session["browser_ws"].send_json(complete_msg)
 
         try:
-            await db_update("scan_sessions", session["session_id"], {
+            await db_update("scans", session["session_id"], {
                 "status": "complete",
-                "scan_result": findings,
-                "security_grade": grade,
+                "grade": grade,
+                "total_issues": len(findings),
+                "auto_fixable": auto_fixable,
                 "completed_at": datetime.utcnow().isoformat(),
             })
         except Exception:
@@ -200,10 +201,9 @@ async def cli_websocket(websocket: WebSocket, session_code: str):
                         "summary": data.get("summary", {})
                     })
 
-                await db_update("scan_sessions", session["session_id"], {
+                await db_update("scans", session["session_id"], {
                     "status": "complete",
-                    "scan_result": session["findings"],
-                    "security_grade": data.get("summary", {}).get("grade"),
+                    "grade": data.get("summary", {}).get("grade"),
                     "completed_at": datetime.utcnow().isoformat(),
                 })
             
