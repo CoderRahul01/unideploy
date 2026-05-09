@@ -33,8 +33,6 @@ gcloud run deploy unideploy-api \
   --set-env-vars BASE_URL=https://unideploy-api-4b25n74mbq-uc.a.run.app \
   --set-env-vars AGENT_ENGINE_RESOURCE_NAME=projects/1063190328420/locations/us-central1/reasoningEngines/8903392712695218176 \
   --set-env-vars INSFORGE_BASE_URL=https://fv5wi54q.us-east.insforge.app \
-  --set-secrets CLERK_SECRET_KEY=clerk-secret-key:latest \
-  --set-secrets CLERK_JWKS_URL=clerk-jwks-url:latest \
   --set-secrets INSFORGE_API_KEY=insforge-api-key:latest \
   --set-secrets INSFORGE_PROJECT_ID=insforge-project-id:latest \
   --set-secrets GEMINI_API_KEY=gemini-api-key:latest \

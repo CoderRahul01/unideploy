@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Sora, DM_Sans, JetBrains_Mono } from "next/font/google";
-import { ClerkProvider } from "@clerk/nextjs";
 import AnnouncementBar from "@/components/AnnouncementBar";
 import FloatingDemoButton from "@/components/FloatingDemoButton";
 import CalScript from "@/components/CalScript";
@@ -63,13 +62,11 @@ export default function RootLayout({
         className={`${sora.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}
         style={{ background: "var(--bg-primary)" }}
       >
-        <ClerkProvider>
           <AnnouncementBar />
           {children}
           <Footer />
           <FloatingDemoButton />
           <CalScript />
-        </ClerkProvider>
       </body>
     </html>
   );

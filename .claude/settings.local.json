@@ -4,7 +4,11 @@
       "Bash(pip --version)",
       "Bash(pip3 --version)",
       "Bash(python -m pip index versions google-adk)",
-      "Bash(python -m pip index versions insforge-sdk)"
+      "Bash(python -m pip index versions insforge-sdk)",
+      "Bash(timeout 5 head -5 /Users/rahulpandey187/unideploy/apps/frontend/.vercel/project.json)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }

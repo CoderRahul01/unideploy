@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Header, Depends
+from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from uuid import uuid4
 import random, string
@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 import os
 
 from core.database import db_insert, db_update
-from core.auth import get_current_user
 
 router = APIRouter(prefix="/api/v1/sessions", tags=["sessions"])
 
@@ -95,11 +94,11 @@ async def create_session(
 @router.post("/connect", response_model=ConnectSessionResponse)
 async def connect_session(
     request: ConnectSessionRequest,
-    user: dict | None = Depends(get_current_user)  # optional auth
 ):
     """
     Called by browser when user enters the 6-digit code.
     Validates code, marks session as browser_connected.
+    Session-code matching serves as the authentication mechanism.
     """
     code = request.code.upper().strip()
     session = _sessions.get(code)
@@ -115,7 +114,7 @@ async def connect_session(
     
     session["status"] = "browser_connected"
     session["browser_connected_at"] = datetime.utcnow()
-    session["user_id"] = user["user_id"] if user else None
+    session["user_id"] = None  # future: populate from auth provider
     
     try:
         await db_update("scans", session["session_id"], {
