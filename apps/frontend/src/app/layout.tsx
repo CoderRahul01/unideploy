@@ -5,6 +5,7 @@ import FloatingDemoButton from "@/components/FloatingDemoButton";
 import CalScript from "@/components/CalScript";
 import Footer from "@/components/Footer";
 import { PostHogProvider } from "@/providers/PostHogProvider";
+import GoogleAnalytics from "@/components/GoogleAnalytics";
 import "./globals.css";
 
 const sora = Sora({
@@ -66,6 +67,7 @@ export default function RootLayout({
         className={`${sora.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}
         style={{ background: "var(--bg-primary)" }}
       >
+        <GoogleAnalytics />
         <PostHogProvider>
           <AnnouncementBar />
           {children}
