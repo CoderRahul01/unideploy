@@ -4,6 +4,7 @@ import AnnouncementBar from "@/components/AnnouncementBar";
 import FloatingDemoButton from "@/components/FloatingDemoButton";
 import CalScript from "@/components/CalScript";
 import Footer from "@/components/Footer";
+import { PostHogProvider } from "@/providers/PostHogProvider";
 import "./globals.css";
 
 const sora = Sora({
@@ -41,6 +42,9 @@ export const metadata: Metadata = {
     "Next.js security",
     "secrets detection",
   ],
+  verification: {
+    google: "IdmvhsfXd8y0B4C7toMdLj28KF-4ykVU587BLDKLkJo",
+  },
   openGraph: {
     title: "UniDeploy — Production-readiness for vibe-coded apps",
     description:
@@ -57,16 +61,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${sora.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}
         style={{ background: "var(--bg-primary)" }}
       >
+        <PostHogProvider>
           <AnnouncementBar />
           {children}
           <Footer />
           <FloatingDemoButton />
           <CalScript />
+        </PostHogProvider>
       </body>
     </html>
   );
