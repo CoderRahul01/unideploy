@@ -456,24 +456,6 @@ export default function LandingPage() {
           >
             Open Dashboard
           </a>
-          <a
-            href="https://github.com/CoderRahul01/unideploy"
-            target="_blank"
-            rel="noreferrer"
-            style={{
-              background: "transparent",
-              border: "1.5px solid var(--border)",
-              color: "var(--text-primary)",
-              padding: "12px 28px",
-              borderRadius: "var(--radius-pill)",
-              fontSize: 15,
-              fontWeight: 500,
-              textDecoration: "none",
-              fontFamily: "var(--font-body), DM Sans, sans-serif",
-            }}
-          >
-            View on GitHub
-          </a>
         </div>
       </section>
     </div>

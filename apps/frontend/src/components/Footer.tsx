@@ -125,15 +125,27 @@ export default function Footer() {
               rel="noopener noreferrer"
               style={{ color: "#4a5a3a" }}
               aria-label="X (Twitter)"
+              title="X (Twitter)"
             >
               <Twitter size={15} strokeWidth={1.5} />
+            </a>
+            <a
+              href="https://www.linkedin.com/in/rahulpandey187/"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "#4a5a3a" }}
+              aria-label="Rahul's LinkedIn"
+              title="Rahul's LinkedIn"
+            >
+              <Linkedin size={15} strokeWidth={1.5} />
             </a>
             <a
               href="https://www.linkedin.com/company/unideployai/"
               target="_blank"
               rel="noopener noreferrer"
               style={{ color: "#4a5a3a" }}
-              aria-label="LinkedIn"
+              aria-label="UniDeploy LinkedIn"
+              title="UniDeploy LinkedIn"
             >
               <Linkedin size={15} strokeWidth={1.5} />
             </a>

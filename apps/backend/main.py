@@ -15,6 +15,28 @@ import os, logging
 from dotenv import load_dotenv
 load_dotenv()
 
+import sentry_sdk
+from posthog import Posthog
+
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
+
+if os.getenv("SENTRY_DSN"):
+    sentry_sdk.init(
+        dsn=os.getenv("SENTRY_DSN"),
+        traces_sample_rate=1.0,
+        profiles_sample_rate=1.0,
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+        default_integrations=False
+    )
+
+posthog_client = None
+if os.getenv("POSTHOG_API_KEY"):
+    posthog_client = Posthog(
+        os.getenv("POSTHOG_API_KEY"),
+        host=os.getenv("POSTHOG_HOST", "https://app.posthog.com")
+    )
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("unideploy")
 
@@ -44,6 +66,11 @@ async def lifespan(app: FastAPI):
     except asyncio.CancelledError:
         pass
     logger.info("UniDeploy API shutting down")
+    
+    import sentry_sdk
+    sentry_sdk.flush()
+    if posthog_client:
+        posthog_client.flush()
 
 
 app = FastAPI(

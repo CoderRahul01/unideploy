@@ -27,6 +27,8 @@ composio-core>=0.7.0
 
 # Observability (import commented out in main.py until metrics router is wired)
 prometheus-client>=0.17.0
+sentry-sdk[fastapi]>=2.0.0
+posthog>=3.0.0
 
 # Testing
 pytest>=8.0.0

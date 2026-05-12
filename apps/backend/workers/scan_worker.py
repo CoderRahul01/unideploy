@@ -5,9 +5,19 @@ Prevents Gemini rate limit exhaustion under concurrent load.
 
 import asyncio
 import logging
+import os
 from datetime import datetime
+import sentry_sdk
+from posthog import Posthog
 
 logger = logging.getLogger("unideploy.worker")
+
+ph = None
+if os.getenv("POSTHOG_API_KEY"):
+    ph = Posthog(
+        os.getenv("POSTHOG_API_KEY"),
+        host=os.getenv("POSTHOG_HOST", "https://app.posthog.com")
+    )
 
 # Shared in-memory scan store (imported by routers/scans.py too)
 _scans: dict[str, dict] = {}
@@ -35,6 +45,12 @@ async def _process_scan(scan_id: str) -> None:
     scan["status"] = "running"
     scan["started_at"] = datetime.utcnow().isoformat()
     logger.info(f"Processing scan {scan_id}: {scan.get('github_url')}")
+
+    if ph:
+        ph.capture(scan.get("user_id", "system"), "agent_scan_started", {
+            "scan_id": scan_id,
+            "github_url": scan["github_url"]
+        })
 
     try:
         # ── Step 1: AnalyzeAgent in E2B sandbox ──────────────────────────
@@ -74,10 +90,26 @@ async def _process_scan(scan_id: str) -> None:
         scan["completed_at"] = datetime.utcnow().isoformat()
         logger.info(f"Scan {scan_id} complete — {len(findings)} findings, grade={grade}")
 
+        if ph:
+            ph.capture(scan.get("user_id", "system"), "agent_scan_completed", {
+                "scan_id": scan_id,
+                "findings_count": len(findings),
+                "grade": grade,
+                "framework": framework
+            })
+
     except Exception as e:
+        sentry_sdk.capture_exception(e)
         scan["status"] = "failed"
         scan["error"] = str(e)
         logger.error(f"Scan {scan_id} failed: {e}")
+        
+        if ph:
+            ph.capture(scan.get("user_id", "system"), "agent_scan_failed", {
+                "scan_id": scan_id,
+                "error": str(e)
+            })
+            
         try:
             await db_update("scans", scan_id, {"status": "failed", "error": str(e)})
         except Exception:
@@ -107,5 +139,6 @@ async def worker_loop() -> None:
             logger.info("Scan worker shutting down")
             break
         except Exception as e:
+            sentry_sdk.capture_exception(e)
             logger.error(f"Worker loop error: {e}")
             await asyncio.sleep(1)
