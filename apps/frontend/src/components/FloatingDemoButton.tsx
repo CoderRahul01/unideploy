@@ -1,6 +1,7 @@
 "use client";
 import { usePathname } from "next/navigation";
 import { Calendar } from "lucide-react";
+import posthog from "posthog-js";
 
 export default function FloatingDemoButton() {
   const pathname = usePathname();
@@ -11,6 +12,7 @@ export default function FloatingDemoButton() {
       data-cal-link="rahulpandey187/unideploy-demo"
       data-cal-namespace="unideploy-demo"
       data-cal-config='{"layout":"month_view"}'
+      onClick={() => posthog.capture("demo_booking_clicked", { location: "floating_button", page: pathname })}
       style={{
         position: "fixed",
         bottom: 24,

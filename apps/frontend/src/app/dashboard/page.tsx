@@ -8,6 +8,7 @@ import {
   startScan, getScanStatus, getScanPlan, triggerFix, getScanReport,
 } from "@/lib/api";
 import SecurityGrade from "@/components/SecurityGrade";
+import posthog from "posthog-js";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 
@@ -276,7 +277,17 @@ function CliReportView({ sessionId }: { sessionId: string }) {
   // Load report immediately (session might already be complete)
   useEffect(() => {
     getScanReport(sessionId)
-      .then(r => { setReport(r); setScanStatus("complete"); })
+      .then(r => {
+        setReport(r);
+        setScanStatus("complete");
+        posthog.capture("scan_report_viewed", {
+          grade: r.grade,
+          total_issues: r.total_issues,
+          auto_fixable: r.auto_fixable,
+          framework: r.framework,
+          files_scanned: r.files_scanned,
+        });
+      })
       .catch(() => setScanStatus("waiting"));
   }, [sessionId]);
 
@@ -460,6 +471,7 @@ function CliReportView({ sessionId }: { sessionId: string }) {
             <button
               onClick={() => {
                 const ids = findings.filter(f => f.auto_fixable).map(f => f.id);
+                posthog.capture("ai_fix_triggered", { fix_count: ids.length, mode: "cli" });
                 socketRef.current?.sendApplyFix(ids);
               }}
               style={{
@@ -556,6 +568,7 @@ function GithubScanFlow({ initialScanId }: { initialScanId?: string }) {
 
   const handleStartScan = async () => {
     if (!githubUrl.trim()) return;
+    posthog.capture("github_scan_started", { branch });
     const result = await startScan(githubUrl.trim(), branch);
     setScanId(result.scan_id);
     router.replace(`/dashboard?scan_id=${result.scan_id}`);
@@ -564,6 +577,7 @@ function GithubScanFlow({ initialScanId }: { initialScanId?: string }) {
   const handleFix = async () => {
     if (!scanId || fixing) return;
     setFixing(true);
+    posthog.capture("github_pr_fix_triggered", { fix_count: selectedIds.size });
     try {
       const result = await triggerFix(scanId, Array.from(selectedIds));
       setPrResult({ pr_url: result.pr_url, error: result.error });

@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import OTPInput from "@/components/OTPInput";
 import { verifySession, getScanReport } from "@/lib/api";
+import posthog from "posthog-js";
 
 const C = {
   bg: "#0F1410",
@@ -94,13 +95,16 @@ export default function ConnectPage() {
   const connectSession = async (code: string) => {
     setLoading(true);
     setError(false);
+    posthog.capture("session_code_submitted");
 
     try {
       const data = await verifySession(code);
       setSessionId(data.session_id);
+      posthog.identify(data.session_id);
       setPageState("waiting");
     } catch {
       setError(true);
+      posthog.capture("session_code_error");
     } finally {
       setLoading(false);
     }
@@ -112,6 +116,7 @@ export default function ConnectPage() {
     navigator.clipboard.writeText("npx unideploy@latest init");
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+    posthog.capture("install_command_copied", { location: "connect_page" });
   };
 
   const progressPct = totalFiles > 0 ? Math.round((filesScanned / totalFiles) * 100) : 0;

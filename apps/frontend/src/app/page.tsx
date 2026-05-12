@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Terminal from "@/components/Terminal";
+import posthog from "posthog-js";
 
 /* ════════════════════════════════════════════════════════════════════════
    UniDeploy Landing Page
@@ -15,6 +16,7 @@ export default function LandingPage() {
     navigator.clipboard.writeText("npx unideploy@latest init");
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+    posthog.capture("install_command_copied", { location: "hero" });
   };
 
   return (
@@ -547,6 +549,7 @@ function DemoSection() {
         data-cal-link="rahulpandey187/unideploy-demo"
         data-cal-namespace="unideploy-demo"
         data-cal-config='{"layout":"month_view"}'
+        onClick={() => posthog.capture("demo_booking_clicked", { location: "landing_demo_section" })}
         style={{
           background: "var(--text-primary)",
           color: "var(--bg-primary)",

@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Check, Zap } from "lucide-react";
+import posthog from "posthog-js";
 
 type Tier = {
   name: string;
@@ -130,7 +131,11 @@ export default function PricingPage() {
           <div style={{ display: "inline-flex", alignItems: "center", gap: 12 }}>
             <span style={{ fontSize: 13, color: annual ? "#4a5a3a" : "#a8b89a" }}>Monthly</span>
             <button
-              onClick={() => setAnnual((v) => !v)}
+              onClick={() => {
+                const next = !annual;
+                setAnnual(next);
+                posthog.capture("pricing_billing_toggle_changed", { billing_period: next ? "annual" : "monthly" });
+              }}
               aria-label="Toggle billing period"
               style={{
                 width: 44,
@@ -279,6 +284,7 @@ export default function PricingPage() {
                   href={tier.ctaHref}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => posthog.capture("pricing_cta_clicked", { tier: tier.name, billing_period: annual ? "annual" : "monthly" })}
                   style={{
                     display: "block",
                     textAlign: "center",
@@ -297,6 +303,7 @@ export default function PricingPage() {
               ) : tier.monthly === 0 ? (
                 <a
                   href="https://unideploy.vercel.app"
+                  onClick={() => posthog.capture("pricing_cta_clicked", { tier: tier.name, billing_period: "free" })}
                   style={{
                     display: "block",
                     textAlign: "center",
@@ -313,6 +320,7 @@ export default function PricingPage() {
                 </a>
               ) : (
                 <button
+                  onClick={() => posthog.capture("pricing_cta_clicked", { tier: tier.name, billing_period: annual ? "annual" : "monthly" })}
                   style={{
                     background: tier.highlight ? "#1D9E75" : "transparent",
                     color: tier.highlight ? "#fff" : "#1D9E75",
