@@ -58,76 +58,14 @@ async function askQuestion(rl: readline.Interface, q: Question): Promise<string>
   return answer.trim() || q.default || "";
 }
 
-export async function runDeploy(options: {
-  local: boolean;
-  dryRun: boolean;
-  platform?: string;
-  manifest: dict;
+async function streamConfigFiles(options: {
   apiBaseUrl: string;
-}): Promise<void> {
-  const { manifest, apiBaseUrl, dryRun, platform } = options;
-
-  console.log("");
-  console.log(chalk.bold("● UniDeploy DeployAgent"));
-  console.log("");
-
-  // ── Step 1: Get stack + questions from backend ────────────────────────────
-
-  let stackInfo: StackInfo;
-  let questions: Question[];
-
-  try {
-    const planRes = await fetch(`${apiBaseUrl}/api/v1/deploy/plan`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ manifest }),
-    });
-    if (!planRes.ok) throw new Error(await planRes.text());
-    const plan = await planRes.json() as { stack: StackInfo; questions: Question[] };
-    stackInfo = plan.stack;
-    questions = plan.questions;
-  } catch (err) {
-    console.error(chalk.red(`  ✗ Could not reach deploy API: ${err}`));
-    process.exit(1);
-  }
-
-  // Override target if --platform flag provided
-  if (platform) {
-    stackInfo.inferred_targets = [platform];
-    questions = questions.filter(q => q.key !== "targets");
-  }
-
-  // ── Step 2: Print detected stack ─────────────────────────────────────────
-
-  const stackDisplay = [stackInfo.frontend, stackInfo.backend, stackInfo.db]
-    .filter(s => s && s !== "none" && s !== "unknown")
-    .join(" + ");
-  const targetsDisplay = stackInfo.inferred_targets.join(", ");
-
-  console.log(chalk.gray(`  Detected: ${stackDisplay || "generic"} → ${targetsDisplay}`));
-  console.log("");
-
-  // ── Step 3: Ask clarifying questions (only those from backend) ────────────
-
-  const answers: Record<string, string> = {};
-
-  if (questions.length > 0) {
-    console.log(chalk.white("  A few quick questions:"));
-    console.log("");
-
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    try {
-      for (const q of questions) {
-        answers[q.key] = await askQuestion(rl, q);
-      }
-    } finally {
-      rl.close();
-    }
-    console.log("");
-  }
-
-  // ── Step 4: Stream config generation via SSE ──────────────────────────────
-
+  manifest: dict;
+  dryRun: boolean;
+  answers: Record<string, string>;
+  stack?: any;
+}) {
+  const { apiBaseUrl, manifest, dryRun, answers, stack } = options;
   const generatedFiles: { path: string; description: string }[] = [];
 
   try {
@@ -136,7 +74,7 @@ export async function runDeploy(options: {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         manifest,
-        stack: stackInfo,
+        stack: stack || {}, // Backend will re-detect if missing, but /chat provides it
         answers,
       }),
     });
@@ -182,8 +120,6 @@ export async function runDeploy(options: {
           }
         } else if (event.type === "error") {
           console.error(chalk.red(`  ✗ ${event.message}`));
-        } else if (event.type === "complete") {
-          // handled below
         }
       }
     }
@@ -191,19 +127,85 @@ export async function runDeploy(options: {
     console.error(chalk.red(`  ✗ Config generation failed: ${err}`));
     process.exit(1);
   }
+  return generatedFiles;
+}
 
-  // ── Step 5: Summary ──────────────────────────────────────────────────────
+export async function runDeploy(options: {
+  local: boolean;
+  dryRun: boolean;
+  platform?: string;
+  manifest: dict;
+  apiBaseUrl: string;
+}): Promise<void> {
+  const { manifest, apiBaseUrl, dryRun, platform } = options;
 
   console.log("");
-  if (dryRun) {
-    console.log(chalk.yellow("  (dry run — no files written)"));
-  } else if (generatedFiles.length > 0) {
-    console.log(`  ${chalk.green(`✓ ${generatedFiles.length} config file${generatedFiles.length !== 1 ? "s" : ""} generated`)}`);
-    console.log(chalk.gray("  Review and commit:"));
-    console.log(chalk.gray(`    git add ${generatedFiles.map(f => f.path).join(" ")}`));
-    console.log(chalk.gray("    git commit -m 'chore: add deployment configs'"));
-  } else {
-    console.log(chalk.yellow("  No config files were generated."));
+  console.log(chalk.bold("● UniDeploy DeployAgent"));
+  console.log("");
+
+  const history: { question: string; answer: string }[] = [];
+  let sessionId: string | undefined;
+  const answers: Record<string, string> = {};
+
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+  try {
+    // ── Turn 1: Send manifest ───────────────────────────────────────────────
+    let res = await (await fetch(`${apiBaseUrl}/api/v1/deploy/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ manifest, history }),
+    })).json();
+    
+    sessionId = res.session_id;
+
+    // ── Conversation loop ────────────────────────────────────────────────────
+    while (res.action === "ask" || res.action === "clarify") {
+      const ans = await askQuestion(rl, {
+        key: res.field || "answer",
+        question: res.question,
+        options: [],
+        default: null,
+      });
+      
+      history.push({ question: res.question, answer: ans });
+      if (res.field) answers[res.field] = ans;
+
+      res = await (await fetch(`${apiBaseUrl}/api/v1/deploy/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, history }),
+      })).json();
+    }
+
+    if (res.action === "generate") {
+      console.log("");
+      const generatedFiles = await streamConfigFiles({
+        apiBaseUrl,
+        manifest,
+        dryRun,
+        answers,
+      });
+
+      // ── Summary ────────────────────────────────────────────────────────────
+      console.log("");
+      if (dryRun) {
+        console.log(chalk.yellow("  (dry run — no files written)"));
+      } else if (generatedFiles.length > 0) {
+        console.log(`  ${chalk.green(`✓ ${generatedFiles.length} config file${generatedFiles.length !== 1 ? "s" : ""} generated`)}`);
+        console.log(chalk.gray("  Review and commit:"));
+        console.log(chalk.gray(`    git add ${generatedFiles.map(f => f.path).join(" ")}`));
+        console.log(chalk.gray("    git commit -m 'chore: add deployment configs'"));
+      } else {
+        console.log(chalk.yellow("  No config files were generated."));
+      }
+    } else {
+      console.error(chalk.red(`  ✗ Unexpected agent action: ${res.action}`));
+    }
+  } catch (err) {
+    console.error(chalk.red(`  ✗ Deployment loop failed: ${err}`));
+  } finally {
+    rl.close();
   }
   console.log("");
 }

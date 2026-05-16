@@ -14,6 +14,7 @@ import logging
 from core.database import db_insert, db_update, db_select
 from routers.sessions import _sessions
 from agents.analyzer import compute_grade
+from core.posthog import posthog_client
 
 logger = logging.getLogger("unideploy.scan_results")
 
@@ -192,6 +193,18 @@ async def post_scan_results(session_id: str, req: ScanResultsRequest):
     # Kick off agent enrichment in background (non-blocking)
     asyncio.create_task(_forward_to_orchestrator(session_id, report))
 
+    if posthog_client:
+        posthog_client.capture(session_id, "scan_results_received", {
+            "framework": req.framework,
+            "files_scanned": req.files_scanned,
+            "total_issues": req.total_issues,
+            "auto_fixable": req.auto_fixable,
+            "grade": grade,
+            "critical": critical,
+            "high": high,
+            "medium": medium,
+        })
+
     return {"accepted": True, "session_id": session_id, "grade": grade}
 
 
@@ -260,6 +273,13 @@ async def post_fix_complete(session_id: str, req: FixCompleteRequest):
         })
     except Exception:
         pass
+
+    if posthog_client:
+        posthog_client.capture(session_id, "fix_complete_received", {
+            "fixed_count": len(req.fixed_ids),
+            "remaining_issues": len(findings_dicts),
+            "grade": grade,
+        })
 
     logger.info(f"fix-complete: session={session_id} fixed={len(req.fixed_ids)} remaining={len(findings_dicts)} grade={grade}")
     return {"ok": True, "grade": grade, "total_issues": len(findings_dicts)}

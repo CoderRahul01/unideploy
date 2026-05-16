@@ -293,6 +293,56 @@ class DeployAgent:
 
         return context
 
+    async def chat(
+        self,
+        session_id: str,
+        manifest: dict | None,   # only on first turn
+        history: list[dict],     # [{question, answer}, ...]
+    ) -> dict:
+        """
+        Agentic deployment conversation loop.
+        Analyse project manifest and history to gather exactly what is needed.
+        """
+        system_prompt = """You are a deployment configuration expert. Analyse the project manifest
+and conversation history. Your job: gather exactly what you need to
+generate correct deployment configs. Rules:
+- Infer from manifest without asking: framework, package manager,
+  monorepo layout, existing config files (vercel.json, cloudbuild.yaml,
+  railway.toml, wrangler.toml)
+- Ask ONLY what you cannot infer: target platform (if ambiguous),
+  GCP project ID (if Cloud Run chosen), DB region (if managed Postgres)
+- Ask ONE question per turn. Never ask two things at once.
+- When you have: target platform, env var list, build command, output
+  directory — return action=generate immediately.
+- Be direct. No filler. No "Great choice!" responses.
+Output JSON only: {action, question?, field?, reasoning}"""
+
+        prompt = f"""Conversation history:
+{json.dumps(history, indent=2)}
+
+"""
+        if manifest:
+            # First turn: include manifest context
+            files = manifest.get("files", {})
+            prompt += f"Project Manifest (subset):\n{json.dumps({k: v[:500] for k, v in list(files.items())[:15]}, indent=2)}"
+
+        client = _build_gemini_client()
+        response = client.models.generate_content(
+            model="gemini-2.0-flash", # Use faster model for chat
+            contents=prompt,
+            config=GenerateContentConfig(
+                system_instruction=system_prompt,
+                response_mime_type="application/json",
+                temperature=0.0,
+            ),
+        )
+
+        try:
+            return json.loads(response.text.strip())
+        except Exception as e:
+            logger.error(f"Deploy chat parse error: {e} | Text: {response.text}")
+            return {"action": "clarify", "question": "Could you please rephrase that?"}
+
     async def generate_configs(
         self,
         manifest: dict,

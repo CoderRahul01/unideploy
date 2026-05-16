@@ -8,6 +8,7 @@ import os
 import asyncio
 from google import genai
 from google.genai.types import GenerateContentConfig
+from services.tinyfish import TinyfishClient
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT", "")
@@ -40,16 +41,23 @@ Rules:
 
 Findings:
 {findings_json}
+
+<reference_docs>
+{reference_docs}
+</reference_docs>
 """
 
 
-def _run_plan_sync(findings: list[dict]) -> list[dict]:
+def _run_plan_sync(findings: list[dict], reference_docs: str = "") -> list[dict]:
     if USE_VERTEX:
         client = genai.Client(vertexai=True, project=GOOGLE_CLOUD_PROJECT, location="us-central1")
     else:
         client = genai.Client(api_key=GEMINI_API_KEY)
 
-    prompt = PLAN_PROMPT.format(findings_json=json.dumps(findings, indent=2))
+    prompt = PLAN_PROMPT.format(
+        findings_json=json.dumps(findings, indent=2),
+        reference_docs=reference_docs
+    )
     response = client.models.generate_content(
         model="gemini-2.0-flash",
         contents=prompt,
@@ -72,8 +80,26 @@ async def generate_remediation_plan(findings: list[dict]) -> list[dict]:
     """Generate per-finding remediation plans using Gemini."""
     if not findings:
         return []
+    
+    reference_docs = ""
+    tinyfish = TinyfishClient()
+    
     try:
-        return await asyncio.to_thread(_run_plan_sync, findings)
+        # Fetch live remediation context for each finding (top 3)
+        tasks = []
+        for f in findings[:5]: # Cap at 5 for performance
+            q = f"{f.get('category')} {f.get('title')} security remediation"
+            tasks.append(tinyfish.search_and_fetch_top(q))
+        
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        docs = []
+        for res in results:
+            if isinstance(res, str) and res:
+                docs.append(res[:2000]) # First 2KB
+        
+        reference_docs = "\n\n".join(docs)
+        
+        return await asyncio.to_thread(_run_plan_sync, findings, reference_docs)
     except Exception as e:
         return [{
             "finding_id": f["id"],

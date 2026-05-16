@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 from agents.fix_agent import generate_patch_for_cli
+from core.posthog import posthog_client
 
 router = APIRouter(prefix="/api/v1/ai", tags=["ai"])
 
@@ -40,6 +41,13 @@ async def generate_patch(req: PatchRequest):
             status_code=422,
             detail="FixAgent could not generate a safe patch for this finding. Manual remediation required.",
         )
+
+    if posthog_client:
+        posthog_client.capture("cli", "ai_patch_requested", {
+            "severity": req.finding.get("severity"),
+            "category": req.finding.get("category"),
+            "auto_fixable": req.finding.get("auto_fixable"),
+        })
 
     return PatchResponse(
         file_path=result["file_path"],

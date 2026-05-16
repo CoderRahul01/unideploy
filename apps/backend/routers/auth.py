@@ -8,11 +8,13 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from uuid import uuid4
 import random
-from datetime import datetime, timedelta
+from datetime import datetime
 import os
 
 from core.database import db_insert, db_update
+from core.redis_client import redis
 from routers.sessions import _sessions
+from core.posthog import posthog_client
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -35,23 +37,29 @@ async def create_auth_session():
     """
     code = _generate_numeric_code()
     session_id = str(uuid4())
-    expiry = datetime.utcnow() + timedelta(minutes=10)
 
-    _sessions[code] = {
+    data = {
         "session_id": session_id,
         "session_code": code,
         "status": "pending",
+        "created_at": datetime.utcnow().isoformat(),
+        # legacy compat fields
+        "machine_name": None,
+        "project_path": "",
+        "cli_version": "latest",
+    }
+
+    # Store in Redis with 10 min TTL
+    await redis.json_set(f"auth:{code}", data, ex=600)
+
+    # Maintain local dict for WebSocket handles (they can't be serialised)
+    _sessions[code] = {
+        **data,
         "cli_ws": None,
         "browser_ws": None,
         "message_queue": [],
         "findings": [],
         "report": None,
-        "created_at": datetime.utcnow(),
-        "expires_at": expiry,
-        # legacy compat fields
-        "machine_name": None,
-        "project_path": "",
-        "cli_version": "latest",
     }
 
     try:
@@ -81,31 +89,42 @@ async def verify_session(req: VerifyRequest):
     """
     code = req.session_code.strip().replace("-", "")
 
-    session = _sessions.get(code)
+    # Get from Redis — if None, it's expired or doesn't exist
+    session = await redis.json_get(f"auth:{code}")
     if not session:
-        raise HTTPException(status_code=404, detail="Session code not found")
-
-    if datetime.utcnow() > session["expires_at"]:
-        raise HTTPException(status_code=410, detail="Session code expired")
+        raise HTTPException(status_code=404, detail="Session code not found or expired")
 
     session["status"] = "authenticated"
-    session["authenticated_at"] = datetime.utcnow()
+    session["authenticated_at"] = datetime.utcnow().isoformat()
 
-    auth_msg = {"type": "session_authenticated", "session_id": session["session_id"]}
+    # One-time use code
+    await redis.delete(f"auth:{code}")
 
-    cli_ws = session.get("cli_ws")
-    if cli_ws:
-        try:
-            await cli_ws.send_json(auth_msg)
-        except Exception:
-            pass
-    else:
-        session["message_queue"].append(auth_msg)
+    # WebSocket routing stays in-process
+    local_session = _sessions.get(code)
+    if local_session:
+        local_session["status"] = "authenticated"
+        local_session["authenticated_at"] = session["authenticated_at"]
+        
+        auth_msg = {"type": "session_authenticated", "session_id": session["session_id"]}
+        cli_ws = local_session.get("cli_ws")
+        if cli_ws:
+            try:
+                await cli_ws.send_json(auth_msg)
+            except Exception:
+                pass
+        else:
+            local_session.setdefault("message_queue", []).append(auth_msg)
 
     try:
         await db_update("scans", session["session_id"], {"status": "authenticated"})
     except Exception:
         pass
+
+    if posthog_client:
+        posthog_client.capture(session["session_id"], "auth_session_verified", {
+            "cli_ws_present": bool(local_session.get("cli_ws") if local_session else False),
+        })
 
     return {
         "session_id": session["session_id"],

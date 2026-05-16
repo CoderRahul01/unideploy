@@ -16,7 +16,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import sentry_sdk
-from posthog import Posthog
 
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
@@ -30,12 +29,7 @@ if os.getenv("SENTRY_DSN"):
         default_integrations=False
     )
 
-posthog_client = None
-if os.getenv("POSTHOG_API_KEY"):
-    posthog_client = Posthog(
-        os.getenv("POSTHOG_API_KEY"),
-        host=os.getenv("POSTHOG_HOST", "https://app.posthog.com")
-    )
+from core.posthog import posthog_client
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("unideploy")
@@ -105,17 +99,17 @@ app.add_middleware(
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 
-from routers import sessions, websockets, scans, webhooks, auth, scan_results, ai, deploy
+from routers import sessions, websockets, scans, auth, scan_results, ai, deploy, metrics
 
 app.include_router(auth.router)
 app.include_router(sessions.router)
 app.include_router(websockets.router)
 app.include_router(scans.router)
 app.include_router(scan_results.router)
-app.include_router(webhooks.router)
+# webhooks router deleted
 app.include_router(ai.router)
 app.include_router(deploy.router)
-# from routers import metrics  # uncomment when metrics endpoint is ready
+app.include_router(metrics.router)
 
 # ── Health ────────────────────────────────────────────────────────────────────
 

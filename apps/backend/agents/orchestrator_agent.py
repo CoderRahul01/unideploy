@@ -12,6 +12,7 @@ from agents.a2a_bus import A2ABus, A2AMessage, get_bus
 from agents.deploy_agent import DeployAgent
 from agents.fix_agent import generate_patch_for_cli
 from agents.analyzer import run_analysis, compute_grade
+from agents.plan_agent import generate_remediation_plan
 
 logger = logging.getLogger("unideploy.orchestrator")
 
@@ -52,6 +53,7 @@ class OrchestratorAgent:
         Progress is sent to CLI + browser via their session WebSockets.
         """
         from routers.sessions import _sessions
+        from core.redis_client import redis
 
         session = None
         for code, s in _sessions.items():
@@ -73,6 +75,7 @@ class OrchestratorAgent:
                         pass
 
         # ── Phase 1: Scan ─────────────────────────────────────────────────────
+        findings = []
         if not options.get("skip_scan"):
             await emit({"type": "pipeline_progress", "phase": "scan", "message": "Starting security scan..."})
             manifest = session.get("project_manifest", {})
@@ -96,7 +99,39 @@ class OrchestratorAgent:
                 await emit({"type": "error", "message": f"Scan phase failed: {e}"})
                 return
 
-        # ── Phase 2: Deploy config generation ─────────────────────────────────
+        # ── Phase 2: Plan ─────────────────────────────────────────────────────
+        plans = []
+        try:
+            await emit({"type": "pipeline_progress", "phase": "plan", "message": "Generating remediation plans..."})
+            plans = await generate_remediation_plan(findings)
+            
+            # Check if agent needs clarification
+            for p in plans:
+                if p.get("effort") == "unknown" or "MISSING_CONTEXT" in str(p):
+                    # Request user input
+                    await emit({
+                        "type": "agent_question",
+                        "question": f"I need more context to fix: {p.get('summary')}. Could you explain how this component is used?",
+                        "finding_id": p.get("finding_id")
+                    })
+                    
+                    # Wait for agent_answer (5 min timeout)
+                    answer = None
+                    for _ in range(300): # 300 * 1s = 5 min
+                        answer_data = await redis.json_get(f"agent_answer:{session_id}")
+                        if answer_data and answer_data.get("finding_id") == p.get("finding_id"):
+                            answer = answer_data.get("answer")
+                            await redis.delete(f"agent_answer:{session_id}")
+                            break
+                        await asyncio.sleep(1)
+                    
+                    if answer:
+                        p["summary"] += f" (User context: {answer})"
+
+        except Exception as e:
+            await emit({"type": "error", "message": f"Plan phase failed: {e}"})
+
+        # ── Phase 3: Deploy config generation ─────────────────────────────────
         if not options.get("skip_deploy"):
             manifest = session.get("project_manifest", {})
             answers = options.get("deploy_answers", {})
@@ -110,6 +145,8 @@ class OrchestratorAgent:
                 })
             except Exception as e:
                 await emit({"type": "error", "message": f"Deploy phase failed: {e}"})
+
+        await emit({"type": "pipeline_complete", "message": "All agents finished."})
 
     async def _handle_deploy(self, session_id: str, payload: dict) -> dict:
         """Generate deployment configs for a session (called from deploy endpoint)."""

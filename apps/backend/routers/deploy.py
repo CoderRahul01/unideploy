@@ -6,13 +6,16 @@ Used by `unideploy deploy` and `unideploy run`.
 import json
 import asyncio
 import logging
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
+from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from agents.deploy_agent import DeployAgent, StackInfo
+from core.posthog import posthog_client
+from core.redis_client import redis
 
 logger = logging.getLogger("unideploy.deploy")
 
@@ -24,10 +27,40 @@ class PlanRequest(BaseModel):
     manifest: dict
 
 
+class ChatRequest(BaseModel):
+    session_id: Optional[str] = None
+    manifest: Optional[dict] = None
+    message: Optional[str] = None
+    history: Optional[list[dict]] = None
+
+
 class GenerateRequest(BaseModel):
     manifest: dict
     stack: dict          # StackInfo serialised
     answers: dict = {}
+
+
+@router.post("/chat")
+async def deploy_chat(req: ChatRequest):
+    """
+    Agentic deployment conversation loop.
+    Maintains history in Redis (deploy_chat:{session_id}).
+    """
+    session_id = req.session_id or str(uuid4())
+    
+    # Load history from Redis if not provided in request
+    history = req.history
+    if history is None:
+        history = await redis.json_get(f"deploy_chat:{session_id}") or []
+
+    # Call agent
+    res = await _agent.chat(session_id, req.manifest, history)
+    
+    # Save history to Redis (30 min TTL)
+    await redis.json_set(f"deploy_chat:{session_id}", history, ex=1800)
+
+    res["session_id"] = session_id
+    return res
 
 
 class StackResponse(BaseModel):
@@ -59,6 +92,16 @@ async def plan(req: PlanRequest):
     try:
         stack = _agent.detect_stack(req.manifest)
         questions = _agent.get_clarifying_questions(stack)
+
+        if posthog_client:
+            posthog_client.capture("cli", "deploy_plan_requested", {
+                "frontend": stack.frontend,
+                "backend": stack.backend,
+                "db": stack.db,
+                "runtime": stack.runtime,
+                "questions_count": len(questions),
+            })
+
         return PlanResponse(
             stack=StackResponse(
                 frontend=stack.frontend,
@@ -138,6 +181,14 @@ async def generate(req: GenerateRequest):
     Generate deployment config files and stream them as SSE.
     CLI writes each received config_file event to disk.
     """
+    if posthog_client:
+        posthog_client.capture("cli", "deploy_generate_started", {
+            "frontend": req.stack.get("frontend"),
+            "backend": req.stack.get("backend"),
+            "db": req.stack.get("db"),
+            "answers_provided": len(req.answers),
+        })
+
     return StreamingResponse(
         _stream_configs(req.manifest, req.stack, req.answers),
         media_type="text/event-stream",

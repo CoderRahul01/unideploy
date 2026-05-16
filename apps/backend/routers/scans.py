@@ -14,6 +14,8 @@ from datetime import datetime
 import os
 
 from core.database import db_insert
+from core.redis_client import redis
+from core.posthog import posthog_client
 
 router = APIRouter(prefix="/api/v1/scan", tags=["scans"])
 
@@ -45,13 +47,8 @@ class ScanStatusResponse(BaseModel):
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _get_store():
-    from workers.scan_worker import _scans
-    return _scans
-
-
-def _get_scan_or_404(scan_id: str) -> dict:
-    scan = _get_store().get(scan_id)
+async def _get_scan_or_404(scan_id: str) -> dict:
+    scan = await redis.json_get(f"scan:{scan_id}")
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
     return scan
@@ -97,13 +94,18 @@ async def start_scan(
 
     await enqueue_scan(scan_id, scan_record)
 
+    if posthog_client:
+        posthog_client.capture(scan_id, "scan_queued", {
+            "branch": req.branch,
+        })
+
     return {"scan_id": scan_id, "status": "queued", "created_at": now}
 
 
 @router.get("/{scan_id}", response_model=ScanStatusResponse)
 async def get_scan_status(scan_id: str):
     """Poll scan status and findings."""
-    scan = _get_scan_or_404(scan_id)
+    scan = await _get_scan_or_404(scan_id)
     return ScanStatusResponse(
         scan_id=scan_id,
         status=scan["status"],
@@ -122,7 +124,7 @@ async def get_scan_status(scan_id: str):
 @router.get("/{scan_id}/plan")
 async def get_remediation_plan(scan_id: str):
     """Get the PlanAgent's remediation plan for a completed scan."""
-    scan = _get_scan_or_404(scan_id)
+    scan = await _get_scan_or_404(scan_id)
     if scan["status"] not in ("done", "planning"):
         raise HTTPException(
             status_code=409,
@@ -149,7 +151,7 @@ async def trigger_fix(
     3. Raises GitHub PR via Composio
     Returns PR URL.
     """
-    scan = _get_scan_or_404(scan_id)
+    scan = await _get_scan_or_404(scan_id)
 
     if scan["status"] != "done":
         raise HTTPException(
@@ -177,6 +179,13 @@ async def trigger_fix(
 
     # Mark scan as fixing
     scan["status"] = "fixing"
+    await redis.json_set(f"scan:{scan_id}", scan, ex=3600)
+
+    if posthog_client:
+        posthog_client.capture(scan_id, "scan_fix_triggered", {
+            "findings_selected": len(target_findings),
+            "specific_ids_requested": bool(req.finding_ids),
+        })
 
     try:
         # Step 1: Get file contents for affected files via a fresh sandbox clone
@@ -216,7 +225,9 @@ async def trigger_fix(
         patches = await generate_patches(target_findings, plans, file_contents)
 
         if not patches:
+            scan = await redis.json_get(f"scan:{scan_id}") or scan
             scan["status"] = "done"
+            await redis.json_set(f"scan:{scan_id}", scan, ex=3600)
             raise HTTPException(status_code=422, detail="Could not generate any patches — try manual fixes")
 
         # Step 3: Apply patches in E2B sandbox and push fix branch
@@ -228,7 +239,9 @@ async def trigger_fix(
         )
 
         if not fix_result.get("success"):
+            scan = await redis.json_get(f"scan:{scan_id}") or scan
             scan["status"] = "done"
+            await redis.json_set(f"scan:{scan_id}", scan, ex=3600)
             raise HTTPException(status_code=500, detail=fix_result.get("error", "Fix failed"))
 
         # Step 4: Raise GitHub PR via Composio
@@ -240,8 +253,17 @@ async def trigger_fix(
             scan_id=scan_id,
         )
 
+        scan = await redis.json_get(f"scan:{scan_id}") or scan
         scan["status"] = "done"
         scan["pr_url"] = pr_result.get("pr_url")
+        await redis.json_set(f"scan:{scan_id}", scan, ex=3600)
+
+        if posthog_client:
+            posthog_client.capture(scan_id, "scan_fix_completed", {
+                "patches_applied": len(patches),
+                "files_changed": len(fix_result.get("files_changed", [])),
+                "pr_raised": bool(pr_result.get("pr_url")),
+            })
 
         return {
             "scan_id": scan_id,
@@ -255,5 +277,7 @@ async def trigger_fix(
     except HTTPException:
         raise
     except Exception as e:
+        scan = await redis.json_get(f"scan:{scan_id}") or scan
         scan["status"] = "done"
+        await redis.json_set(f"scan:{scan_id}", scan, ex=3600)
         raise HTTPException(status_code=500, detail=f"Fix pipeline error: {str(e)}")
