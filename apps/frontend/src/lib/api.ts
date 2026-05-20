@@ -3,7 +3,7 @@
  * Covers both the CLI session flow and the GitHub URL scan pipeline.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787";
 
 // ── Shared types ─────────────────────────────────────────────────────────────
 

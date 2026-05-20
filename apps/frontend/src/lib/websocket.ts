@@ -1,3 +1,9 @@
+/**
+ * UniDeploy messaging client — HTTP polling replacement for WebSocket.
+ * Polls the Cloudflare Worker's /poll/browser/:sessionId endpoint
+ * for messages from the CLI, and sends messages via /send/browser/:sessionId.
+ */
+
 export interface WSReportFinding {
   id: string
   file_path: string
@@ -47,12 +53,20 @@ export interface ScanSummary {
   low: number
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8787'
+
+/**
+ * UniDeploySocket — HTTP polling client that mimics the WebSocket API.
+ * Polls every 1.5s for new messages from the CLI via the worker.
+ */
 export class UniDeploySocket {
-  private ws: WebSocket | null = null
+  private pollInterval: ReturnType<typeof setInterval> | null = null
   private sessionId: string
   private onMessage: (msg: WSMessage) => void
   private onOpen?: () => void
   private onClose?: () => void
+  private lastId = 0
+  private connected = false
 
   constructor(
     sessionId: string,
@@ -67,27 +81,50 @@ export class UniDeploySocket {
   }
 
   connect() {
-    const base = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:8000'
-    this.ws = new WebSocket(`${base}/ws/browser/${this.sessionId}`)
+    this.connected = true
+    this.onOpen?.()
 
-    this.ws.onopen = () => this.onOpen?.()
-    this.ws.onclose = () => this.onClose?.()
-    this.ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data) as WSMessage
-        this.onMessage(msg)
-      } catch {
-        console.error('Failed to parse WS message', event.data)
+    // Start polling for messages from CLI
+    this.pollInterval = setInterval(() => this.poll(), 1500)
+    // Immediate first poll
+    this.poll()
+  }
+
+  private async poll() {
+    if (!this.connected) return
+
+    try {
+      const url = `${API_BASE}/poll/browser/${this.sessionId}${this.lastId ? `?since=${this.lastId}` : ''}`
+      const res = await fetch(url)
+      if (!res.ok) return
+
+      const data = await res.json() as { messages: WSMessage[]; last_id: number }
+      if (data.last_id) {
+        this.lastId = data.last_id
       }
+
+      for (const msg of data.messages) {
+        this.onMessage(msg)
+      }
+    } catch {
+      // Non-fatal — just retry on next interval
     }
   }
 
   sendApplyFix(findingIds: string[]) {
-    this.ws?.send(JSON.stringify({ type: 'apply_fix', finding_ids: findingIds }))
+    fetch(`${API_BASE}/send/browser/${this.sessionId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'apply_fix', finding_ids: findingIds }),
+    }).catch(err => console.error('Failed to send apply_fix:', err))
   }
 
   disconnect() {
-    this.ws?.close()
-    this.ws = null
+    this.connected = false
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval)
+      this.pollInterval = null
+    }
+    this.onClose?.()
   }
 }

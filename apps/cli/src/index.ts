@@ -3,14 +3,14 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import Table from "cli-table3";
-import WebSocket from "ws";
+// WebSocket replaced with HTTP polling — no ws import needed
 import os from "os";
 import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 
-const API_URL = process.env.UNIDEPLOY_API_URL || "https://unideploy-api-4b25n74mbq-uc.a.run.app";
-const LOCAL_URL = "http://localhost:8000";
+const API_URL = process.env.UNIDEPLOY_API_URL || "https://unideploy-api.rahulpandey187.workers.dev";
+const LOCAL_URL = "http://localhost:8787";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -731,7 +731,7 @@ program
 program
   .command("init")
   .description("Scan local project and pair with UniDeploy dashboard")
-  .option("--local", "Hit local backend (localhost:8000)")
+  .option("--local", "Hit local backend (localhost:8787)")
   .option("--json", "Output results as JSON (skips interactive mode)")
   .option("--ci", "CI mode: exit 1 if CRITICAL findings")
   .action(async (opts: { local: boolean; json: boolean; ci: boolean }) => {
@@ -806,175 +806,178 @@ program
     console.log(chalk.gray(`  Open https://unideploy.in/connect and enter this code.`));
     console.log("");
 
-    // ── Step 3: Connect WebSocket and wait for session_authenticated ───────
-
-    const wsUrl = session.websocket_url.replace(/^https?:\/\//, (m) =>
-      m.startsWith("https") ? "wss://" : "ws://"
-    );
+    // ── Step 3: Poll for session_authenticated ─────────────────────────────
 
     let sessionFindings: Finding[] = [];
+    let authenticated = false;
 
-    await new Promise<void>((resolve, reject) => {
-      const ws = new WebSocket(wsUrl);
-      let authenticated = false;
+    // Poll the backend for the authentication message from the browser
+    console.log(chalk.gray("  Waiting for browser authentication..."));
 
-      ws.on("open", () => {
-        // Connection established — just wait
-      });
+    const pollForAuth = async (): Promise<void> => {
+      const startTime = Date.now();
+      const timeout = 600_000; // 10 minutes (matches session code expiry)
 
-      ws.on("message", async (raw: Buffer | string) => {
-        let msg: { type: string; [k: string]: unknown };
-        try { msg = JSON.parse(raw.toString()); }
-        catch { return; }
-
-        if (msg.type === "session_authenticated") {
-          authenticated = true;
-
-          // ── Step 4: Run local scan ────────────────────────────────────────
-
-          console.log(chalk.green("  ✓ Authenticated — scanning..."));
-          console.log("");
-
-          const onFinding = (f: Finding) => {
-            const col = severityColor(f.severity);
-            const loc = f.file_path + (f.line_number ? `:${f.line_number}` : "");
-            console.log(`  ${col} ${chalk.white(f.title.padEnd(36).slice(0, 36))} ${chalk.gray(loc)}`);
-          };
-
-          // Run heuristics and stream progress via WebSocket
-          const allFindings = runHeuristics(files, cwd, onFinding);
-          sessionFindings = allFindings;
-          scannedCount = files.length;
-
-          ws.send(JSON.stringify({
-            type: "scan_progress",
-            files_scanned: scannedCount,
-            total_files: files.length,
-          }));
-
-          const grade = computeGrade(allFindings);
-          const riskScore = computeRiskScore(allFindings);
-          const autoFixable = allFindings.filter(f => f.auto_fixable).length;
-
-          console.log("");
-          console.log(
-            `  Grade: ${gradeColor(grade)}  |  Risk Score: ${riskScore}/100  |  ${allFindings.length} issues  |  ${autoFixable} auto-fixable`
-          );
-          console.log("");
-          console.log(chalk.green("  ✓ Dashboard ready → https://unideploy.in/dashboard"));
-          console.log("");
-
-          // ── Step 5: POST findings to backend ───────────────────────────────
-
-          const payload = {
-            session_id: session.session_id,
-            project_name: projectName,
-            framework,
-            scanned_at: new Date().toISOString(),
-            files_scanned: scannedCount,
-            total_issues: allFindings.length,
-            auto_fixable: autoFixable,
-            grade,
-            risk_score: riskScore,
-            findings: allFindings,
-          };
-
-          try {
-            await apiFetch(`${baseUrl}/scans/${session.session_id}/results`, {
-              method: "POST",
-              body: JSON.stringify(payload),
-            });
-          } catch (err) {
-            console.error(chalk.yellow(`  Warning: could not send results to backend: ${err}`));
+      while (Date.now() - startTime < timeout) {
+        try {
+          const res = await fetch(`${baseUrl}/poll/cli/${session.session_id}`);
+          if (res.ok) {
+            const data = await res.json() as { messages: Array<{ type: string; [k: string]: unknown }> };
+            for (const msg of data.messages) {
+              if (msg.type === "session_authenticated") {
+                authenticated = true;
+                return;
+              }
+            }
           }
+        } catch { /* retry */ }
+        await new Promise(r => setTimeout(r, 1500));
+      }
+      throw new Error("Session timed out — code expired after 10 minutes");
+    };
 
-          // ── Step 6: Save state for `unideploy fix` ─────────────────────────
-          try {
-            const stateDir = path.join(os.homedir(), ".unideploy");
-            if (!fs.existsSync(stateDir)) fs.mkdirSync(stateDir, { recursive: true });
-            fs.writeFileSync(path.join(stateDir, "last-scan.json"), JSON.stringify({
-              session_id: session.session_id,
-              project_root: cwd,
-              grade,
-              scanned_at: new Date().toISOString(),
-              findings: allFindings,
-            }, null, 2));
-          } catch { /* best-effort */ }
-
-          if (autoFixable > 0) {
-            console.log(chalk.gray(`  Run 'npx unideploy fix' to apply ${autoFixable} auto-fixes locally,`));
-            console.log(chalk.gray(`  or click 'Fix with AI' on the dashboard for AI-powered patches.`));
-          }
-          console.log(chalk.gray(`  Session active — waiting for AI fix commands from dashboard...`));
-          console.log(chalk.gray(`  Press Ctrl+C to exit when done.\n`));
-
-          // Stay connected — resolve but do NOT close WebSocket
-          resolve();
-
-        } else if (msg.type === "apply_fix") {
-          // Dashboard triggered "Fix with AI" — apply AI patches locally
-          const fixMsg = msg as unknown as ApplyFixMessage;
-          const result = await applyAIPatches(fixMsg, cwd, baseUrl);
-
-          // Re-scan changed files
-          const changedPaths = fixMsg.findings
-            .filter(f => result.fixed_ids.includes(f.id))
-            .map(f => f.file_path);
-
-          const updatedFindings = await rescanAfterFix(
-            changedPaths, cwd, sessionFindings, runHeuristics
-          );
-          sessionFindings = updatedFindings as Finding[];
-
-          // Report fix-complete to backend
-          try {
-            await apiFetch(`${baseUrl}/scans/${session.session_id}/fix-complete`, {
-              method: "POST",
-              body: JSON.stringify({
-                session_id: session.session_id,
-                fixed_ids: result.fixed_ids,
-                diff_summaries: result.diff_summaries,
-                updated_findings: updatedFindings,
-              }),
-            });
-          } catch (err) {
-            console.error(chalk.yellow(`  Warning: could not report fix status to backend: ${err}`));
-          }
-
-          // Send fix_applied over WS for immediate browser feedback
-          ws.send(JSON.stringify({
-            type: "fix_applied",
-            fixed_ids: result.fixed_ids,
-            failed_ids: result.failed_ids,
-            diff_summaries: result.diff_summaries,
-          }));
-        }
-      });
-
-      ws.on("error", (err) => {
-        if (!authenticated) reject(err);
-      });
-
-      ws.on("close", () => {
-        if (!authenticated) {
-          reject(new Error("WebSocket closed before authentication"));
-        }
-      });
-
-      // Timeout after 30 minutes of inactivity (3× the session code expiry)
-      setTimeout(() => {
-        if (!authenticated) {
-          ws.close();
-          reject(new Error("Session timed out — code expired after 10 minutes"));
-        } else {
-          console.log(chalk.gray("\n  Session timed out after 30 minutes."));
-          ws.close();
-        }
-      }, 1_800_000);
-    }).catch(err => {
+    try {
+      await pollForAuth();
+    } catch (err: any) {
       console.error(chalk.red(`\n  ✗ ${err.message}`));
       process.exit(1);
-    });
+    }
+
+    // ── Step 4: Run local scan ────────────────────────────────────────────
+
+    console.log(chalk.green("  ✓ Authenticated — scanning..."));
+    console.log("");
+
+    const onFinding = (f: Finding) => {
+      const col = severityColor(f.severity);
+      const loc = f.file_path + (f.line_number ? `:${f.line_number}` : "");
+      console.log(`  ${col} ${chalk.white(f.title.padEnd(36).slice(0, 36))} ${chalk.gray(loc)}`);
+    };
+
+    const allFindings = runHeuristics(files, cwd, onFinding);
+    sessionFindings = allFindings;
+    scannedCount = files.length;
+
+    // Send scan progress to browser via HTTP
+    try {
+      await fetch(`${baseUrl}/send/cli/${session.session_id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "scan_progress",
+          files_scanned: scannedCount,
+          total_files: files.length,
+        }),
+      });
+    } catch { /* best-effort */ }
+
+    const grade = computeGrade(allFindings);
+    const riskScore = computeRiskScore(allFindings);
+    const autoFixable = allFindings.filter(f => f.auto_fixable).length;
+
+    console.log("");
+    console.log(
+      `  Grade: ${gradeColor(grade)}  |  Risk Score: ${riskScore}/100  |  ${allFindings.length} issues  |  ${autoFixable} auto-fixable`
+    );
+    console.log("");
+    console.log(chalk.green("  ✓ Dashboard ready → https://unideploy.in/dashboard"));
+    console.log("");
+
+    // ── Step 5: POST findings to backend ───────────────────────────────
+
+    const payload = {
+      session_id: session.session_id,
+      project_name: projectName,
+      framework,
+      scanned_at: new Date().toISOString(),
+      files_scanned: scannedCount,
+      total_issues: allFindings.length,
+      auto_fixable: autoFixable,
+      grade,
+      risk_score: riskScore,
+      findings: allFindings,
+    };
+
+    try {
+      await apiFetch(`${baseUrl}/scans/${session.session_id}/results`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      console.error(chalk.yellow(`  Warning: could not send results to backend: ${err}`));
+    }
+
+    // ── Step 6: Save state for `unideploy fix` ─────────────────────────
+    try {
+      const stateDir = path.join(os.homedir(), ".unideploy");
+      if (!fs.existsSync(stateDir)) fs.mkdirSync(stateDir, { recursive: true });
+      fs.writeFileSync(path.join(stateDir, "last-scan.json"), JSON.stringify({
+        session_id: session.session_id,
+        project_root: cwd,
+        grade,
+        scanned_at: new Date().toISOString(),
+        findings: allFindings,
+      }, null, 2));
+    } catch { /* best-effort */ }
+
+    if (autoFixable > 0) {
+      console.log(chalk.gray(`  Run 'npx unideploy fix' to apply ${autoFixable} auto-fixes locally,`));
+      console.log(chalk.gray(`  or click 'Fix with AI' on the dashboard for AI-powered patches.`));
+    }
+    console.log(chalk.gray(`  Session active — waiting for AI fix commands from dashboard...`));
+    console.log(chalk.gray(`  Press Ctrl+C to exit when done.\n`));
+
+    // ── Step 7: Stay alive — poll for fix commands from dashboard ──────────
+
+    const pollForFixes = async (): Promise<void> => {
+      const fixTimeout = 1_800_000; // 30 minutes
+      const startTime = Date.now();
+
+      while (Date.now() - startTime < fixTimeout) {
+        try {
+          const res = await fetch(`${baseUrl}/poll/cli/${session.session_id}`);
+          if (res.ok) {
+            const data = await res.json() as { messages: Array<{ type: string; [k: string]: unknown }> };
+            for (const msg of data.messages) {
+              if (msg.type === "apply_fix") {
+                const fixMsg = msg as unknown as ApplyFixMessage;
+                const result = await applyAIPatches(fixMsg, cwd, baseUrl);
+
+                // Re-scan changed files
+                const changedPaths = fixMsg.findings
+                  .filter(f => result.fixed_ids.includes(f.id))
+                  .map(f => f.file_path);
+
+                const updatedFindings = await rescanAfterFix(
+                  changedPaths, cwd, sessionFindings, runHeuristics
+                );
+                sessionFindings = updatedFindings as Finding[];
+
+                // Report fix-complete to backend
+                try {
+                  await apiFetch(`${baseUrl}/scans/${session.session_id}/fix-complete`, {
+                    method: "POST",
+                    body: JSON.stringify({
+                      session_id: session.session_id,
+                      fixed_ids: result.fixed_ids,
+                      diff_summaries: result.diff_summaries,
+                      updated_findings: updatedFindings,
+                    }),
+                  });
+                } catch (err) {
+                  console.error(chalk.yellow(`  Warning: could not report fix status to backend: ${err}`));
+                }
+              }
+            }
+          }
+        } catch { /* retry */ }
+        await new Promise(r => setTimeout(r, 2000));
+      }
+
+      console.log(chalk.gray("\n  Session timed out after 30 minutes."));
+    };
+
+    await pollForFixes();
 
     process.exit(0);
   });
@@ -1125,7 +1128,7 @@ program
 program
   .command("deploy")
   .description("Generate production deployment configs for your stack")
-  .option("--local", "Hit local backend (localhost:8000)")
+  .option("--local", "Hit local backend (localhost:8787)")
   .option("--dry-run", "Print configs without writing files")
   .option("--platform <platform>", "Force a target platform (vercel|gcp|aws|cloudflare|railway)")
   .action(async (opts: { local: boolean; dryRun: boolean; platform?: string }) => {
@@ -1152,7 +1155,7 @@ program
 program
   .command("run")
   .description("Scan, fix, and generate deployment configs in one command")
-  .option("--local", "Hit local backend (localhost:8000)")
+  .option("--local", "Hit local backend (localhost:8787)")
   .option("--ci", "CI mode: exit 1 on CRITICAL findings (skips interactive prompts)")
   .option("--skip-fix", "Skip the auto-fix step")
   .option("--skip-deploy", "Skip the deployment config generation step")

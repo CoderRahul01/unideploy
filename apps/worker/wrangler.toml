@@ -1,0 +1,20 @@
+name = "unideploy-api"
+main = "src/index.ts"
+compatibility_date = "2026-05-20"
+
+[vars]
+AI_BASE_URL = "https://api.groq.com/openai/v1"
+AI_MODEL = "llama-3.3-70b-versatile"
+# AI_API_KEY is configured via wrangler secret put
+
+[[d1_databases]]
+binding = "DB"
+database_name = "unideploy-db"
+database_id = "dce30b62-b72f-4a35-b047-37b6c2974368"
+
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "e4e4b8e60c0d4a24bc95813244f82737"
+
+
+

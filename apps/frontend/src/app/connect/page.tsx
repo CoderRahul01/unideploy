@@ -36,38 +36,37 @@ export default function ConnectPage() {
   // Scan progress from WebSocket
   const [filesScanned, setFilesScanned] = useState(0);
   const [totalFiles, setTotalFiles] = useState(0);
-  const wsRef = useRef<WebSocket | null>(null);
+  const pollRef2 = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Connect to browser WebSocket for real-time progress
+  // Poll for real-time progress from CLI via HTTP (replaces WebSocket)
   useEffect(() => {
     if (!sessionId) return;
 
-    const wsBase = (process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000")
-      .replace(/^http:/, "ws:").replace(/^https:/, "wss:");
-    const ws = new WebSocket(`${wsBase}/ws/browser/${sessionId}`);
-    wsRef.current = ws;
+    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
 
-    ws.onmessage = (event) => {
+    pollRef2.current = setInterval(async () => {
       try {
-        const msg = JSON.parse(event.data);
-        if (msg.type === "scan_progress") {
-          setFilesScanned(msg.files_scanned ?? 0);
-          setTotalFiles(msg.total_files ?? 0);
-        } else if (msg.type === "scan_complete") {
-          setPageState("complete");
-          ws.close();
-          setTimeout(() => {
-            router.push(`/dashboard?session_id=${sessionId}`);
-          }, 800);
-        }
-      } catch { /* ignore parse errors */ }
-    };
+        const res = await fetch(`${apiBase}/poll/browser/${sessionId}`);
+        if (!res.ok) return;
+        const data = await res.json() as { messages: Array<{ type: string; [k: string]: unknown }>; last_id: number };
 
-    ws.onerror = () => { /* non-fatal — CLI will still POST results */ };
+        for (const msg of data.messages) {
+          if (msg.type === "scan_progress") {
+            setFilesScanned((msg.files_scanned as number) ?? 0);
+            setTotalFiles((msg.total_files as number) ?? 0);
+          } else if (msg.type === "scan_complete") {
+            setPageState("complete");
+            if (pollRef2.current) clearInterval(pollRef2.current);
+            setTimeout(() => {
+              router.push(`/dashboard?session_id=${sessionId}`);
+            }, 800);
+          }
+        }
+      } catch { /* non-fatal — retry next interval */ }
+    }, 1500);
 
     return () => {
-      ws.close();
-      wsRef.current = null;
+      if (pollRef2.current) clearInterval(pollRef2.current);
     };
   }, [sessionId, router]);
 
