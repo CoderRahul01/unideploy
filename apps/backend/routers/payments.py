@@ -56,7 +56,7 @@ async def create_checkout(req: CheckoutRequest, authorization: str = Header(None
     if not dodo_api_key:
         raise HTTPException(status_code=500, detail="DODO payments not configured")
 
-    base_url = os.getenv("BASE_URL", "https://unideploy.vercel.app")
+    frontend_url = os.getenv("FRONTEND_URL", "https://www.unideploy.in")
 
     payload = {
         "billing": {
@@ -78,7 +78,8 @@ async def create_checkout(req: CheckoutRequest, authorization: str = Header(None
                 "quantity": 1
             }
         ],
-        "return_url": f"{base_url}/dashboard?payment=success",
+        "return_url": f"{frontend_url}/dashboard?payment=success",
+        "cancel_url": f"{frontend_url}/dashboard?payment=cancelled",
         "metadata": {
             "user_id": user_id,
             "tier": req.tier,

@@ -747,7 +747,8 @@ function DashboardContent() {
   const sessionId = params.get("session_id");
   const scanId = params.get("scan_id");
   const paymentSuccess = params.get("payment") === "success";
-  
+  const paymentCancelled = params.get("payment") === "cancelled";
+
   const [user, setUser] = useState<AuthResponse | null>(null);
 
   useEffect(() => {
@@ -776,14 +777,14 @@ function DashboardContent() {
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text }}>
-      {/* Top Bar for User Info */}
+      {/* Top Bar */}
       {user && (
         <div style={{ background: C.surface, padding: "10px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, fontFamily: C.mono }}>
           <div>
             <span style={{ color: C.muted }}>User: </span>
             <span style={{ color: C.text }}>{user.email}</span>
           </div>
-          <div style={{ display: "flex", gap: 16 }}>
+          <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
             <div>
               <span style={{ color: C.muted }}>Tier: </span>
               <span style={{ color: C.green, fontWeight: 700, padding: "2px 8px", background: `${C.green}11`, borderRadius: 4, border: `1px solid ${C.green}33` }}>{user.plan_tier}</span>
@@ -792,13 +793,48 @@ function DashboardContent() {
               <span style={{ color: C.muted }}>Scans Left: </span>
               <span style={{ color: C.text, fontWeight: 700 }}>{user.scans_remaining}</span>
             </div>
+            {user.plan_tier === "Free" && (
+              <a
+                href="/pricing"
+                style={{
+                  background: "#1D9E75", color: "#fff", padding: "5px 14px",
+                  borderRadius: 6, fontSize: 12, fontWeight: 700,
+                  textDecoration: "none", fontFamily: C.font, letterSpacing: "0.02em",
+                }}
+              >
+                Upgrade Plan ↑
+              </a>
+            )}
           </div>
+        </div>
+      )}
+
+      {/* Upgrade nudge for Free tier (below top bar) */}
+      {user && user.plan_tier === "Free" && !paymentSuccess && !paymentCancelled && (
+        <div style={{
+          background: "rgba(29,158,117,0.06)", borderBottom: `1px solid rgba(29,158,117,0.15)`,
+          padding: "10px 24px", display: "flex", justifyContent: "space-between", alignItems: "center",
+          flexWrap: "wrap", gap: 8,
+        }}>
+          <span style={{ fontSize: 13, color: "#4a7a5a" }}>
+            Free plan · auto-fixes, unlimited projects and priority scans are on paid plans
+          </span>
+          <a href="/pricing" style={{ fontSize: 12, color: "#1D9E75", textDecoration: "none", fontWeight: 600, fontFamily: C.mono }}>
+            View plans →
+          </a>
         </div>
       )}
 
       {paymentSuccess && (
         <div style={{ background: `${C.green}1A`, color: C.green, textAlign: "center", padding: "12px", fontSize: 14, fontWeight: 600, borderBottom: `1px solid ${C.green}33` }}>
-          Payment successful! Your tier and AI limits have been updated.
+          ✓ Payment successful — your plan has been upgraded. Scans remaining updated.
+        </div>
+      )}
+
+      {paymentCancelled && (
+        <div style={{ background: `${C.red}1A`, color: C.red, textAlign: "center", padding: "12px", fontSize: 14, fontWeight: 600, borderBottom: `1px solid ${C.red}33`, display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
+          <span>Payment was not completed. You remain on the Free plan.</span>
+          <a href="/pricing" style={{ color: C.red, fontSize: 13, textDecoration: "underline" }}>Try again →</a>
         </div>
       )}
 
