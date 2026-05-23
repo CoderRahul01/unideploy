@@ -32,6 +32,20 @@ services:
         sync: false
       - key: DODO_WEBHOOK_SECRET
         sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: DODO_PRODUCT_BUILDER_MONTHLY
+        sync: false
+      - key: DODO_PRODUCT_BUILDER_ANNUAL
+        sync: false
+      - key: DODO_PRODUCT_PRO_MONTHLY
+        sync: false
+      - key: DODO_PRODUCT_PRO_ANNUAL
+        sync: false
+      - key: DODO_PRODUCT_ENTERPRISE_MONTHLY
+        sync: false
+      - key: DODO_PRODUCT_ENTERPRISE_ANNUAL
+        sync: false
       - key: E2B_API_KEY
         sync: false
       - key: TINYFISH_API_KEY
