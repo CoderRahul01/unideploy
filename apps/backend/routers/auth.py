@@ -88,7 +88,7 @@ async def create_auth_session():
     except Exception:
         pass
 
-    base_url = os.getenv("BASE_URL", "wss://unideploy-api-4b25n74mbq-uc.a.run.app")
+    base_url = os.getenv("BASE_URL", "wss://unideploy-backend.onrender.com")
     return {
         "session_id": session_id,
         "session_code": code,

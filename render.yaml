@@ -1,0 +1,46 @@
+services:
+  - type: web
+    name: unideploy-backend
+    runtime: docker
+    rootDir: apps/backend
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: PORT
+        value: 8080
+      # Set these in the Render dashboard → Environment tab after first deploy:
+      - key: BASE_URL
+        sync: false        # e.g. https://unideploy-backend.onrender.com
+      - key: ALLOWED_ORIGINS
+        sync: false        # e.g. https://unideploy.in,https://www.unideploy.in
+      - key: INSFORGE_PROJECT_ID
+        sync: false
+      - key: INSFORGE_API_KEY
+        sync: false
+      - key: INSFORGE_BASE_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      - key: DODO_API_KEY
+        sync: false
+      - key: DODO_WEBHOOK_SECRET
+        sync: false
+      - key: E2B_API_KEY
+        sync: false
+      - key: TINYFISH_API_KEY
+        sync: false
+      - key: COMPOSIO_API_KEY
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: POSTHOG_API_KEY
+        sync: false
+      - key: POSTHOG_HOST
+        sync: false
