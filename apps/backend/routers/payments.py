@@ -38,7 +38,7 @@ async def create_checkout(req: CheckoutRequest, authorization: str = Header(None
         raise HTTPException(status_code=401, detail="Session expired")
         
     user_id = session_data["user_id"]
-    users = await db_select("users", {"id": user_id})
+    users = await db_select("app_users", {"id": user_id})
     if not users:
         raise HTTPException(status_code=404, detail="User not found")
         

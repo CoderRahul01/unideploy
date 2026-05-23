@@ -80,7 +80,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 ALLOWED_ORIGINS = os.getenv(
     "ALLOWED_ORIGINS",
-    "http://localhost:3000",
+    "http://localhost:3000,https://unideploy.in,https://www.unideploy.in,https://unideploy.vercel.app",
 ).split(",")
 
 app.add_middleware(

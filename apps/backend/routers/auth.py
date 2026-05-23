@@ -176,7 +176,7 @@ from schemas import UserRegisterRequest, UserLoginRequest, AuthTokenResponse
 @router.post("/register", response_model=AuthTokenResponse)
 async def register_user(req: UserRegisterRequest):
     # Check if user exists
-    existing = await db_select("users", {"email": req.email})
+    existing = await db_select("app_users", {"email": req.email})
     if existing:
         raise HTTPException(status_code=400, detail="User already exists")
 
@@ -193,7 +193,7 @@ async def register_user(req: UserRegisterRequest):
         "created_at": datetime.utcnow().isoformat()
     }
     
-    await db_insert("users", user_data)
+    await db_insert("app_users", user_data)
     
     # Generate token
     token = secrets.token_hex(32)
@@ -208,7 +208,7 @@ async def register_user(req: UserRegisterRequest):
 
 @router.post("/login", response_model=AuthTokenResponse)
 async def login_user(req: UserLoginRequest):
-    users = await db_select("users", {"email": req.email})
+    users = await db_select("app_users", {"email": req.email})
     if not users:
         raise HTTPException(status_code=401, detail="Invalid email or password")
         
@@ -238,7 +238,7 @@ async def get_current_user(authorization: str = Header(None)):
     if not session_data or "user_id" not in session_data:
         raise HTTPException(status_code=401, detail="Session expired")
         
-    users = await db_select("users", {"id": session_data["user_id"]})
+    users = await db_select("app_users", {"id": session_data["user_id"]})
     if not users:
         raise HTTPException(status_code=404, detail="User not found")
         

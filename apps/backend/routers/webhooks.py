@@ -26,8 +26,9 @@ async def dodo_webhook(request: Request):
 
     if not hmac.compare_digest(expected_signature, signature):
         raise HTTPException(status_code=400, detail="Invalid signature")
-        
-    data = await request.json()
+
+    import json
+    data = json.loads(payload)
     
     # We care about payment success
     event_type = data.get("type", data.get("event"))
@@ -40,9 +41,9 @@ async def dodo_webhook(request: Request):
         scans = metadata.get("scans")
         
         if user_id and tier and scans:
-            users = await db_select("users", {"id": user_id})
+            users = await db_select("app_users", {"id": user_id})
             if users:
-                await db_update("users", user_id, {
+                await db_update("app_users", user_id, {
                     "plan_tier": tier,
                     "scans_remaining": int(scans),
                 })
