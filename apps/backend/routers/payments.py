@@ -24,8 +24,11 @@ TIER_CONFIG = {
 #   DODO_CHECKOUT_PRO_MONTHLY,     DODO_CHECKOUT_PRO_ANNUAL
 #   DODO_CHECKOUT_ENTERPRISE_MONTHLY, DODO_CHECKOUT_ENTERPRISE_ANNUAL
 def _payment_link_id(tier: str, billing: str) -> str | None:
-    key = f"DODO_CHECKOUT_{tier.upper()}_{billing.upper()}"
-    return os.getenv(key)
+    # Check both naming conventions (Render still uses DODO_PRODUCT_*)
+    return (
+        os.getenv(f"DODO_CHECKOUT_{tier.upper()}_{billing.upper()}")
+        or os.getenv(f"DODO_PRODUCT_{tier.upper()}_{billing.upper()}")
+    )
 
 
 @router.post("/checkout")
