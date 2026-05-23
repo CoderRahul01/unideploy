@@ -71,10 +71,22 @@ export interface StatusResponse {
 
 // ── HTTP helper ───────────────────────────────────────────────────────────────
 
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const token = localStorage.getItem("unideploy_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
+  const headers = { 
+    "Content-Type": "application/json", 
+    ...getAuthHeaders(),
+    ...(opts.headers ?? {}) 
+  };
+  
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...(opts.headers ?? {}) },
     ...opts,
+    headers,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Request failed" }));
@@ -165,4 +177,47 @@ export async function getApiStatus(): Promise<StatusResponse> {
 
 export async function healthCheck(): Promise<{ status: string }> {
   return request("/health");
+}
+
+// ── Auth & Payments ───────────────────────────────────────────────────────────
+
+export interface AuthResponse {
+  token: string;
+  user_id: string;
+  email?: string;
+  plan_tier: string;
+  scans_remaining: number;
+}
+
+export async function loginUser(email: string, password: string): Promise<AuthResponse> {
+  const res = await request<AuthResponse>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+  localStorage.setItem("unideploy_token", res.token);
+  return res;
+}
+
+export async function registerUser(email: string, password: string): Promise<AuthResponse> {
+  const res = await request<AuthResponse>("/auth/register", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+  localStorage.setItem("unideploy_token", res.token);
+  return res;
+}
+
+export async function getCurrentUser(): Promise<AuthResponse> {
+  return request<AuthResponse>("/auth/me");
+}
+
+export function logoutUser() {
+  localStorage.removeItem("unideploy_token");
+}
+
+export async function createCheckoutSession(tier: string, annual = false): Promise<{ checkout_url: string }> {
+  return request("/payments/checkout", {
+    method: "POST",
+    body: JSON.stringify({ tier, billing: annual ? "annual" : "monthly" }),
+  });
 }

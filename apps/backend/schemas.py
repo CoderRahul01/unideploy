@@ -70,6 +70,23 @@ class StatusResponse(BaseModel):
     last_scan: Optional[datetime] = None
 
 
+# ── Auth ─────────────────────────────────────────────────────────────────────
+
+class UserRegisterRequest(BaseModel):
+    email: str
+    password: str
+
+class UserLoginRequest(BaseModel):
+    email: str
+    password: str
+
+class AuthTokenResponse(BaseModel):
+    token: str
+    user_id: str
+    plan_tier: str
+    scans_remaining: int
+
+
 # ── Project ──────────────────────────────────────────────────────────────────
 
 class ProjectResponse(BaseModel):

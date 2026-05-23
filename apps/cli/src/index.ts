@@ -3,7 +3,9 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import Table from "cli-table3";
-// WebSocket replaced with HTTP polling — no ws import needed
+import WebSocket from "ws";
+import { createMCPServer } from "./mcp-server.js";
+import { WebSocketClientTransport } from "./mcp-transport.js";
 import os from "os";
 import fs from "fs";
 import path from "path";
@@ -20,7 +22,7 @@ interface Finding {
   line_number: number | null;
   severity: "critical" | "high" | "medium" | "low";
   category: "secrets" | "auth" | "rls" | "cors" | "rate_limiting" |
-            "input_validation" | "dependency" | "error_handling" | "other";
+  "input_validation" | "dependency" | "error_handling" | "other";
   title: string;
   description: string;
   fix_hint: string;
@@ -33,8 +35,8 @@ interface Finding {
 
 function severityColor(s: string): string {
   if (s === "critical") return chalk.red.bold("[CRITICAL]");
-  if (s === "high")     return chalk.yellow.bold("[HIGH]    ");
-  if (s === "medium")   return chalk.white("[MEDIUM]  ");
+  if (s === "high") return chalk.yellow.bold("[HIGH]    ");
+  if (s === "medium") return chalk.white("[MEDIUM]  ");
   return chalk.gray("[LOW]     ");
 }
 
@@ -360,7 +362,7 @@ function runHeuristics(
 
   for (const { path: fp, content } of files) {
     const isSchema = fp.replace(/\\/g, "/").includes("supabase/") &&
-                     (fp.endsWith(".sql") || fp.includes("migration"));
+      (fp.endsWith(".sql") || fp.includes("migration"));
     if (!isSchema) continue;
 
     const createTableRe = /create\s+table\s+(?:if\s+not\s+exists\s+)?["'\`]?(\w+)["'\`]?\s*\(/gi;
@@ -822,7 +824,7 @@ program
         try {
           const res = await fetch(`${baseUrl}/poll/cli/${session.session_id}`);
           if (res.ok) {
-            const data = await res.json() as { messages: Array<{ type: string; [k: string]: unknown }> };
+            const data = await res.json() as { messages: Array<{ type: string;[k: string]: unknown }> };
             for (const msg of data.messages) {
               if (msg.type === "session_authenticated") {
                 authenticated = true;
@@ -845,8 +847,44 @@ program
 
     // ── Step 4: Run local scan ────────────────────────────────────────────
 
-    console.log(chalk.green("  ✓ Authenticated — scanning..."));
+    console.log(chalk.green("  ✓ Authenticated. Establishing persistent connection..."));
     console.log("");
+
+    // Initialize MCP Server
+    const wsUrl = session.websocket_url || `${baseUrl.replace("http", "ws")}/api/v1/ws/session/${session.session_id}`;
+    const ws = new WebSocket(wsUrl);
+    
+    ws.on("open", async () => {
+      console.log(chalk.gray("  [MCP Server] Connected to backend transport."));
+      const mcpServer = createMCPServer(cwd);
+      const transport = new WebSocketClientTransport(ws);
+      await mcpServer.connect(transport);
+      console.log(chalk.green("  ✓ MCP Server ready and listening for context requests."));
+    });
+
+    ws.on("message", (data) => {
+      try {
+        const msg = JSON.parse(data.toString());
+        if (msg.type === "pipeline_progress") {
+          console.log(chalk.blue(`  ➤ Agent Pipeline: Executing ${msg.agent}...`));
+        } else if (msg.type === "skill_md_generated") {
+          console.log(chalk.green(`\n  ★ Contextual Fix Plan Generated!`));
+          const skillPath = path.join(cwd, "skill.md");
+          fs.writeFileSync(skillPath, msg.content);
+          console.log(chalk.white(`  ↳ Saved to: ${skillPath}`));
+          console.log(chalk.gray(`  Review this file. It contains tailored steps to patch your project safely.\n`));
+        } else if (msg.type === "payment_required") {
+          console.log("");
+          console.log(chalk.bgRed.white.bold(`  PAYMENT REQUIRED `));
+          console.log(chalk.red(`  ✗ ${msg.message || "You have exhausted your scan quota."}`));
+          console.log(chalk.yellow(`  ➤ Please upgrade your plan at https://unideploy.vercel.app/pricing`));
+          console.log("");
+          process.exit(1);
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    });
 
     const onFinding = (f: Finding) => {
       const col = severityColor(f.severity);
@@ -856,7 +894,7 @@ program
 
     const allFindings = runHeuristics(files, cwd, onFinding);
     sessionFindings = allFindings;
-    scannedCount = files.length;
+    const scannedCount = files.length;
 
     // Send scan progress to browser via HTTP
     try {
@@ -906,6 +944,15 @@ program
     } catch (err) {
       console.error(chalk.yellow(`  Warning: could not send results to backend: ${err}`));
     }
+    
+    // We also notify the backend via WS that the initial manifest is ready.
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "cli_ready", project_manifest: payload }));
+    } else {
+      ws.once("open", () => {
+        ws.send(JSON.stringify({ type: "cli_ready", project_manifest: payload }));
+      });
+    }
 
     // ── Step 6: Save state for `unideploy fix` ─────────────────────────
     try {
@@ -937,7 +984,7 @@ program
         try {
           const res = await fetch(`${baseUrl}/poll/cli/${session.session_id}`);
           if (res.ok) {
-            const data = await res.json() as { messages: Array<{ type: string; [k: string]: unknown }> };
+            const data = await res.json() as { messages: Array<{ type: string;[k: string]: unknown }> };
             for (const msg of data.messages) {
               if (msg.type === "apply_fix") {
                 const fixMsg = msg as unknown as ApplyFixMessage;

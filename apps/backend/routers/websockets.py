@@ -5,9 +5,9 @@ from datetime import datetime
 router = APIRouter(tags=["websockets"])
 
 from .sessions import _sessions
-from core.database import db_update
-from agents.analyzer import run_analysis, compute_grade
-
+from core.database import db_update, db_select
+from agents.graph import build_graph
+from agents.analyzer import compute_grade
 
 async def run_agent_pipeline(session_code: str, project_manifest: dict):
     session = _sessions.get(session_code)
@@ -15,16 +15,73 @@ async def run_agent_pipeline(session_code: str, project_manifest: dict):
         return
 
     try:
-        findings = await run_analysis(project_manifest)
+        # Enforce quota / tier limits
+        user_id = session.get("user_id")
+        if not user_id:
+            # Should not happen, but safe guard
+            return
 
+        users = await db_select("users", {"id": user_id})
+        if not users:
+            return
+
+        user = users[0]
+        scans_remaining = user.get("scans_remaining", 0)
+
+        if scans_remaining <= 0:
+            payment_req = {"type": "payment_required", "message": "You have exhausted your scan quota. Please upgrade your plan."}
+            if session.get("cli_ws"):
+                await session.get("cli_ws").send_json(payment_req)
+            if session.get("browser_ws"):
+                await session.get("browser_ws").send_json(payment_req)
+            return
+        
+        # Deduct quota
+        await db_update("users", user_id, {"scans_remaining": scans_remaining - 1})
+
+        graph = build_graph()
+        initial_state = {
+            "session_id": session["session_id"],
+            "manifest": project_manifest,
+            "findings": [],
+            "remediation_plans": [],
+            "messages": [],
+            "current_agent": "system",
+            "error": None,
+            "completed": False
+        }
+
+        # Stream events from LangGraph
+        async for event in graph.astream(initial_state):
+            # For each node execution, relay progress to CLI and Browser
+            node_name = list(event.keys())[0]
+            progress_msg = {"type": "pipeline_progress", "agent": node_name}
+            
+            if session.get("cli_ws"):
+                await session["cli_ws"].send_json(progress_msg)
+            if session.get("browser_ws"):
+                await session["browser_ws"].send_json(progress_msg)
+            
+            state = event[node_name]
+            
+            # If findings were added, send them (diff the lists if needed, but we can just send new ones)
+            # For simplicity, if the node produced findings we can rely on it putting them in the state.
+            # In a real app we'd compute the diff. For now we just emit complete at the end.
+            
+        # The final state will have all findings
+        # We need to retrieve the final state to compute grade etc.
+        final_state = state
+        findings = final_state.get("findings", [])
+
+        # Deduplicate and send to browser
+        session["findings"] = findings
         for finding in findings:
-            session["findings"].append(finding)
             msg = {"type": "finding", "finding": finding}
             if session.get("cli_ws"):
                 await session["cli_ws"].send_json(msg)
             if session.get("browser_ws"):
                 await session["browser_ws"].send_json(msg)
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(0.05)
 
         grade = compute_grade(findings)
         session["security_grade"] = grade
@@ -50,14 +107,25 @@ async def run_agent_pipeline(session_code: str, project_manifest: dict):
         if session.get("browser_ws"):
             await session["browser_ws"].send_json(complete_msg)
 
+        # Extract skill_md from the final state messages if generated
+        skill_md = None
+        for msg in reversed(final_state.get("messages", [])):
+            if msg.get("role") == "planner":
+                skill_md = msg.get("content")
+                break
+
         try:
-            await db_update("scans", session["session_id"], {
+            db_payload = {
                 "status": "complete",
                 "grade": grade,
                 "total_issues": len(findings),
                 "auto_fixable": auto_fixable,
                 "completed_at": datetime.utcnow().isoformat(),
-            })
+            }
+            if skill_md:
+                db_payload["skill_md"] = skill_md
+                
+            await db_update("scans", session["session_id"], db_payload)
         except Exception:
             pass
 
@@ -178,7 +246,10 @@ async def cli_websocket(websocket: WebSocket, session_code: str):
                         "project_manifest": session["project_manifest"]
                     })
                 
-                asyncio.create_task(run_agent_pipeline(code, session["project_manifest"]))
+                if session.get("status") == "authenticated":
+                    asyncio.create_task(run_agent_pipeline(code, session["project_manifest"]))
+                else:
+                    session["waiting_for_auth"] = True
             
             elif msg_type == "finding":
                 # CLI/agent found an issue — relay to browser immediately
@@ -212,6 +283,16 @@ async def cli_websocket(websocket: WebSocket, session_code: str):
                 # CLI agent progress — relay to browser
                 if session.get("browser_ws"):
                     await session["browser_ws"].send_json(data)
+            
+            elif msg_type == "mcp_response":
+                # Fulfill pending MCP request future
+                payload = data.get("payload", {})
+                req_id = payload.get("id")
+                pending = session.get("mcp_pending_requests", {})
+                if req_id and req_id in pending:
+                    future = pending[req_id]
+                    if not future.done():
+                        future.set_result(payload)
     
     except WebSocketDisconnect:
         session["cli_ws"] = None

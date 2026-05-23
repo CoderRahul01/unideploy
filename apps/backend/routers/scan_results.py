@@ -54,35 +54,15 @@ def _find_session(session_id: str) -> Optional[dict]:
 
 
 async def _forward_to_orchestrator(session_id: str, payload: dict):
-    """Forward findings to Vertex AI Orchestrator agent for deep analysis."""
-    import os, json
-
-    resource = os.getenv("AGENT_ENGINE_RESOURCE_NAME", "")
-    if not resource:
-        logger.info("No AGENT_ENGINE_RESOURCE_NAME set — skipping agent enrichment")
-        return
-
+    """Forward findings to LangGraph Orchestrator agent for deep analysis."""
     try:
-        import vertexai
-        from vertexai.preview import reasoning_engines
-
-        gcp_project = os.getenv("GOOGLE_CLOUD_PROJECT", "")
-        gcp_location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
-        vertexai.init(project=gcp_project, location=gcp_location)
-
-        prompt = json.dumps({
-            "task": "deep_analysis",
-            "session_id": session_id,
-            "framework": payload.get("framework"),
-            "findings": payload.get("findings", []),
-        })
-
-        def _query():
-            app = reasoning_engines.ReasoningEngine(resource)
-            return app.query(input=prompt)
-
-        await asyncio.to_thread(_query)
-        logger.info(f"Orchestrator enrichment complete for session {session_id}")
+        from agents.orchestrator_agent import get_orchestrator
+        orchestrator = get_orchestrator()
+        
+        # run_pipeline will iterate over LangGraph nodes and emit websocket events
+        await orchestrator.run_pipeline(session_id, payload)
+        
+        logger.info(f"Orchestrator pipeline complete for session {session_id}")
     except Exception as e:
         logger.warning(f"Orchestrator forwarding failed (non-fatal): {e}")
 

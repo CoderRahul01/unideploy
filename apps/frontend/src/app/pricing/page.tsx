@@ -1,7 +1,10 @@
 "use client";
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Check, Zap } from "lucide-react";
 import posthog from "posthog-js";
+import { createCheckoutSession, getCurrentUser } from "@/lib/api";
 
 type Tier = {
   name: string;
@@ -33,9 +36,9 @@ const TIERS: Tier[] = [
   },
   {
     name: "Builder",
-    monthly: 15,
-    annual: 12,
-    annualTotal: 144,
+    monthly: 99,
+    annual: 990,
+    annualTotal: 990,
     description: "For developers shipping to production. Auto-fixes critical issues before they become incidents.",
     cta: "Get started",
     features: [
@@ -48,9 +51,9 @@ const TIERS: Tier[] = [
   },
   {
     name: "Pro",
-    monthly: 49,
-    annual: 39,
-    annualTotal: 468,
+    monthly: 199,
+    annual: 1990,
+    annualTotal: 1990,
     description: "For teams that can't afford a security incident. Unlimited fixes, agent memory, priority queue.",
     cta: "Get started",
     highlight: true,
@@ -65,12 +68,11 @@ const TIERS: Tier[] = [
   },
   {
     name: "Enterprise",
-    monthly: null,
-    annual: null,
-    annualTotal: null,
+    monthly: 299,
+    annual: 2990,
+    annualTotal: 2990,
     description: "For regulated industries and teams with compliance requirements. Custom everything.",
-    cta: "Talk to us",
-    ctaHref: "https://cal.com/rahulpandey187/unideploy-demo",
+    cta: "Get started",
     features: [
       "Everything in Pro",
       "SOC 2 / HIPAA compliance track",
@@ -83,7 +85,33 @@ const TIERS: Tier[] = [
 ];
 
 export default function PricingPage() {
+  const router = useRouter();
   const [annual, setAnnual] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loadingTier, setLoadingTier] = useState<string | null>(null);
+
+  useEffect(() => {
+    getCurrentUser().then(() => setIsLoggedIn(true)).catch(() => setIsLoggedIn(false));
+  }, []);
+
+  const handleCheckout = async (tierName: string) => {
+    if (!isLoggedIn) {
+      router.push("/login");
+      return;
+    }
+
+    try {
+      setLoadingTier(tierName);
+      const res = await createCheckoutSession(tierName, annual);
+      if (res.checkout_url) {
+        window.location.href = res.checkout_url;
+      }
+    } catch (err: any) {
+      alert("Checkout failed: " + err.message);
+    } finally {
+      setLoadingTier(null);
+    }
+  };
 
   return (
     <main
@@ -251,7 +279,7 @@ export default function PricingPage() {
                         lineHeight: 1,
                       }}
                     >
-                      ${annual && tier.annual !== null ? tier.annual : tier.monthly}
+                      ₹{annual && tier.annual !== null ? Math.round(tier.annual / 12) : tier.monthly}
                     </span>
                     <span style={{ fontSize: 13, color: "#4a5a3a" }}>/mo</span>
                   </div>
@@ -267,9 +295,10 @@ export default function PricingPage() {
                     Custom
                   </span>
                 )}
+
                 {annual && tier.annualTotal && (
                   <p style={{ fontSize: 11, color: "#3a4a2a", marginTop: 4 }}>
-                    billed ${tier.annualTotal}/yr
+                    billed ₹{tier.annualTotal}/yr
                   </p>
                 )}
               </div>
@@ -302,7 +331,7 @@ export default function PricingPage() {
                 </a>
               ) : tier.monthly === 0 ? (
                 <a
-                  href="https://unideploy.vercel.app"
+                  href="/dashboard"
                   onClick={() => posthog.capture("pricing_cta_clicked", { tier: tier.name, billing_period: "free" })}
                   style={{
                     display: "block",
@@ -320,7 +349,11 @@ export default function PricingPage() {
                 </a>
               ) : (
                 <button
-                  onClick={() => posthog.capture("pricing_cta_clicked", { tier: tier.name, billing_period: annual ? "annual" : "monthly" })}
+                  onClick={() => {
+                    posthog.capture("pricing_cta_clicked", { tier: tier.name, billing_period: annual ? "annual" : "monthly" });
+                    handleCheckout(tier.name);
+                  }}
+                  disabled={loadingTier === tier.name}
                   style={{
                     background: tier.highlight ? "#1D9E75" : "transparent",
                     color: tier.highlight ? "#fff" : "#1D9E75",
@@ -329,17 +362,18 @@ export default function PricingPage() {
                     padding: "10px 0",
                     fontSize: 13,
                     fontWeight: 500,
-                    cursor: "pointer",
+                    cursor: loadingTier === tier.name ? "not-allowed" : "pointer",
                     fontFamily: "var(--font-body), DM Sans, sans-serif",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     gap: 6,
                     width: "100%",
+                    opacity: loadingTier === tier.name ? 0.7 : 1,
                   }}
                 >
                   {tier.highlight && <Zap size={13} strokeWidth={2} />}
-                  {tier.cta}
+                  {loadingTier === tier.name ? "Redirecting..." : tier.cta}
                 </button>
               )}
 

@@ -1,59 +1,32 @@
 """
-OrchestratorAgent — routes tasks to specialist agents via the A2A bus.
-Registered at startup; receives tasks from the run_pipeline endpoint and
-streams progress back to the CLI and browser WebSocket.
+OrchestratorAgent — routes tasks to specialist agents via LangGraph.
 """
 
 import asyncio
 import logging
 from typing import Optional
 
-from agents.a2a_bus import A2ABus, A2AMessage, get_bus
 from agents.deploy_agent import DeployAgent
-from agents.fix_agent import generate_patch_for_cli
-from agents.analyzer import run_analysis, compute_grade
-from agents.plan_agent import generate_remediation_plan
+from agents.graph import build_graph
 
 logger = logging.getLogger("unideploy.orchestrator")
 
 
 class OrchestratorAgent:
     """
-    Orchestrates scan → fix → deploy pipelines via the A2A bus.
-    Agents communicate via JSON-RPC 2.0 messages; the orchestrator
-    manages task state per session_id.
+    Orchestrates scan → fix → deploy pipelines via LangGraph.
     """
 
-    def __init__(self, bus: Optional[A2ABus] = None):
-        self.bus = bus or get_bus()
+    def __init__(self):
         self._deploy_agent = DeployAgent()
-        self._active: dict[str, dict] = {}  # session_id → state
+        self.graph = build_graph()
 
-    async def handle_message(self, msg: A2AMessage) -> Optional[dict]:
-        """Handler registered with the A2A bus under 'orchestrator'."""
-        task = msg.params.get("task")
-        payload = msg.params.get("payload", {})
-        context_id = msg.params.get("context_id", "")
-
-        logger.info(f"Orchestrator received task='{task}' context={context_id}")
-
-        if task == "run_pipeline":
-            asyncio.create_task(self._run_pipeline(context_id, payload))
-            return {"accepted": True, "context_id": context_id}
-
-        if task == "generate_configs":
-            return await self._handle_deploy(context_id, payload)
-
-        logger.warning(f"Orchestrator: unknown task '{task}'")
-        return None
-
-    async def _run_pipeline(self, session_id: str, options: dict) -> None:
+    async def run_pipeline(self, session_id: str, options: dict) -> None:
         """
-        Full scan → fix → deploy pipeline.
-        Progress is sent to CLI + browser via their session WebSockets.
+        Full scan → fix → deploy pipeline using LangGraph.
+        Progress is streamed to CLI + browser via their session WebSockets.
         """
         from routers.sessions import _sessions
-        from core.redis_client import redis
 
         session = None
         for code, s in _sessions.items():
@@ -74,81 +47,40 @@ class OrchestratorAgent:
                     except Exception:
                         pass
 
-        # ── Phase 1: Scan ─────────────────────────────────────────────────────
-        findings = []
-        if not options.get("skip_scan"):
-            await emit({"type": "pipeline_progress", "phase": "scan", "message": "Starting security scan..."})
-            manifest = session.get("project_manifest", {})
-            try:
-                findings = await run_analysis(manifest)
-                for f in findings:
-                    session.setdefault("findings", []).append(f)
-                    await emit({"type": "finding", "finding": f})
-                grade = compute_grade(findings)
-                session["security_grade"] = grade
-                await emit({"type": "scan_complete", "summary": {
-                    "grade": grade,
-                    "total": len(findings),
-                    "critical": sum(1 for f in findings if f.get("severity", "").upper() == "CRITICAL"),
-                    "high": sum(1 for f in findings if f.get("severity", "").upper() == "HIGH"),
-                    "medium": sum(1 for f in findings if f.get("severity", "").upper() == "MEDIUM"),
-                    "low": sum(1 for f in findings if f.get("severity", "").upper() == "LOW"),
-                    "auto_fixable": sum(1 for f in findings if f.get("auto_fixable")),
-                }})
-            except Exception as e:
-                await emit({"type": "error", "message": f"Scan phase failed: {e}"})
-                return
+        await emit({"type": "pipeline_progress", "phase": "scan", "message": "Starting multi-agent pipeline..."})
 
-        # ── Phase 2: Plan ─────────────────────────────────────────────────────
-        plans = []
+        # Initialize Graph State
+        manifest = session.get("project_manifest", {})
+        findings = options.get("findings", [])
+        
+        initial_state = {
+            "session_id": session_id,
+            "manifest": manifest,
+            "findings": findings,
+            "remediation_plans": [],
+            "messages": [],
+            "current_agent": "research_agent",
+            "error": None,
+            "completed": False
+        }
+
         try:
-            await emit({"type": "pipeline_progress", "phase": "plan", "message": "Generating remediation plans..."})
-            plans = await generate_remediation_plan(findings)
-            
-            # Check if agent needs clarification
-            for p in plans:
-                if p.get("effort") == "unknown" or "MISSING_CONTEXT" in str(p):
-                    # Request user input
+            # Stream events from LangGraph
+            async for output in self.graph.astream(initial_state):
+                for node_name, state_update in output.items():
                     await emit({
-                        "type": "agent_question",
-                        "question": f"I need more context to fix: {p.get('summary')}. Could you explain how this component is used?",
-                        "finding_id": p.get("finding_id")
+                        "type": "pipeline_progress", 
+                        "phase": "agent_action", 
+                        "message": f"Agent {node_name} finished."
                     })
-                    
-                    # Wait for agent_answer (5 min timeout)
-                    answer = None
-                    for _ in range(300): # 300 * 1s = 5 min
-                        answer_data = await redis.json_get(f"agent_answer:{session_id}")
-                        if answer_data and answer_data.get("finding_id") == p.get("finding_id"):
-                            answer = answer_data.get("answer")
-                            await redis.delete(f"agent_answer:{session_id}")
-                            break
-                        await asyncio.sleep(1)
-                    
-                    if answer:
-                        p["summary"] += f" (User context: {answer})"
-
+            
+            await emit({"type": "pipeline_complete", "message": "All agents finished."})
+            
         except Exception as e:
-            await emit({"type": "error", "message": f"Plan phase failed: {e}"})
+            logger.error(f"Pipeline failed: {e}")
+            await emit({"type": "error", "message": f"Pipeline failed: {e}"})
 
-        # ── Phase 3: Deploy config generation ─────────────────────────────────
-        if not options.get("skip_deploy"):
-            manifest = session.get("project_manifest", {})
-            answers = options.get("deploy_answers", {})
-            await emit({"type": "pipeline_progress", "phase": "deploy", "message": "Generating deployment configs..."})
-            try:
-                stack = self._deploy_agent.detect_stack(manifest)
-                configs = await self._deploy_agent.generate_configs(manifest, stack, answers)
-                await emit({
-                    "type": "deploy_configs_ready",
-                    "configs": [{"path": c.path, "content": c.content, "description": c.description} for c in configs],
-                })
-            except Exception as e:
-                await emit({"type": "error", "message": f"Deploy phase failed: {e}"})
-
-        await emit({"type": "pipeline_complete", "message": "All agents finished."})
-
-    async def _handle_deploy(self, session_id: str, payload: dict) -> dict:
+    async def handle_deploy(self, session_id: str, payload: dict) -> dict:
         """Generate deployment configs for a session (called from deploy endpoint)."""
         manifest = payload.get("manifest", {})
         answers = payload.get("answers", {})
@@ -164,27 +96,9 @@ class OrchestratorAgent:
 
 _orchestrator: Optional[OrchestratorAgent] = None
 
-
 def get_orchestrator() -> OrchestratorAgent:
     global _orchestrator
     if _orchestrator is None:
         _orchestrator = OrchestratorAgent()
     return _orchestrator
 
-
-async def setup_a2a_agents() -> list[asyncio.Task]:
-    """
-    Register all agents with the A2A bus and start their consumer loops.
-    Call this once from FastAPI lifespan.
-    """
-    bus = get_bus()
-    orchestrator = get_orchestrator()
-
-    bus.register("orchestrator", orchestrator.handle_message)
-
-    tasks = [
-        asyncio.create_task(bus.run_agent("orchestrator"), name="a2a-orchestrator"),
-    ]
-
-    logger.info("A2A agents registered: orchestrator")
-    return tasks

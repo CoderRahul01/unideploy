@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { UniDeploySocket, WSMessage } from "@/lib/websocket";
 import {
   Finding, RemediationPlan, ScanStatus, ScanReport, ReportFinding,
-  startScan, getScanStatus, getScanPlan, triggerFix, getScanReport,
+  startScan, getScanStatus, getScanPlan, triggerFix, getScanReport, getCurrentUser, AuthResponse
 } from "@/lib/api";
 import SecurityGrade from "@/components/SecurityGrade";
 import posthog from "posthog-js";
@@ -746,18 +746,67 @@ function DashboardContent() {
   const params = useSearchParams();
   const sessionId = params.get("session_id");
   const scanId = params.get("scan_id");
+  const paymentSuccess = params.get("payment") === "success";
+  
+  const [user, setUser] = useState<AuthResponse | null>(null);
 
-  if (sessionId) {
-    return (
-      <div style={{ minHeight: "100vh", background: C.bg, color: C.text }}>
-        <CliReportView sessionId={sessionId} />
-      </div>
-    );
-  }
+  useEffect(() => {
+    getCurrentUser().then(setUser).catch(() => {});
+  }, []);
+
+  // After a successful payment the DODO webhook may take a few seconds to fire.
+  // Poll up to 5× (every 2 s) until the plan tier upgrades away from Free.
+  useEffect(() => {
+    if (!paymentSuccess) return;
+    let attempts = 0;
+    const id = setInterval(async () => {
+      attempts++;
+      try {
+        const fresh = await getCurrentUser();
+        if (fresh.plan_tier !== "Free" || attempts >= 5) {
+          setUser(fresh);
+          clearInterval(id);
+        }
+      } catch {
+        clearInterval(id);
+      }
+    }, 2000);
+    return () => clearInterval(id);
+  }, [paymentSuccess]);
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text }}>
-      <GithubScanFlow initialScanId={scanId ?? undefined} />
+      {/* Top Bar for User Info */}
+      {user && (
+        <div style={{ background: C.surface, padding: "10px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, fontFamily: C.mono }}>
+          <div>
+            <span style={{ color: C.muted }}>User: </span>
+            <span style={{ color: C.text }}>{user.email}</span>
+          </div>
+          <div style={{ display: "flex", gap: 16 }}>
+            <div>
+              <span style={{ color: C.muted }}>Tier: </span>
+              <span style={{ color: C.green, fontWeight: 700, padding: "2px 8px", background: `${C.green}11`, borderRadius: 4, border: `1px solid ${C.green}33` }}>{user.plan_tier}</span>
+            </div>
+            <div>
+              <span style={{ color: C.muted }}>Scans Left: </span>
+              <span style={{ color: C.text, fontWeight: 700 }}>{user.scans_remaining}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {paymentSuccess && (
+        <div style={{ background: `${C.green}1A`, color: C.green, textAlign: "center", padding: "12px", fontSize: 14, fontWeight: 600, borderBottom: `1px solid ${C.green}33` }}>
+          Payment successful! Your tier and AI limits have been updated.
+        </div>
+      )}
+
+      {sessionId ? (
+        <CliReportView sessionId={sessionId} />
+      ) : (
+        <GithubScanFlow initialScanId={scanId ?? undefined} />
+      )}
     </div>
   );
 }

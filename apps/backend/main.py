@@ -46,17 +46,11 @@ async def lifespan(app: FastAPI):
     from workers.scan_worker import worker_loop
     worker_task = asyncio.create_task(worker_loop())
 
-    # Start A2A agent message bus
-    from agents.orchestrator_agent import setup_a2a_agents
-    a2a_tasks = await setup_a2a_agents()
-
     yield
 
-    for t in a2a_tasks:
-        t.cancel()
     worker_task.cancel()
     try:
-        await asyncio.gather(worker_task, *a2a_tasks, return_exceptions=True)
+        await asyncio.gather(worker_task, return_exceptions=True)
     except asyncio.CancelledError:
         pass
     logger.info("UniDeploy API shutting down")
@@ -93,23 +87,23 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Api-Key"],
 )
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 
-from routers import sessions, websockets, scans, auth, scan_results, ai, deploy, metrics
+from routers import sessions, websockets, scans, auth, scan_results, ai, deploy, payments, webhooks
 
 app.include_router(auth.router)
 app.include_router(sessions.router)
 app.include_router(websockets.router)
 app.include_router(scans.router)
 app.include_router(scan_results.router)
-# webhooks router deleted
+app.include_router(payments.router)
+app.include_router(webhooks.router)
 app.include_router(ai.router)
 app.include_router(deploy.router)
-app.include_router(metrics.router)
 
 # ── Health ────────────────────────────────────────────────────────────────────
 
