@@ -39,7 +39,7 @@ docs/               Mintlify docs — DO NOT MODIFY
 ## Quick start
 
 ```bash
-export ANTHROPIC_API_KEY=...   # or GEMINI_API_KEY / GROQ_API_KEY
+export ANTHROPIC_API_KEY=...   # or GEMINI_API_KEY / GROQ_API_KEY / HF_TOKEN / NVIDIA_API_KEY
 npx tsx packages/cli/src/cli.ts                           # interactive REPL
 npx tsx packages/cli/src/cli.ts "scan this project"       # one-shot mode
 npx tsx packages/cli/src/cli.ts "scan for secrets"        # secrets only
@@ -69,7 +69,9 @@ rl.on("line", async (line) => {
 });
 ```
 
-Model auto-detection priority: ANTHROPIC_API_KEY → GEMINI_API_KEY → GROQ_API_KEY
+Model auto-detection priority: ANTHROPIC_API_KEY → GEMINI_API_KEY → GROQ_API_KEY → HF_TOKEN (or HUGGINGFACE_API_KEY) → NVIDIA_API_KEY
+
+Configurable model overrides via: `ANTHROPIC_MODEL`, `GEMINI_MODEL`, `GROQ_MODEL`, `HF_MODEL`/`HUGGINGFACE_MODEL`, `NVIDIA_MODEL` environment variables.
 
 ## Tool API (AgentTool from @earendil-works/pi-agent-core)
 

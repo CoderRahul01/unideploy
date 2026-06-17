@@ -18,10 +18,30 @@ import { editTool } from "./tools/edit.js";
 import { loadSkill, listSkills } from "./skills/loader.js";
 
 function resolveModel() {
-  if (process.env.ANTHROPIC_API_KEY) return { model: getModel("anthropic", "claude-sonnet-4-20250514"), label: "claude-sonnet (Anthropic)" };
-  if (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) return { model: getModel("google", "gemini-2.5-flash"), label: "gemini-2.5-flash (Google)" };
-  if (process.env.GROQ_API_KEY) return { model: getModel("groq", "llama-3.3-70b-versatile"), label: "llama-3.3-70b (Groq)" };
-  console.error("\n❌  Set ANTHROPIC_API_KEY, GEMINI_API_KEY, or GROQ_API_KEY\n");
+  if (process.env.ANTHROPIC_API_KEY) {
+    const modelId = process.env.ANTHROPIC_MODEL || "claude-3-7-sonnet-20250219";
+    return { model: getModel("anthropic", modelId as any), label: `${modelId} (Anthropic)` };
+  }
+  if (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) {
+    const modelId = process.env.GEMINI_MODEL || process.env.GOOGLE_MODEL || "gemini-2.5-flash";
+    return { model: getModel("google", modelId as any), label: `${modelId} (Google)` };
+  }
+  if (process.env.GROQ_API_KEY) {
+    const modelId = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+    return { model: getModel("groq", modelId as any), label: `${modelId} (Groq)` };
+  }
+  if (process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY) {
+    if (!process.env.HF_TOKEN && process.env.HUGGINGFACE_API_KEY) {
+      process.env.HF_TOKEN = process.env.HUGGINGFACE_API_KEY;
+    }
+    const modelId = process.env.HF_MODEL || process.env.HUGGINGFACE_MODEL || "Qwen/Qwen3-Coder-480B-A35B-Instruct";
+    return { model: getModel("huggingface", modelId as any), label: `${modelId} (Hugging Face)` };
+  }
+  if (process.env.NVIDIA_API_KEY) {
+    const modelId = process.env.NVIDIA_MODEL || "meta/llama-3.1-70b-instruct";
+    return { model: getModel("nvidia", modelId as any), label: `${modelId} (NVIDIA NIM)` };
+  }
+  console.error("\n❌  Set ANTHROPIC_API_KEY, GEMINI_API_KEY, GROQ_API_KEY, HF_TOKEN (or HUGGINGFACE_API_KEY), or NVIDIA_API_KEY\n");
   process.exit(1);
 }
 

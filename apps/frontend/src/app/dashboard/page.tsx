@@ -9,6 +9,7 @@ import {
 } from "@/lib/api";
 import SecurityGrade from "@/components/SecurityGrade";
 import posthog from "posthog-js";
+import Link from "next/link";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 
@@ -288,7 +289,10 @@ function CliReportView({ sessionId }: { sessionId: string }) {
           files_scanned: r.files_scanned,
         });
       })
-      .catch(() => setScanStatus("waiting"));
+      .catch(() => {
+        setScanStatus("waiting");
+        setLoadError(true);
+      });
   }, [sessionId]);
 
   // Connect browser WebSocket to receive live progress + scan_complete + fix events
@@ -348,9 +352,9 @@ function CliReportView({ sessionId }: { sessionId: string }) {
     return (
       <div style={{ maxWidth: 800, margin: "0 auto", padding: "40px 24px", fontFamily: C.font }}>
         <nav style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 48 }}>
-          <a href="/" style={{ fontFamily: C.mono, fontSize: 15, fontWeight: 700, color: C.text, textDecoration: "none" }}>
+          <Link href="/" style={{ fontFamily: C.mono, fontSize: 15, fontWeight: 700, color: C.text, textDecoration: "none" }}>
             unideploy
-          </a>
+          </Link>
         </nav>
 
         <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 40,
@@ -395,12 +399,12 @@ function CliReportView({ sessionId }: { sessionId: string }) {
     <div style={{ maxWidth: 800, margin: "0 auto", padding: "40px 24px", fontFamily: C.font }}>
       {/* Nav */}
       <nav style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 48 }}>
-        <a href="/" style={{ fontFamily: C.mono, fontSize: 15, fontWeight: 700, color: C.text, textDecoration: "none" }}>
+        <Link href="/" style={{ fontFamily: C.mono, fontSize: 15, fontWeight: 700, color: C.text, textDecoration: "none" }}>
           unideploy
-        </a>
-        <a href="/connect" style={{ fontSize: 13, color: C.muted, textDecoration: "none" }}>
+        </Link>
+        <Link href="/connect" style={{ fontSize: 13, color: C.muted, textDecoration: "none" }}>
           New scan →
-        </a>
+        </Link>
       </nav>
 
       {/* Header: project + grade */}
@@ -484,7 +488,7 @@ function CliReportView({ sessionId }: { sessionId: string }) {
             </button>
           ) : (
             <span style={{ fontFamily: C.mono, fontSize: 12, color: C.muted }}>
-              Run <strong style={{ color: C.text }}>npx unideploy "fix the secrets issues"</strong> in your terminal to apply
+              Run <strong style={{ color: C.text }}>npx unideploy &quot;fix the secrets issues&quot;</strong> in your terminal to apply
             </span>
           )}
         </div>
@@ -592,12 +596,12 @@ function GithubScanFlow({ initialScanId }: { initialScanId?: string }) {
   return (
     <div style={{ maxWidth: 800, margin: "0 auto", padding: "40px 24px", fontFamily: C.font }}>
       <nav style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 48 }}>
-        <a href="/" style={{ fontFamily: C.mono, fontSize: 15, fontWeight: 700, color: C.text, textDecoration: "none" }}>
+        <Link href="/" style={{ fontFamily: C.mono, fontSize: 15, fontWeight: 700, color: C.text, textDecoration: "none" }}>
           unideploy
-        </a>
-        <a href="/connect" style={{ fontSize: 13, color: C.muted, textDecoration: "none" }}>
+        </Link>
+        <Link href="/connect" style={{ fontSize: 13, color: C.muted, textDecoration: "none" }}>
           CLI session →
-        </a>
+        </Link>
       </nav>
 
       <h1 style={{ fontFamily: C.display, fontSize: "clamp(28px,5vw,38px)", fontWeight: 800,
@@ -721,7 +725,11 @@ function GithubScanFlow({ initialScanId }: { initialScanId?: string }) {
               selected={selectedIds.has(f.id)}
               onToggle={() => {
                 const next = new Set(selectedIds);
-                next.has(f.id) ? next.delete(f.id) : next.add(f.id);
+                if (next.has(f.id)) {
+                  next.delete(f.id);
+                } else {
+                  next.add(f.id);
+                }
                 setSelectedIds(next);
               }}
               onFix={f.auto_fixable ? () => { setSelectedIds(new Set([f.id])); handleFix(); } : undefined}
@@ -794,7 +802,7 @@ function DashboardContent() {
               <span style={{ color: C.text, fontWeight: 700 }}>{user.scans_remaining}</span>
             </div>
             {user.plan_tier === "Free" && (
-              <a
+              <Link
                 href="/pricing"
                 style={{
                   background: "#1D9E75", color: "#fff", padding: "5px 14px",
@@ -803,7 +811,7 @@ function DashboardContent() {
                 }}
               >
                 Upgrade Plan ↑
-              </a>
+              </Link>
             )}
           </div>
         </div>
@@ -819,9 +827,9 @@ function DashboardContent() {
           <span style={{ fontSize: 13, color: "#4a7a5a" }}>
             Free plan · auto-fixes, unlimited projects and priority scans are on paid plans
           </span>
-          <a href="/pricing" style={{ fontSize: 12, color: "#1D9E75", textDecoration: "none", fontWeight: 600, fontFamily: C.mono }}>
+          <Link href="/pricing" style={{ fontSize: 12, color: "#1D9E75", textDecoration: "none", fontWeight: 600, fontFamily: C.mono }}>
             View plans →
-          </a>
+          </Link>
         </div>
       )}
 
@@ -834,7 +842,7 @@ function DashboardContent() {
       {paymentCancelled && (
         <div style={{ background: `${C.red}1A`, color: C.red, textAlign: "center", padding: "12px", fontSize: 14, fontWeight: 600, borderBottom: `1px solid ${C.red}33`, display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
           <span>Payment was not completed. You remain on the Free plan.</span>
-          <a href="/pricing" style={{ color: C.red, fontSize: 13, textDecoration: "underline" }}>Try again →</a>
+          <Link href="/pricing" style={{ color: C.red, fontSize: 13, textDecoration: "underline" }}>Try again →</Link>
         </div>
       )}
 
