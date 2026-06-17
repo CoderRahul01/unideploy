@@ -137,7 +137,12 @@ async def verify_session(req: VerifyRequest, authorization: str = Header(None)):
         local_session["status"] = "authenticated"
         local_session["authenticated_at"] = session["authenticated_at"]
         
-        auth_msg = {"type": "session_authenticated", "session_id": session["session_id"]}
+        auth_msg = {
+            "type": "session_authenticated",
+            "session_id": session["session_id"],
+            "token": token,
+            "user_id": user_id
+        }
         cli_ws = local_session.get("cli_ws")
         if cli_ws:
             try:

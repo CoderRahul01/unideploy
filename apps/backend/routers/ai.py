@@ -54,3 +54,25 @@ async def generate_patch(req: PatchRequest):
         new_content=result["new_content"],
         change_summary=result.get("change_summary", ""),
     )
+
+
+class ChatRequest(BaseModel):
+    message: str
+    session_id: str
+
+
+class ChatResponse(BaseModel):
+    response: str
+
+
+@router.post("/chat", response_model=ChatResponse)
+async def chat(req: ChatRequest):
+    """
+    Handles natural language queries from the conversational CLI.
+    """
+    from agents.chat_agent import answer_chat_query
+    try:
+        reply = await answer_chat_query(req.message, req.session_id)
+        return ChatResponse(response=reply)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Agent prompt query failed: {e}")

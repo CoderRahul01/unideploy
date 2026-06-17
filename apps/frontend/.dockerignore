@@ -1,0 +1,9 @@
+node_modules
+.next
+.vercel
+.git
+.DS_Store
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

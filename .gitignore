@@ -24,7 +24,7 @@ apps/backend/.env
 apps/backend/.env.development
 apps/frontend/.env.local
 apps/frontend/.env.production
-apps/cli/.env
+packages/cli/.env
 
 # Credentials
 .unideploy/
@@ -105,6 +105,9 @@ docs/project_management/
 apps/frontend/src/components/Login.tsx
 apps/frontend/src/lib/auth.ts
 scripts/deploy_agent.py
+
+# Pi upstream — read-only reference, not committed
+pi-upstream/
 
 # Binary assets that belong outside version control
 *.pdf

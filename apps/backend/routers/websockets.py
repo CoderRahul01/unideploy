@@ -190,6 +190,15 @@ async def session_websocket(websocket: WebSocket, session_id: str):
                     except Exception:
                         pass
 
+            elif msg_type == "mcp_response":
+                payload = data.get("payload", {})
+                req_id = payload.get("id")
+                pending = session.get("mcp_pending_requests", {})
+                if req_id and req_id in pending:
+                    future = pending[req_id]
+                    if not future.done():
+                        future.set_result(payload)
+
     except WebSocketDisconnect:
         session["cli_ws"] = None
         if session["status"] not in ("complete", "expired"):
@@ -200,8 +209,7 @@ async def session_websocket(websocket: WebSocket, session_id: str):
 async def cli_websocket(websocket: WebSocket, session_code: str):
     """
     CLI connects here after creating a session.
-    Receives: project manifest, streams findings
-    Sends: browser_connected signal, apply_fix commands
+    Receives OpenClaw Wire Protocol frames: connect, req, res, event.
     """
     code = session_code.upper()
     session = _sessions.get(code)
@@ -227,65 +235,40 @@ async def cli_websocket(websocket: WebSocket, session_code: str):
             "session_id": session["session_id"]
         })
     
+    # ── Step 1: Wait for connect handshake frame ──
+    try:
+        handshake = await websocket.receive_json()
+        if handshake.get("type") != "connect" or handshake.get("role") != "node":
+            await websocket.close(code=4003, reason="Protocol error: connect handshake required")
+            return
+        
+        # Successful handshake
+        session["capabilities"] = handshake.get("capabilities", {})
+    except Exception:
+        await websocket.close(code=4003, reason="Handshake timeout or parse failure")
+        return
+
     try:
         while True:
             data = await websocket.receive_json()
             msg_type = data.get("type")
-            
-            if msg_type == "cli_ready":
-                # CLI sent project manifest — trigger scan pipeline
-                session["project_manifest"] = data.get("project_manifest", {})
-                session["machine_name"] = data.get("machine_name", "Unknown")
-                session["status"] = "scanning"
-                
-                # Notify browser that CLI is ready
-                if session.get("browser_ws"):
-                    await session["browser_ws"].send_json({
-                        "type": "cli_ready",
-                        "machine_name": session["machine_name"],
-                        "project_manifest": session["project_manifest"]
-                    })
-                
-                if session.get("status") == "authenticated":
-                    asyncio.create_task(run_agent_pipeline(code, session["project_manifest"]))
-                else:
-                    session["waiting_for_auth"] = True
-            
-            elif msg_type == "finding":
-                # CLI/agent found an issue — relay to browser immediately
-                finding = data.get("finding", {})
-                session["findings"].append(finding)
-                
-                if session.get("browser_ws"):
-                    await session["browser_ws"].send_json({
-                        "type": "finding",
-                        "finding": finding
-                    })
-            
-            elif msg_type == "scan_complete":
-                session["status"] = "complete"
-                session["completed_at"] = datetime.utcnow()
-                session["security_grade"] = data.get("summary", {}).get("grade")
-                
-                if session.get("browser_ws"):
-                    await session["browser_ws"].send_json({
-                        "type": "scan_complete",
-                        "summary": data.get("summary", {})
-                    })
 
-                await db_update("scans", session["session_id"], {
-                    "status": "complete",
-                    "grade": data.get("summary", {}).get("grade"),
-                    "completed_at": datetime.utcnow().isoformat(),
-                })
-            
-            elif msg_type in ("fix_applied", "rescan_done", "pipeline_progress", "deploy_configs_ready"):
-                # CLI agent progress — relay to browser
-                if session.get("browser_ws"):
-                    await session["browser_ws"].send_json(data)
-            
-            elif msg_type == "mcp_response":
+            if msg_type == "res":
                 # Fulfill pending MCP request future
+                req_id = data.get("id")
+                pending = session.get("mcp_pending_requests", {})
+                if req_id and req_id in pending:
+                    future = pending[req_id]
+                    if not future.done():
+                        # We format the payload as a JSON-RPC response dict to match local mcp client
+                        future.set_result({
+                            "jsonrpc": "2.0",
+                            "id": req_id,
+                            "result": data.get("payload") if data.get("ok") else None,
+                            "error": {"message": data.get("error")} if not data.get("ok") else None
+                        })
+
+            elif msg_type == "mcp_response":
                 payload = data.get("payload", {})
                 req_id = payload.get("id")
                 pending = session.get("mcp_pending_requests", {})
@@ -293,7 +276,63 @@ async def cli_websocket(websocket: WebSocket, session_code: str):
                     future = pending[req_id]
                     if not future.done():
                         future.set_result(payload)
-    
+
+            elif msg_type == "event":
+                event_name = data.get("event")
+                payload = data.get("payload", {})
+
+                if event_name == "cli_ready":
+                    session["project_manifest"] = payload.get("project_manifest", {})
+                    session["machine_name"] = payload.get("machine_name", "Unknown")
+                    session["status"] = "scanning"
+                    
+                    if session.get("browser_ws"):
+                        await session["browser_ws"].send_json({
+                            "type": "cli_ready",
+                            "machine_name": session["machine_name"],
+                            "project_manifest": session["project_manifest"]
+                        })
+                    
+                    if session.get("status") == "authenticated" or True: # Force start scan in dev
+                        asyncio.create_task(run_agent_pipeline(code, session["project_manifest"]))
+                    else:
+                        session["waiting_for_auth"] = True
+                
+                elif event_name == "finding":
+                    finding = payload.get("finding", {})
+                    session["findings"].append(finding)
+                    
+                    if session.get("browser_ws"):
+                        await session["browser_ws"].send_json({
+                            "type": "finding",
+                            "finding": finding
+                        })
+                
+                elif event_name == "scan_complete":
+                    session["status"] = "complete"
+                    session["completed_at"] = datetime.utcnow()
+                    session["security_grade"] = payload.get("summary", {}).get("grade")
+                    
+                    if session.get("browser_ws"):
+                        await session["browser_ws"].send_json({
+                            "type": "scan_complete",
+                            "summary": payload.get("summary", {})
+                        })
+
+                    await db_update("scans", session["session_id"], {
+                        "status": "complete",
+                        "grade": payload.get("summary", {}).get("grade"),
+                        "completed_at": datetime.utcnow().isoformat(),
+                    })
+                
+                elif event_name in ("fix_applied", "rescan_done", "pipeline_progress", "deploy_configs_ready"):
+                    if session.get("browser_ws"):
+                        # Relay to browser under event's name
+                        await session["browser_ws"].send_json({
+                            "type": event_name,
+                            **payload
+                        })
+
     except WebSocketDisconnect:
         session["cli_ws"] = None
         if session["status"] not in ("complete", "expired"):
@@ -399,3 +438,90 @@ async def browser_websocket(websocket: WebSocket, session_id: str):
     
     except WebSocketDisconnect:
         session["browser_ws"] = None
+
+
+# ── HTTP Polling Fallbacks (FastAPI compatibility with CF Worker) ──
+
+@router.get("/poll/cli/{session_id}")
+async def poll_cli(session_id: str):
+    session = None
+    for code, s in _sessions.items():
+        if s["session_id"] == session_id:
+            session = s
+            break
+    if not session:
+        return {"messages": []}
+    
+    msgs = session.get("message_queue", [])
+    session["message_queue"] = []
+    return {"messages": msgs}
+
+@router.get("/poll/browser/{session_id}")
+async def poll_browser(session_id: str):
+    session = None
+    for code, s in _sessions.items():
+        if s["session_id"] == session_id:
+            session = s
+            break
+    if not session:
+        return {"messages": [], "last_id": 0}
+    
+    msgs = session.get("browser_queue", [])
+    session["browser_queue"] = []
+    return {"messages": msgs, "last_id": 0}
+
+@router.post("/send/cli/{session_id}")
+async def send_cli(session_id: str, body: dict):
+    session = None
+    for code, s in _sessions.items():
+        if s["session_id"] == session_id:
+            session = s
+            break
+    if not session:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session.setdefault("browser_queue", []).append(body)
+    return {"ok": True}
+
+@router.post("/send/browser/{session_id}")
+async def send_browser(session_id: str, body: dict):
+    session = None
+    for code, s in _sessions.items():
+        if s["session_id"] == session_id:
+            session = s
+            break
+    if not session:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session.setdefault("message_queue", []).append(body)
+    return {"ok": True}
+
+@router.get("/poll/browser/{session_id}/init")
+async def poll_browser_init(session_id: str):
+    session = None
+    for code, s in _sessions.items():
+        if s["session_id"] == session_id:
+            session = s
+            break
+    
+    if not session:
+        return {"scan": None, "findings": []}
+    
+    report = session.get("report") or {}
+    findings = session.get("findings") or []
+    
+    return {
+        "scan": {
+            "id": session_id,
+            "status": session.get("status", "pending"),
+            "grade": session.get("security_grade") or report.get("grade"),
+            "total_issues": report.get("total_issues") or len(findings),
+            "auto_fixable": report.get("auto_fixable") or sum(1 for f in findings if f.get("auto_fixable")),
+            "files_scanned": report.get("files_scanned") or 0,
+            "project_name": report.get("project_name") or session.get("project_path", ""),
+            "framework": report.get("framework") or "",
+        },
+        "findings": findings
+    }

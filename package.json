@@ -1,6 +1,28 @@
 {
-  "dependencies": {
-    "dotenv": "^17.4.1",
-    "e2b": "^2.19.0"
+  "name": "unideploy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/tui",
+    "packages/ai",
+    "packages/agent",
+    "packages/coding-agent",
+    "packages/cli",
+    "apps/backend-node",
+    "apps/frontend"
+  ],
+  "scripts": {
+    "dev": "npx tsx packages/cli/src/cli.ts",
+    "dev:gateway": "npm run dev --workspace=apps/backend-node",
+    "dev:frontend": "npm run dev --workspace=apps/frontend",
+    "dev:agent": "cd apps/backend && python main.py",
+    "check": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck:cli": "npm run typecheck --workspace=packages/cli",
+    "typecheck:gateway": "npm run typecheck --workspace=apps/backend-node"
+  },
+  "engines": {
+    "node": ">=22.19.0"
   }
 }

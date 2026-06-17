@@ -1,0 +1,35 @@
+model_list:
+  - model_name: gemini/gemini-1.5-pro
+    litellm_params:
+      model: gemini/gemini-1.5-pro
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: openai/gpt-4o-mini
+    litellm_params:
+      model: gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: anthropic/claude-3-5-sonnet
+    litellm_params:
+      model: anthropic/claude-3-5-sonnet
+      api_key: os.environ/ANTHROPIC_API_KEY
+  # Open Source Models
+  - model_name: groq/llama-3.1-70b
+    litellm_params:
+      model: groq/llama-3.1-70b-versatile
+      api_key: os.environ/GROQ_API_KEY
+  - model_name: openrouter/qwen-2.5-72b
+    litellm_params:
+      model: openrouter/qwen/qwen-2.5-72b-instruct
+      api_key: os.environ/OPENROUTER_API_KEY
+  - model_name: openrouter/llama-3.1-70b
+    litellm_params:
+      model: openrouter/meta-llama/llama-3.1-70b-instruct
+      api_key: os.environ/OPENROUTER_API_KEY
+  - model_name: ollama/llama3
+    litellm_params:
+      model: ollama/llama3
+      api_base: http://localhost:11434
+
+general_settings:
+  master_key: sk-1234
+  store_model_in_db: false
+  pass_through_errors: true
