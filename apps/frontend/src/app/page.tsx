@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Terminal from "@/components/Terminal";
 import posthog from "posthog-js";
 
@@ -10,14 +9,6 @@ import posthog from "posthog-js";
    ════════════════════════════════════════════════════════════════════════ */
 
 export default function LandingPage() {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText('npx unideploy "scan this project"');
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-    posthog.capture("install_command_copied", { location: "hero" });
-  };
 
   return (
     <div
@@ -99,7 +90,7 @@ export default function LandingPage() {
           fontWeight: 500,
         }}
       >
-        macOS · Linux · Windows · Free to start
+        Mac App · Apple Silicon + Intel · Free to start
       </div>
 
       {/* ── Section 3: Hero Headline ───────────────────────────────────── */}
@@ -253,58 +244,53 @@ export default function LandingPage() {
         ))}
       </div>
 
-      {/* ── Section 4: Install Command Block ───────────────────────────── */}
-      <div style={{ marginBottom: 48 }}>
+      {/* ── Section 4: Download CTA ─────────────────────────────────────── */}
+      <div style={{ marginBottom: 48, textAlign: "center" }}>
         <div
           style={{
             fontSize: 11,
             textTransform: "uppercase",
             letterSpacing: "0.1em",
             color: "var(--text-muted)",
-            marginBottom: 12,
-            textAlign: "center",
+            marginBottom: 16,
             fontWeight: 500,
           }}
         >
-          RUN YOUR FIRST SCAN
+          Get started in seconds
         </div>
 
-        <div className="terminal-block">
-          <div className="terminal-dots">
-            <div className="terminal-dot-red" />
-            <div className="terminal-dot-amber" />
-            <div className="terminal-dot-green" />
-          </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <div>
-              <span style={{ color: "#6DB84A" }}>$ </span>
-              <span style={{ color: "#C8D8B0" }}>npx unideploy &quot;scan this project&quot;</span>
-            </div>
-            <button
-              onClick={handleCopy}
-              style={{
-                color: "var(--text-muted)",
-                border: "1px solid rgba(255,255,255,0.15)",
-                background: "transparent",
-                fontFamily: "var(--font-mono), JetBrains Mono, monospace",
-                fontSize: 11,
-                padding: "4px 10px",
-                borderRadius: "var(--radius-sm)",
-                cursor: "pointer",
-                transition: "color 0.15s ease, border-color 0.15s ease",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {copied ? "Copied!" : "Copy"}
-            </button>
-          </div>
-        </div>
+        <a
+          href="https://github.com/rahulpandey535/unideploy/releases/latest/download/UniDeploy.dmg"
+          onClick={() => posthog.capture("mac_download_clicked", { location: "hero" })}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 10,
+            background: "var(--text-primary)",
+            color: "var(--bg-primary)",
+            padding: "14px 32px",
+            borderRadius: "var(--radius-pill)",
+            fontSize: 16,
+            fontWeight: 600,
+            textDecoration: "none",
+            fontFamily: "var(--font-body), DM Sans, sans-serif",
+            letterSpacing: "-0.01em",
+          }}
+        >
+          <span style={{ fontSize: 18 }}>↓</span>
+          Download for Mac
+        </a>
+
+        <p
+          style={{
+            fontSize: 12,
+            color: "var(--text-muted)",
+            marginTop: 12,
+            marginBottom: 0,
+          }}
+        >
+          macOS 13+ · Apple Silicon &amp; Intel · Free to start
+        </p>
 
         {/* Trust badges */}
         <div
@@ -313,16 +299,14 @@ export default function LandingPage() {
             flexWrap: "wrap",
             justifyContent: "center",
             gap: 24,
-            marginTop: 16,
+            marginTop: 20,
             fontSize: 13,
             color: "var(--text-secondary)",
           }}
         >
-          {["Any framework", "Auto-fix", "Zero config", "Free forever"].map(
-            (badge) => (
-              <span key={badge}>✓ {badge}</span>
-            )
-          )}
+          {["Any framework", "Auto-fix", "Zero config", "Free forever"].map((badge) => (
+            <span key={badge}>✓ {badge}</span>
+          ))}
         </div>
       </div>
 
@@ -392,22 +376,22 @@ export default function LandingPage() {
           {
             num: "01",
             title: "Scan your project",
-            desc: "One command scans your entire project — Next.js, FastAPI, Django, Express, Vite, or mixed stack. UniDeploy detects your framework, finds secrets, audits RLS, and checks deploy readiness. You get a grade from A to F with every issue listed by file and line number.",
-            cmd: 'npx unideploy "scan this project"',
+            desc: "Open UniDeploy, point it at your project folder, and click Scan. Supports Next.js, FastAPI, Django, Express, Vite, or mixed stack. UniDeploy detects your framework, finds secrets, audits RLS, and checks deploy readiness. You get a grade from A to F with every issue listed by file and line number.",
+            action: "Open app → select folder → Scan",
           },
           {
             num: "02",
             title: "Fix issues automatically",
             desc: "UniDeploy doesn't just report — it fixes. The agent patches your local files directly: moves secrets to env vars, creates ignore files for LLM tools, adds RLS policies, and hardens your configuration.",
-            cmd: 'npx unideploy "fix the secrets issues"',
+            action: "Select findings → Apply fixes",
           },
           {
             num: "03",
             title: "Ship with confidence",
             desc: "Re-scan after fixes to verify your grade improved. Every finding is specific — exact file, exact line, exact fix. No false positives. Production-grade in minutes, not days.",
-            cmd: 'npx unideploy "check deploy readiness"',
+            action: "Re-scan → Grade improves → Deploy",
           },
-        ].map(({ num, title, desc, cmd }) => (
+        ].map(({ num, title, desc, action }) => (
           <div
             key={num}
             style={{
@@ -447,17 +431,17 @@ export default function LandingPage() {
             >
               {desc}
             </p>
-            <code style={{
+            <span style={{
               fontFamily: "var(--font-mono), JetBrains Mono, monospace",
-              fontSize: 13,
+              fontSize: 12,
               color: "var(--accent-green)",
               background: "rgba(109,184,74,0.08)",
               border: "1px solid rgba(109,184,74,0.2)",
               borderRadius: 6,
               padding: "4px 10px",
             }}>
-              $ {cmd}
-            </code>
+              {action}
+            </span>
           </div>
         ))}
       </section>
@@ -517,9 +501,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Section 8: Bottom CTA ──────────────────────────────────────── */}
-      <section
-        style={{ textAlign: "center", padding: "80px 0" }}
-      >
+      <section style={{ textAlign: "center", padding: "80px 0" }}>
         <h2
           style={{
             fontFamily: "var(--font-display), Sora, sans-serif",
@@ -529,31 +511,18 @@ export default function LandingPage() {
             marginBottom: 16,
           }}
         >
-          Run your first scan →
+          Start your first scan →
         </h2>
         <p
           style={{
             fontSize: 16,
             color: "var(--text-secondary)",
-            marginBottom: 20,
+            marginBottom: 28,
             lineHeight: 1.6,
           }}
         >
-          One command. Security grade in 60 seconds.
+          Security grade in 60 seconds. No config. No DevOps.
         </p>
-        <code style={{
-          fontFamily: "var(--font-mono), JetBrains Mono, monospace",
-          fontSize: 14,
-          color: "var(--accent-green)",
-          background: "rgba(109,184,74,0.08)",
-          border: "1px solid rgba(109,184,74,0.2)",
-          borderRadius: 8,
-          padding: "10px 20px",
-          display: "inline-block",
-          marginBottom: 24,
-        }}>
-          $ npx unideploy &quot;scan this project&quot;
-        </code>
         <div
           style={{
             display: "flex",
@@ -563,10 +532,27 @@ export default function LandingPage() {
           }}
         >
           <a
-            href="/dashboard"
+            href="https://github.com/rahulpandey535/unideploy/releases/latest/download/UniDeploy.dmg"
+            onClick={() => posthog.capture("mac_download_clicked", { location: "footer_cta" })}
             style={{
               background: "var(--text-primary)",
               color: "var(--bg-primary)",
+              padding: "12px 28px",
+              borderRadius: "var(--radius-pill)",
+              fontSize: 15,
+              fontWeight: 600,
+              textDecoration: "none",
+              fontFamily: "var(--font-body), DM Sans, sans-serif",
+            }}
+          >
+            ↓ Download for Mac
+          </a>
+          <a
+            href="/dashboard"
+            style={{
+              border: "1px solid var(--border)",
+              color: "var(--text-primary)",
+              background: "transparent",
               padding: "12px 28px",
               borderRadius: "var(--radius-pill)",
               fontSize: 15,

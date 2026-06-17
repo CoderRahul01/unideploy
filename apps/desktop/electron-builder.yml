@@ -1,0 +1,40 @@
+appId: in.unideploy.app
+productName: UniDeploy
+copyright: Copyright © 2025 7EDGE
+
+directories:
+  output: release
+
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+  # icon: assets/icon.icns  # add 1024x1024 icns before shipping
+
+dmg:
+  title: UniDeploy ${version}
+  window:
+    width: 560
+    height: 340
+
+files:
+  - dist/**
+  - "!dist/renderer/**"
+  - dist/renderer/**
+  - node_modules/**
+  - package.json
+
+extraResources:
+  - from: ../../packages/cli
+    to: cli
+    filter:
+      - "**/*"
+      - "!node_modules/**"
+
+publish:
+  provider: github
+  owner: rahulpandey535
+  repo: unideploy

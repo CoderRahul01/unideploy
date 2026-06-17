@@ -102,3 +102,38 @@ export const myTool: AgentTool<typeof schema> = {
 - British English in user-facing strings
 - Secrets: mask as `first6chars****`, never log plaintext values
 - No direct push to main — PRs required
+
+## Desktop App (apps/desktop/)
+
+Electron Mac app — wraps the Pi agent + tools in a native `.dmg` installer.
+Distribution: GitHub Releases → "Download for Mac" button on landing page.
+
+```
+apps/desktop/
+  src/
+    main.ts       Electron main process — spawns CLI subprocess, handles IPC
+    preload.ts    contextBridge: window.uni.agent / scan / settings
+    renderer/     Vite + React UI (NOT Next.js)
+      App.tsx     sidebar nav: Scan | Settings
+      components/
+        ChatPane.tsx    streaming agent chat with quick-scan buttons
+        Settings.tsx    API key storage via electron-store
+      styles/globals.css  cream palette matching unideploy.in
+```
+
+Dev:  `npm run dev:desktop`
+Build `.dmg`: `npm run dist:mac`
+
+IPC handlers in main.ts:
+- `agent:prompt` — spawns `npx tsx packages/cli/src/cli.ts <prompt>`, streams stdout/stderr to renderer via `agent:chunk` / `agent:tool` / `agent:done` events
+- `scan:run` — same as above with scan-specific prompt + cwd
+- `settings:get` / `settings:set` — electron-store; keys written to `process.env` on save so model resolution picks them up without restart
+
+## Web Search (Tinyfish)
+
+`webSearchTool` in `packages/cli/src/tools/web-search.ts`
+
+Priority web search provider for the agent. Requires `TINYFISH_API_KEY`.
+Endpoint: `POST https://api.tinyfish.io/search`
+Used whenever the agent needs live docs, CVE details, package versions, or error message lookup.
+Falls back gracefully (returns info message) if key is not set.

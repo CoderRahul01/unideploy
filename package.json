@@ -10,17 +10,20 @@
     "packages/coding-agent",
     "packages/cli",
     "apps/backend-node",
+    "apps/desktop",
     "apps/frontend"
   ],
   "scripts": {
     "dev": "npx tsx packages/cli/src/cli.ts",
     "dev:gateway": "npm run dev --workspace=apps/backend-node",
     "dev:frontend": "npm run dev --workspace=apps/frontend",
+    "dev:desktop": "npm run dev --workspace=apps/desktop",
     "dev:agent": "cd apps/backend && python main.py",
     "check": "npm run typecheck --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "typecheck:cli": "npm run typecheck --workspace=packages/cli",
-    "typecheck:gateway": "npm run typecheck --workspace=apps/backend-node"
+    "typecheck:gateway": "npm run typecheck --workspace=apps/backend-node",
+    "dist:mac": "npm run dist --workspace=apps/desktop"
   },
   "engines": {
     "node": ">=22.19.0"

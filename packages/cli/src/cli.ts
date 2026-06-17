@@ -15,6 +15,7 @@ import { readTool } from "./tools/read.js";
 import { writeTool } from "./tools/write.js";
 import { bashTool } from "./tools/bash.js";
 import { editTool } from "./tools/edit.js";
+import { webSearchTool } from "./tools/web-search.js";
 import { loadSkill, listSkills } from "./skills/loader.js";
 
 function resolveModel() {
@@ -61,6 +62,7 @@ Tools:
 - secrets_audit: finds hardcoded API keys, missing LLM tool ignore coverage (.cursorignore, .claudeignore, .aiderignore etc.), secrets in git history
 - rls_scan: finds Supabase RLS misconfigs — CVE-2025-48757 pattern (USING(true), service_role in client, disabled RLS)
 - deploy_check: pre-deploy checklist — CORS, rate limiting, HTTPS, error handling, npm vulnerabilities
+- web_search: live web search via Tinyfish — use for CVE details, package docs, error messages, platform changelog
 
 Grade apps A–F:
 A = no critical or high | B = 1–2 high | C = 1 critical or 3–5 high | D = 2–3 critical | F = 4+ critical
@@ -78,7 +80,7 @@ async function main(): Promise<void> {
     initialState: {
       systemPrompt: SYSTEM_PROMPT,
       model,
-      tools: [readTool, writeTool, editTool, bashTool, secretsAuditTool, rlsScanTool, deployCheckTool],
+      tools: [readTool, writeTool, editTool, bashTool, secretsAuditTool, rlsScanTool, deployCheckTool, webSearchTool],
     },
   });
 
