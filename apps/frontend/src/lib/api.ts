@@ -3,7 +3,7 @@
  * Covers both the CLI session flow and the GitHub URL scan pipeline.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 // ── Shared types ─────────────────────────────────────────────────────────────
 
@@ -220,4 +220,35 @@ export async function createCheckoutSession(tier: string, annual = false): Promi
     method: "POST",
     body: JSON.stringify({ tier, billing: annual ? "annual" : "monthly" }),
   });
+}
+
+// ── Secrets Audit ─────────────────────────────────────────────────────────────
+
+export interface SecretsFinding {
+  id?: string;
+  file: string;
+  line?: number | null;
+  type: string;
+  provider?: string;
+  severity: "critical" | "high" | "medium" | "low";
+  masked_value?: string;
+  fingerprint?: string;
+  description: string;
+  fix: string;
+}
+
+export interface SecretsAuditResponse {
+  grade: "A" | "B" | "C" | "D" | "F";
+  summary: string;
+  findings: SecretsFinding[];
+  scanned_files: number;
+  recommendation: string;
+}
+
+export async function runSecretsAudit(repoPath?: string): Promise<SecretsAuditResponse> {
+  const res = await request<{ data: SecretsAuditResponse }>("/api/v1/secrets/audit", {
+    method: "POST",
+    body: JSON.stringify({ repoPath }),
+  });
+  return res.data;
 }

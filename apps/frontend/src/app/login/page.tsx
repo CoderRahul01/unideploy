@@ -1,12 +1,26 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { loginUser, registerUser } from "@/lib/api";
 import posthog from "posthog-js";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight: "100vh", background: "#0F1410", color: "#E8F0D8", fontFamily: "var(--font-body), sans-serif", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ fontSize: 16 }}>Loading login...</div>
+      </div>
+    }>
+      <LoginPageContent />
+    </Suspense>
+  );
+}
+
+function LoginPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTarget = searchParams.get("redirect") || "/dashboard";
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -26,8 +40,8 @@ export default function LoginPage() {
         await registerUser(email, password);
         posthog.capture("user_registered");
       }
-      // Redirect back to pricing or dashboard
-      router.push("/dashboard");
+      // Redirect back to original route (or pricing/dashboard)
+      router.push(redirectTarget);
     } catch (err: any) {
       setError(err.message || "Something went wrong");
     } finally {

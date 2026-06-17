@@ -13,7 +13,7 @@ export default function LandingPage() {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText("npx unideploy@latest init");
+    navigator.clipboard.writeText('npx unideploy "scan this project"');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
     posthog.capture("install_command_copied", { location: "hero" });
@@ -114,7 +114,7 @@ export default function LandingPage() {
           marginBottom: 20,
         }}
       >
-        <span style={{ color: "var(--text-primary)" }}>Make your app</span>
+        <span style={{ color: "var(--text-primary)" }}>UniDeploy</span>
         <br />
         <span style={{ color: "var(--accent-green)", fontStyle: "italic" }}>production-ready.</span>
       </h1>
@@ -126,12 +126,132 @@ export default function LandingPage() {
           lineHeight: 1.7,
           textAlign: "center",
           maxWidth: 520,
-          margin: "0 auto 40px",
+          margin: "0 auto 20px",
         }}
       >
-        UniDeploy scans your vibe-coded app in seconds. No DevOps. No config.
-        One command and your app is hardened, secure, and ready to ship.
+        Production-readiness agent for vibe-coded apps.
+        You build anywhere. We make it production-grade.
       </p>
+
+      {/* ── Section 3b: Stat Tiles ─────────────────────────────────────── */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+          gap: 12,
+          marginBottom: 40,
+        }}
+      >
+        {[
+          { stat: "2,000+", desc: "critical vulns found in 5,600+ vibe-coded apps (Escape.tech)" },
+          { stat: "400+", desc: "exposed secrets in production apps" },
+          { stat: "45%", desc: "of AI-generated code has OWASP Top 10 flaws (Veracode)" },
+          { stat: "63%", desc: "of vibe-coding users are non-developers" },
+        ].map(({ stat, desc }) => (
+          <div
+            key={stat}
+            style={{
+              border: "1px solid var(--border)",
+              borderRadius: 10,
+              padding: "16px 14px",
+              textAlign: "center",
+              background: "rgba(255,255,255,0.3)",
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "var(--font-display), Sora, sans-serif",
+                fontSize: 24,
+                fontWeight: 800,
+                color: "var(--text-primary)",
+                marginBottom: 6,
+              }}
+            >
+              {stat}
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                color: "var(--text-secondary)",
+                lineHeight: 1.5,
+              }}
+            >
+              {desc}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Section 3c: Three Scan Category Cards ──────────────────────── */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 40 }}>
+        {[
+          {
+            emoji: "🔐",
+            title: "Secrets",
+            desc: "Finds hardcoded API keys, missing LLM tool ignore files (.cursorignore, .claudeignore, .aiderignore), and secrets in git history.",
+            grade: "Grade: A–F",
+          },
+          {
+            emoji: "🛡️",
+            title: "Supabase RLS",
+            desc: "Detects CVE-2025-48757 pattern: USING(true) policies, service_role in client code, disabled RLS.",
+            grade: "Grade: A–F",
+          },
+          {
+            emoji: "🚀",
+            title: "Deploy Readiness",
+            desc: "CORS wildcard, missing rate limiting, HTTPS issues, dep vulnerabilities, error handling gaps.",
+            grade: "Grade: A–F",
+          },
+        ].map(({ emoji, title, desc, grade }) => (
+          <div
+            key={title}
+            style={{
+              border: "1px solid var(--border)",
+              borderRadius: 10,
+              padding: "20px 24px",
+              background: "rgba(255,255,255,0.3)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <span style={{ fontSize: 22 }}>{emoji}</span>
+              <span
+                style={{
+                  fontFamily: "var(--font-display), Sora, sans-serif",
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: "var(--text-primary)",
+                }}
+              >
+                {title}
+              </span>
+              <span
+                style={{
+                  marginLeft: "auto",
+                  fontFamily: "var(--font-mono), JetBrains Mono, monospace",
+                  fontSize: 11,
+                  color: "var(--text-muted)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 4,
+                  padding: "2px 8px",
+                }}
+              >
+                {grade}
+              </span>
+            </div>
+            <p
+              style={{
+                fontSize: 14,
+                color: "var(--text-secondary)",
+                lineHeight: 1.6,
+                margin: 0,
+              }}
+            >
+              {desc}
+            </p>
+          </div>
+        ))}
+      </div>
 
       {/* ── Section 4: Install Command Block ───────────────────────────── */}
       <div style={{ marginBottom: 48 }}>
@@ -146,7 +266,7 @@ export default function LandingPage() {
             fontWeight: 500,
           }}
         >
-          INSTALL VIA TERMINAL
+          RUN YOUR FIRST SCAN
         </div>
 
         <div className="terminal-block">
@@ -164,7 +284,7 @@ export default function LandingPage() {
           >
             <div>
               <span style={{ color: "#6DB84A" }}>$ </span>
-              <span style={{ color: "#C8D8B0" }}>npx unideploy@latest init</span>
+              <span style={{ color: "#C8D8B0" }}>npx unideploy &quot;scan this project&quot;</span>
             </div>
             <button
               onClick={handleCopy}
@@ -211,32 +331,27 @@ export default function LandingPage() {
         title="Terminal — zsh"
         animated={true}
         lines={[
-          { text: "$ npx unideploy@latest init", color: "#C8D8B0", delay: 600 },
+          { text: '$ npx unideploy "scan this project"', color: "#C8D8B0", delay: 600 },
           { text: "● UniDeploy agent running", color: "#6DB84A", delay: 500 },
-          { text: "  Detected: Next.js 14 + FastAPI + Supabase", color: "#C8D8B0", delay: 400 },
+          { text: "  Detected: Next.js 14 + Supabase", color: "#C8D8B0", delay: 400 },
           { text: "  Scanning 847 files...", color: "#C8D8B0", delay: 800 },
           { text: "", delay: 200 },
           { text: "  [CRITICAL] Stripe live key in source    src/lib/stripe.ts:3", color: "#FF6B6B", delay: 350 },
+          { text: "  [CRITICAL] .env in git history          recoverable via git log", color: "#FF6B6B", delay: 300 },
           { text: "  [HIGH]     RLS disabled on 4 tables     supabase/schema.sql", color: "#F0A830", delay: 300 },
           { text: "  [HIGH]     No rate limiting on /api     routes/auth.ts:12", color: "#F0A830", delay: 300 },
+          { text: "  [HIGH]     .cursorignore missing        .env exposed to Cursor", color: "#F0A830", delay: 300 },
           { text: "  [MEDIUM]   Missing security headers     next.config.js", color: "#8A9070", delay: 300 },
           { text: "", delay: 200 },
           { text: "  Grade: D  |  12 issues  |  8 auto-fixable", color: "#FF6B6B", bold: true, delay: 400 },
-          { text: "  ✓ Dashboard ready → unideploy.in/dashboard", color: "#6DB84A", delay: 400 },
+          { text: "  Migrate secrets → 1Claw: https://1claw.xyz", color: "#6DB84A", delay: 400 },
           { text: "", delay: 600 },
-          { text: "$ unideploy fix", color: "#C8D8B0", delay: 400 },
-          { text: "● UniDeploy FixAgent — patching 8 issues...", color: "#6DB84A", delay: 500 },
+          { text: '$ npx unideploy "fix the secrets issues"', color: "#C8D8B0", delay: 400 },
+          { text: "● UniDeploy — patching 8 issues...", color: "#6DB84A", delay: 500 },
           { text: "  ✓ [CRITICAL] Stripe key moved to env var", color: "#6DB84A", delay: 350 },
           { text: "  ✓ [HIGH]     RLS policies added to 4 tables", color: "#6DB84A", delay: 350 },
+          { text: "  ✓ [HIGH]     .cursorignore created", color: "#6DB84A", delay: 350 },
           { text: "  ✓ 8 patches applied  |  Grade: B", color: "#6DB84A", bold: true, delay: 400 },
-          { text: "", delay: 600 },
-          { text: "$ unideploy deploy", color: "#C8D8B0", delay: 400 },
-          { text: "● UniDeploy DeployAgent", color: "#6DB84A", delay: 500 },
-          { text: "  Detected: Next.js → Vercel + FastAPI → Cloud Run", color: "#C8D8B0", delay: 400 },
-          { text: "  ✓ vercel.json — Vercel deployment config", color: "#6DB84A", delay: 350 },
-          { text: "  ✓ cloudbuild.yaml — GCP Cloud Build pipeline", color: "#6DB84A", delay: 350 },
-          { text: "  ✓ Dockerfile — production container", color: "#6DB84A", delay: 350 },
-          { text: "  ✓ 3 config files generated", color: "#6DB84A", bold: true, delay: 400 },
         ]}
         style={{ minHeight: 400, marginBottom: 80 }}
       />
@@ -276,27 +391,21 @@ export default function LandingPage() {
         {[
           {
             num: "01",
-            title: "Install the scanner",
-            desc: "One command installs UniDeploy globally. Works with any project — Next.js, FastAPI, Django, Express, Vite, or mixed stack. No dependencies. No config files.",
-            cmd: "npx unideploy@latest init",
+            title: "Scan your project",
+            desc: "One command scans your entire project — Next.js, FastAPI, Django, Express, Vite, or mixed stack. UniDeploy detects your framework, finds secrets, audits RLS, and checks deploy readiness. You get a grade from A to F with every issue listed by file and line number.",
+            cmd: 'npx unideploy "scan this project"',
           },
           {
             num: "02",
-            title: "Get your security grade",
-            desc: "UniDeploy detects your framework and scans across 13 production-readiness categories — secrets, auth, RLS, rate limiting, dependencies, and more. You get a grade from A to F with every issue listed by file and line number.",
-            cmd: "unideploy scan",
+            title: "Fix issues automatically",
+            desc: "UniDeploy doesn't just report — it fixes. The agent patches your local files directly: moves secrets to env vars, creates ignore files for LLM tools, adds RLS policies, and hardens your configuration.",
+            cmd: 'npx unideploy "fix the secrets issues"',
           },
           {
             num: "03",
-            title: "Fix and generate deployment configs",
-            desc: "AI patches your local files directly. Then generate platform-aware deployment configs for Vercel, Cloud Run, Railway, AWS, or Cloudflare — with live docs fetched at runtime. Or run it all in one command.",
-            cmd: "unideploy fix  &&  unideploy deploy",
-          },
-          {
-            num: "04",
-            title: "One command does it all",
-            desc: "unideploy run orchestrates the full pipeline — scan, AI fix, and deployment config generation — in a single command. Built for CI/CD and power users.",
-            cmd: "unideploy run",
+            title: "Ship with confidence",
+            desc: "Re-scan after fixes to verify your grade improved. Every finding is specific — exact file, exact line, exact fix. No false positives. Production-grade in minutes, not days.",
+            cmd: 'npx unideploy "check deploy readiness"',
           },
         ].map(({ num, title, desc, cmd }) => (
           <div
@@ -420,19 +529,31 @@ export default function LandingPage() {
             marginBottom: 16,
           }}
         >
-          Ready to harden your app?
+          Run your first scan →
         </h2>
         <p
           style={{
             fontSize: 16,
             color: "var(--text-secondary)",
-            marginBottom: 32,
+            marginBottom: 20,
             lineHeight: 1.6,
           }}
         >
-          Install the scanner, get your grade, and fix issues — all in under 60
-          seconds.
+          One command. Security grade in 60 seconds.
         </p>
+        <code style={{
+          fontFamily: "var(--font-mono), JetBrains Mono, monospace",
+          fontSize: 14,
+          color: "var(--accent-green)",
+          background: "rgba(109,184,74,0.08)",
+          border: "1px solid rgba(109,184,74,0.2)",
+          borderRadius: 8,
+          padding: "10px 20px",
+          display: "inline-block",
+          marginBottom: 24,
+        }}>
+          $ npx unideploy &quot;scan this project&quot;
+        </code>
         <div
           style={{
             display: "flex",

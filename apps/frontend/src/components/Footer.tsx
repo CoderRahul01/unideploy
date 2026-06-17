@@ -115,8 +115,7 @@ export default function Footer() {
               maxWidth: 200,
             }}
           >
-            The production layer for vibe-coded apps. Scan, fix, and deploy —
-            without touching DevOps.
+            UniDeploy · unideploy.in · Production-readiness for vibe-coded apps.
           </p>
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
             <a

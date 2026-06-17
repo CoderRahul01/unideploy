@@ -381,7 +381,7 @@ function CliReportView({ sessionId }: { sessionId: string }) {
         <div style={{ textAlign: "center", padding: "60px 0", color: C.muted, fontSize: 14 }}>
           {loadError
             ? "Could not load report. The scan may still be running."
-            : "Run npx unideploy@latest init in your project and enter the code at unideploy.in/connect"}
+            : "No scans yet. Run: npx unideploy \"scan this project\" — or try: npx unideploy \"scan for secrets\" / npx unideploy \"check RLS\""}
         </div>
       </div>
     );
@@ -484,7 +484,7 @@ function CliReportView({ sessionId }: { sessionId: string }) {
             </button>
           ) : (
             <span style={{ fontFamily: C.mono, fontSize: 12, color: C.muted }}>
-              Run <strong style={{ color: C.text }}>unideploy fix</strong> in your terminal to apply
+              Run <strong style={{ color: C.text }}>npx unideploy "fix the secrets issues"</strong> in your terminal to apply
             </span>
           )}
         </div>
@@ -602,10 +602,10 @@ function GithubScanFlow({ initialScanId }: { initialScanId?: string }) {
 
       <h1 style={{ fontFamily: C.display, fontSize: "clamp(28px,5vw,38px)", fontWeight: 800,
         color: C.text, letterSpacing: "-0.03em", marginBottom: 8 }}>
-        Security Scanner
+        Production-Readiness Scanner
       </h1>
       <p style={{ color: C.muted, fontSize: 14, marginBottom: 32 }}>
-        Paste a GitHub repository URL — we'll scan it inside an isolated sandbox.
+        Paste a GitHub repository URL — we&apos;ll scan it for secrets, RLS issues, and deploy readiness.
       </p>
 
       {!scanId && (

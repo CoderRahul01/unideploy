@@ -53,7 +53,7 @@ export interface ScanSummary {
   low: number
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8787'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
 /**
  * UniDeploySocket — HTTP polling client that mimics the WebSocket API.

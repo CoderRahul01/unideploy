@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useCallback, useEffect, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import OTPInput from "@/components/OTPInput";
 import { verifySession, getScanReport } from "@/lib/api";
 import posthog from "posthog-js";
@@ -26,12 +26,49 @@ const C = {
 type PageState = "entry" | "waiting" | "complete";
 
 export default function ConnectPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: C.font, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ fontSize: 16, fontFamily: C.mono }}>Loading connection...</div>
+      </div>
+    }>
+      <ConnectPageContent />
+    </Suspense>
+  );
+}
+
+function ConnectPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const codeParam = searchParams.get("code");
   const [pageState, setPageState] = useState<PageState>("entry");
   const [error, setError] = useState(false);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const autoSubmitRef = useRef(false);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("unideploy_token") : null;
+    if (!token) {
+      const currentPath = window.location.pathname + window.location.search;
+      router.push(`/login?redirect=${encodeURIComponent(currentPath)}`);
+    }
+  }, [router]);
+
+  // Auto-connect if code parameter is present in URL
+  useEffect(() => {
+    if (codeParam && !autoSubmitRef.current) {
+      const cleanCode = codeParam.replace(/[-\s]/g, "");
+      if (cleanCode.length === 6 && /^[0-9]+$/.test(cleanCode)) {
+        autoSubmitRef.current = true;
+        setCode(cleanCode);
+        connectSession(cleanCode);
+      }
+    }
+  }, [codeParam]);
 
   // Scan progress from WebSocket
   const [filesScanned, setFilesScanned] = useState(0);
@@ -42,7 +79,7 @@ export default function ConnectPage() {
   useEffect(() => {
     if (!sessionId) return;
 
-    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
+    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
     pollRef2.current = setInterval(async () => {
       try {
@@ -331,6 +368,7 @@ export default function ConnectPage() {
           error={error}
           loading={loading}
           onShakeComplete={handleShakeComplete}
+          value={code}
         />
       </div>
 

@@ -7,6 +7,7 @@ interface OTPInputProps {
   error?: boolean;
   loading?: boolean;
   onShakeComplete?: () => void;
+  value?: string;
 }
 
 export default function OTPInput({
@@ -14,8 +15,21 @@ export default function OTPInput({
   error = false,
   loading = false,
   onShakeComplete,
+  value = "",
 }: OTPInputProps) {
   const [values, setValues] = useState<string[]>(Array(6).fill(""));
+
+  // Sync value prop to internal state
+  useEffect(() => {
+    if (value) {
+      const clean = value.replace(/[-\s]/g, "").slice(0, 6);
+      const next = clean.split("");
+      while (next.length < 6) {
+        next.push("");
+      }
+      setValues(next);
+    }
+  }, [value]);
   const inputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
   // Focus first input on mount
