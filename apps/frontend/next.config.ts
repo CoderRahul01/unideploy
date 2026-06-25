@@ -1,11 +1,12 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
+import path from "node:path";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
   output: process.env.DOCKER_BUILD === "1" ? "standalone" : undefined,
   turbopack: {
-    root: __dirname,
+    root: path.join(__dirname, "../.."),
   },
   typescript: {
     // ETIMEDOUT on next-env.d.ts — macOS filesystem issue, not code.
