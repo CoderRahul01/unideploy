@@ -4,6 +4,11 @@ import type { Server } from "http";
 import { redis } from "../services/redis.js";
 import type { WsServerMessage, WsClientMessage, AuthSession } from "../types/index.js";
 
+const MAX_MESSAGE_SIZE = 16 * 1024; // 16KB
+const MAX_CONNECTIONS_PER_IP = 5;
+const HEARTBEAT_INTERVAL_MS = 30_000;
+const SESSION_CLEANUP_INTERVAL_MS = 30 * 60_000; // 30 minutes
+
 // In-memory session map: sessionId → { cli, browser, queue }
 // For a single-process deployment this is sufficient. For multi-instance, replace with Redis.
 interface SessionSockets {
@@ -11,16 +16,19 @@ interface SessionSockets {
   browser: WebSocket | null;
   queue: WsServerMessage[];         // messages buffered before both sides connect
   userId: string | null;
+  lastActivity: number;
 }
 
 const sessions = new Map<string, SessionSockets>();
+const ipConnections = new Map<string, number>();
 
 function getOrCreate(sessionId: string): SessionSockets {
   let s = sessions.get(sessionId);
   if (!s) {
-    s = { cli: null, browser: null, queue: [], userId: null };
+    s = { cli: null, browser: null, queue: [], userId: null, lastActivity: Date.now() };
     sessions.set(sessionId, s);
   }
+  s.lastActivity = Date.now();
   return s;
 }
 
@@ -50,9 +58,61 @@ async function validateToken(token: string): Promise<{ userId: string } | null> 
 }
 
 export function attachWebSocketServer(server: Server): WebSocketServer {
-  const wss = new WebSocketServer({ server, path: "/ws" });
+  const wss = new WebSocketServer({
+    server,
+    path: "/ws",
+    maxPayload: MAX_MESSAGE_SIZE,
+  });
+
+  // Heartbeat: detect stale connections
+  const heartbeat = setInterval(() => {
+    for (const ws of wss.clients) {
+      const ext = ws as WebSocket & { isAlive?: boolean };
+      if (ext.isAlive === false) {
+        ws.terminate();
+        continue;
+      }
+      ext.isAlive = false;
+      ws.ping();
+    }
+  }, HEARTBEAT_INTERVAL_MS);
+
+  // Session memory cleanup: remove sessions idle for 30+ minutes
+  const cleanup = setInterval(() => {
+    const cutoff = Date.now() - SESSION_CLEANUP_INTERVAL_MS;
+    for (const [id, s] of sessions) {
+      if (!s.cli && !s.browser && s.lastActivity < cutoff) {
+        sessions.delete(id);
+      }
+    }
+  }, SESSION_CLEANUP_INTERVAL_MS);
+
+  wss.on("close", () => {
+    clearInterval(heartbeat);
+    clearInterval(cleanup);
+  });
 
   wss.on("connection", async (ws: WebSocket, req: IncomingMessage) => {
+    // Heartbeat tracking
+    const ext = ws as WebSocket & { isAlive?: boolean };
+    ext.isAlive = true;
+    ws.on("pong", () => { ext.isAlive = true; });
+
+    // Per-IP connection limiting
+    const clientIp = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim()
+      ?? req.socket.remoteAddress ?? "unknown";
+    const currentCount = ipConnections.get(clientIp) ?? 0;
+    if (currentCount >= MAX_CONNECTIONS_PER_IP) {
+      ws.close(4029, "Too many connections from this IP");
+      return;
+    }
+    ipConnections.set(clientIp, currentCount + 1);
+    ws.on("close", () => {
+      const c = ipConnections.get(clientIp) ?? 1;
+      if (c <= 1) ipConnections.delete(clientIp);
+      else ipConnections.set(clientIp, c - 1);
+    });
+
     const url = new URL(req.url ?? "", "http://localhost");
     const role = url.searchParams.get("role") as "cli" | "browser" | null;
     const sessionId = url.searchParams.get("session") ?? "";
@@ -88,17 +148,16 @@ export function attachWebSocketServer(server: Server): WebSocketServer {
         send(ws, { type: "browser_connected", sessionId });
       }
 
-      // Subscribe to Redis pub/sub channel for this session
-      // Upstash REST does not support subscribe; we poll the verify endpoint instead.
-      // Real pub/sub messages are delivered via the /poll fallback endpoints.
-
       ws.on("message", (raw) => {
+        if (Buffer.byteLength(raw as Buffer) > MAX_MESSAGE_SIZE) return;
         let msg: WsClientMessage;
         try {
           msg = JSON.parse(raw.toString()) as WsClientMessage;
         } catch {
           return;
         }
+
+        session.lastActivity = Date.now();
 
         if (msg.type === "scan_progress" && session.browser) {
           send(session.browser, msg as unknown as WsServerMessage);
@@ -121,12 +180,15 @@ export function attachWebSocketServer(server: Server): WebSocketServer {
       }
 
       ws.on("message", (raw) => {
+        if (Buffer.byteLength(raw as Buffer) > MAX_MESSAGE_SIZE) return;
         let msg: WsClientMessage;
         try {
           msg = JSON.parse(raw.toString()) as WsClientMessage;
         } catch {
           return;
         }
+
+        session.lastActivity = Date.now();
 
         if (msg.type === "apply_fix") {
           if (!session.cli) {

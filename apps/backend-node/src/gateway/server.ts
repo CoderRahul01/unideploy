@@ -1,5 +1,6 @@
 import express, { type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
+import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { config } from "../config.js";
 import { authRouter } from "../routes/auth.js";
@@ -7,6 +8,7 @@ import { scanRouter } from "../routes/scan.js";
 import { deployRouter } from "../routes/deploy.js";
 import { secretsRouter } from "../routes/secrets.js";
 import { paymentsRouter } from "../routes/payments.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const ALLOWED_ORIGINS = [
   "https://unideploy.in",
@@ -20,9 +22,24 @@ const ALLOWED_ORIGINS = [
 export function createApp(): express.Application {
   const app = express();
 
+  // ── Security headers ─────────────────────────────────────────────────────
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:"],
+        connectSrc: ["'self'", ...ALLOWED_ORIGINS],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  }));
+
   // ── Raw body capture for webhook HMAC verification ────────────────────────
   app.use(
     express.json({
+      limit: "1mb",
       verify: (req: Request & { rawBody?: Buffer }, _res, buf) => {
         req.rawBody = buf;
       },
@@ -86,7 +103,7 @@ export function createApp(): express.Application {
   app.use("/payments", paymentsRouter);
 
   // ── Polling fallbacks (CLI compatibility with existing session flow) ──────
-  app.get("/poll/cli/:sessionId", async (req, res) => {
+  app.get("/poll/cli/:sessionId", requireAuth, async (req, res) => {
     const { redis } = await import("../services/redis.js");
     const { sessionId } = req.params as { sessionId: string };
     const msgs = await redis.jsonGet<unknown[]>(`poll:cli:${sessionId}`) ?? [];
@@ -94,7 +111,7 @@ export function createApp(): express.Application {
     res.json({ messages: msgs });
   });
 
-  app.get("/poll/browser/:sessionId", async (req, res) => {
+  app.get("/poll/browser/:sessionId", requireAuth, async (req, res) => {
     const { redis } = await import("../services/redis.js");
     const { sessionId } = req.params as { sessionId: string };
     const msgs = await redis.jsonGet<unknown[]>(`poll:browser:${sessionId}`) ?? [];
@@ -102,7 +119,7 @@ export function createApp(): express.Application {
     res.json({ messages: msgs, last_id: 0 });
   });
 
-  app.post("/send/cli/:sessionId", express.json(), async (req, res) => {
+  app.post("/send/cli/:sessionId", requireAuth, express.json(), async (req, res) => {
     const { redis } = await import("../services/redis.js");
     const { sessionId } = req.params as { sessionId: string };
     const existing = await redis.jsonGet<unknown[]>(`poll:browser:${sessionId}`) ?? [];
@@ -111,7 +128,7 @@ export function createApp(): express.Application {
     res.json({ ok: true });
   });
 
-  app.post("/send/browser/:sessionId", express.json(), async (req, res) => {
+  app.post("/send/browser/:sessionId", requireAuth, express.json(), async (req, res) => {
     const { redis } = await import("../services/redis.js");
     const { sessionId } = req.params as { sessionId: string };
     const existing = await redis.jsonGet<unknown[]>(`poll:cli:${sessionId}`) ?? [];

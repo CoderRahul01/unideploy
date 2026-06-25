@@ -1,60 +1,43 @@
 services:
   - type: web
-    name: unideploy-backend
-    runtime: docker
-    rootDir: apps/backend
-    dockerfilePath: ./Dockerfile
+    name: unideploy-gateway
+    runtime: node
+    rootDir: apps/backend-node
+    buildCommand: npm install && npm run build
+    startCommand: node dist/index.js
     plan: free
     healthCheckPath: /health
     envVars:
-      - key: APP_ENV
+      - key: NODE_ENV
         value: production
       - key: PORT
-        value: 8080
+        value: 3001
       # Set these in the Render dashboard → Environment tab after first deploy:
-      - key: BASE_URL
-        sync: false        # e.g. https://unideploy-backend.onrender.com
-      - key: ALLOWED_ORIGINS
-        sync: false        # e.g. https://unideploy.in,https://www.unideploy.in
+      - key: FRONTEND_URL
+        sync: false        # e.g. https://app.unideploy.in
       - key: INSFORGE_PROJECT_ID
         sync: false
       - key: INSFORGE_API_KEY
         sync: false
       - key: INSFORGE_BASE_URL
         sync: false
-      - key: GEMINI_API_KEY
-        sync: false
       - key: UPSTASH_REDIS_REST_URL
         sync: false
       - key: UPSTASH_REDIS_REST_TOKEN
         sync: false
-      - key: DODO_API_KEY
+      - key: DODO_PAYMENTS_API_KEY
         sync: false
       - key: DODO_WEBHOOK_SECRET
         sync: false
-      - key: FRONTEND_URL
+      - key: DODO_CHECKOUT_BUILDER_MONTHLY
         sync: false
-      - key: DODO_PRODUCT_BUILDER_MONTHLY
+      - key: DODO_CHECKOUT_BUILDER_ANNUAL
         sync: false
-      - key: DODO_PRODUCT_BUILDER_ANNUAL
+      - key: DODO_CHECKOUT_PRO_MONTHLY
         sync: false
-      - key: DODO_PRODUCT_PRO_MONTHLY
+      - key: DODO_CHECKOUT_PRO_ANNUAL
         sync: false
-      - key: DODO_PRODUCT_PRO_ANNUAL
+      - key: DODO_CHECKOUT_ENTERPRISE_MONTHLY
         sync: false
-      - key: DODO_PRODUCT_ENTERPRISE_MONTHLY
-        sync: false
-      - key: DODO_PRODUCT_ENTERPRISE_ANNUAL
-        sync: false
-      - key: E2B_API_KEY
-        sync: false
-      - key: TINYFISH_API_KEY
-        sync: false
-      - key: COMPOSIO_API_KEY
-        sync: false
-      - key: SENTRY_DSN
-        sync: false
-      - key: POSTHOG_API_KEY
-        sync: false
-      - key: POSTHOG_HOST
+      - key: DODO_CHECKOUT_ENTERPRISE_ANNUAL
         sync: false

@@ -20,7 +20,7 @@ const C = {
 
 /* ════════════════════════════════════════════════════════════════════════
    UniDeploy — Session Code Entry Page
-   Developer runs `npx unideploy init` → gets 6-digit code → enters here
+   Developer runs `unideploy auth` → gets 6-digit code → enters here
    ════════════════════════════════════════════════════════════════════════ */
 
 type PageState = "entry" | "waiting" | "complete";
@@ -149,7 +149,7 @@ function ConnectPageContent() {
   const handleShakeComplete = useCallback(() => setError(false), []);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText("npx unideploy@latest init");
+    navigator.clipboard.writeText("unideploy auth");
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
     posthog.capture("install_command_copied", { location: "connect_page" });
@@ -230,7 +230,7 @@ function ConnectPageContent() {
               borderRadius: 8, padding: "14px 18px", textAlign: "left",
               fontFamily: C.mono, fontSize: 12, color: C.muted,
             }}>
-              <div style={{ color: "#6DB84A", marginBottom: 4 }}>$ npx unideploy init</div>
+              <div style={{ color: "#6DB84A", marginBottom: 4 }}>$ unideploy auth</div>
               <div>● UniDeploy agent running</div>
               <div style={{ color: C.muted }}>  Scanning local files...</div>
             </div>
@@ -357,7 +357,7 @@ function ConnectPageContent() {
             borderRadius: 4, color: "var(--accent-green)",
           }}
         >
-          npx unideploy@latest init
+          unideploy auth
         </code>
       </p>
 
@@ -405,7 +405,7 @@ function ConnectPageContent() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
               <span style={{ color: "#6DB84A" }}>$ </span>
-              <span style={{ color: "#C8D8B0" }}>npx unideploy@latest init</span>
+              <span style={{ color: "#C8D8B0" }}>unideploy auth</span>
             </div>
             <button
               onClick={handleCopy}

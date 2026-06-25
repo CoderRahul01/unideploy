@@ -54,8 +54,8 @@ export default function SecretsDashboardPage() {
     try {
       const data = await runSecretsAudit(path);
       setAuditData(data);
-    } catch (err: any) {
-      setError(err.message || "Failed to run secrets audit");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to run secrets audit");
     } finally {
       setLoading(false);
     }

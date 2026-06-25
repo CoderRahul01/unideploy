@@ -3,10 +3,19 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  output: process.env.DOCKER_BUILD === "1" ? "standalone" : undefined,
+  turbopack: {
+    root: __dirname,
+  },
   typescript: {
     // ETIMEDOUT on next-env.d.ts — macOS filesystem issue, not code.
     // Compilation succeeds; this skips the TS checker during `next build`.
     ignoreBuildErrors: true,
+  },
+
+  webpack(config) {
+    config.ignoreWarnings = [{ module: /@prisma\/instrumentation/ }];
+    return config;
   },
 
   async rewrites() {

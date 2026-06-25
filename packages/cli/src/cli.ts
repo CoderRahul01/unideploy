@@ -8,6 +8,10 @@ import "dotenv/config";
 import { Agent } from "@earendil-works/pi-agent-core";
 import { getModel } from "@earendil-works/pi-ai";
 import * as readline from "node:readline";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
+import { spawn } from "node:child_process";
 import { secretsAuditTool } from "./tools/secrets-audit.js";
 import { rlsScanTool } from "./tools/rls-scan.js";
 import { deployCheckTool } from "./tools/deploy-check.js";
@@ -18,9 +22,137 @@ import { editTool } from "./tools/edit.js";
 import { webSearchTool } from "./tools/web-search.js";
 import { loadSkill, listSkills } from "./skills/loader.js";
 
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const GATEWAY_URL = process.env.UNIDEPLOY_API_URL || "http://localhost:3001";
+const APP_URL     = process.env.UNIDEPLOY_APP_URL  || "http://localhost:3000";
+const AUTH_FILE   = path.join(os.homedir(), ".unideploy", "auth.json");
+
+// ── Auth helpers ──────────────────────────────────────────────────────────────
+
+function readStoredAuth(): { token: string; user_id?: string } | null {
+  try {
+    const raw = fs.readFileSync(AUTH_FILE, "utf8");
+    return JSON.parse(raw) as { token: string; user_id?: string };
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredAuth(token: string, user_id?: string): void {
+  const dir = path.dirname(AUTH_FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(AUTH_FILE, JSON.stringify({ token, user_id }, null, 2), { mode: 0o600 });
+}
+
+function openBrowser(url: string): void {
+  const platform = process.platform;
+  const cmd = platform === "darwin" ? "open" : platform === "win32" ? "start" : "xdg-open";
+  spawn(cmd, [url], { detached: true, stdio: "ignore" }).unref();
+}
+
+async function pollForToken(code: string, maxSeconds = 600): Promise<string | null> {
+  const deadline = Date.now() + maxSeconds * 1000;
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 2000));
+    try {
+      const res = await fetch(`${GATEWAY_URL}/auth/session/${code}`);
+      if (!res.ok) continue;
+      const body = (await res.json()) as { data?: { status: string; token?: string } };
+      if (body.data?.status === "verified" && body.data.token) {
+        return body.data.token;
+      }
+    } catch {
+      // gateway not yet reachable — keep polling
+    }
+  }
+  return null;
+}
+
+// ── `unideploy auth` ──────────────────────────────────────────────────────────
+
+async function runAuth(): Promise<void> {
+  console.log(`
+\x1b[36m┌─────────────────────────────────────────────────┐
+│  UniDeploy Auth  ·  unideploy.in                │
+│  Connect your account to the CLI                │
+└─────────────────────────────────────────────────┘\x1b[0m
+`);
+
+  // 1. Create session
+  let sessionCode: string;
+  let formatted: string;
+  try {
+    const res = await fetch(`${GATEWAY_URL}/auth/session`, { method: "POST" });
+    if (!res.ok) throw new Error(`Gateway returned ${res.status}`);
+    const body = (await res.json()) as { data: { session_code: string; formatted: string } };
+    sessionCode = body.data.session_code;
+    formatted   = body.data.formatted;
+  } catch (err) {
+    console.error(`\x1b[31m❌  Cannot reach gateway at ${GATEWAY_URL}\x1b[0m`);
+    console.error(`   Start it with: npm run dev:gateway\n`);
+    process.exit(1);
+  }
+
+  // 2. Show code + open browser
+  console.log(`Your session code: \x1b[33;1m${formatted}\x1b[0m\n`);
+  console.log(`\x1b[90mOpening browser — sign in and enter this code...\x1b[0m`);
+
+  const authUrl = `${APP_URL}/auth?code=${sessionCode}`;
+  openBrowser(authUrl);
+
+  console.log(`\x1b[90mIf the browser didn't open, visit:\x1b[0m`);
+  console.log(`  \x1b[36m${authUrl}\x1b[0m\n`);
+
+  // 3. Poll
+  process.stdout.write("\x1b[90mWaiting for authentication");
+  const dotInterval = setInterval(() => process.stdout.write("."), 2000);
+
+  const token = await pollForToken(sessionCode, 600);
+  clearInterval(dotInterval);
+  process.stdout.write("\x1b[0m\n");
+
+  if (!token) {
+    console.error("\n\x1b[31m❌  Authentication timed out (10 minutes). Run `unideploy auth` again.\x1b[0m\n");
+    process.exit(1);
+  }
+
+  // 4. Store token
+  writeStoredAuth(token);
+
+  // 5. Success
+  console.log(`\n\x1b[32m✓ Authenticated!\x1b[0m Token stored at \x1b[90m~/.unideploy/auth.json\x1b[0m
+
+\x1b[36m┌─────────────────────────────────────────────────┐
+│  UniDeploy  ·  unideploy.in                     │
+│  Production-readiness for vibe-coded apps        │
+└─────────────────────────────────────────────────┘\x1b[0m
+
+\x1b[33mReady. Try:\x1b[0m
+  unideploy scan this project
+  unideploy check RLS
+  unideploy scan for secrets
+`);
+}
+
+// ── `unideploy whoami` ────────────────────────────────────────────────────────
+
+function runWhoami(): void {
+  const auth = readStoredAuth();
+  if (!auth) {
+    console.log(`\x1b[33mNot logged in.\x1b[0m Run \x1b[36munideploy auth\x1b[0m to connect your account.\n`);
+  } else {
+    console.log(`\x1b[32m✓ Logged in\x1b[0m — token stored at \x1b[90m~/.unideploy/auth.json\x1b[0m`);
+    if (auth.user_id) console.log(`  user_id: ${auth.user_id}`);
+    console.log();
+  }
+}
+
+// ── Model resolver ────────────────────────────────────────────────────────────
+
 function resolveModel() {
   if (process.env.ANTHROPIC_API_KEY) {
-    const modelId = process.env.ANTHROPIC_MODEL || "claude-3-7-sonnet-20250219";
+    const modelId = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
     return { model: getModel("anthropic", modelId as any), label: `${modelId} (Anthropic)` };
   }
   if (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) {
@@ -45,6 +177,8 @@ function resolveModel() {
   console.error("\n❌  Set ANTHROPIC_API_KEY, GEMINI_API_KEY, GROQ_API_KEY, HF_TOKEN (or HUGGINGFACE_API_KEY), or NVIDIA_API_KEY\n");
   process.exit(1);
 }
+
+// ── Agent REPL ────────────────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `\
 You are UniDeploy, a production-readiness agent for apps built with Lovable, Bolt, V0, Replit, and Claude Code.
@@ -75,6 +209,19 @@ Skills available: ${listSkills().join(", ") || "secrets, rls, auth, rate-limitin
 `;
 
 async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  const cmd  = args[0];
+
+  // ── Named commands (no LLM needed) ────────────────────────────────────────
+  if (cmd === "auth")   { await runAuth();   return; }
+  if (cmd === "whoami") { runWhoami();       return; }
+  if (cmd === "logout") {
+    try { fs.unlinkSync(AUTH_FILE); } catch {}
+    console.log("\x1b[32m✓ Logged out\x1b[0m\n");
+    return;
+  }
+
+  // ── Agent ─────────────────────────────────────────────────────────────────
   const { model, label } = resolveModel();
   const agent = new Agent({
     initialState: {
@@ -90,19 +237,21 @@ async function main(): Promise<void> {
     if (event.type === "agent_end") process.stdout.write("\n");
   });
 
-  const args = process.argv.slice(2);
-  if (args.length > 0 && args[0] !== undefined && !args[0].startsWith("/")) {
+  // Non-interactive one-shot
+  if (args.length > 0 && cmd !== undefined && !cmd.startsWith("/")) {
     await agent.prompt(args.join(" "));
     return;
   }
 
+  // Interactive REPL
+  const auth   = readStoredAuth();
   const skills = listSkills();
   console.log(`
 \x1b[36m┌─────────────────────────────────────────────────┐
 │  UniDeploy  ·  unideploy.in                     │
 │  Production-readiness for vibe-coded apps        │
 └─────────────────────────────────────────────────┘\x1b[0m
-\x1b[90mModel: ${label}\x1b[0m
+\x1b[90mModel: ${label}${auth ? "  ·  ✓ authenticated" : "  ·  run \`unideploy auth\` to connect"}\x1b[0m
 
 \x1b[33mTry:\x1b[0m
   scan this project               full production-readiness audit

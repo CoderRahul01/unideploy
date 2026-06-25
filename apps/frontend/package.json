@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
     "db:push": "drizzle-kit push",
@@ -34,6 +34,7 @@
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
+    "picocolors": "^1.1.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

@@ -15,7 +15,6 @@ const schema = z.object({
   DODO_WEBHOOK_SECRET: z.string().min(1),
 
   FRONTEND_URL: z.string().url().default("https://app.unideploy.in"),
-  AGENT_SERVICE_URL: z.string().url().default("http://localhost:8001"),
 
   // Optional — only required for specific tiers
   RAZORPAY_KEY_ID: z.string().optional(),

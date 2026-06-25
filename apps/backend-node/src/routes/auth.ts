@@ -1,10 +1,21 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
+import { z } from "zod";
 import { redis } from "../services/redis.js";
 import { dbInsert, dbSelect, dbUpdate } from "../services/insforge.js";
 import { requireAuth } from "../middleware/auth.js";
 import type { User, AuthSession } from "../types/index.js";
+
+const registerSchema = z.object({
+  email: z.string().email("Invalid email address").transform(v => v.toLowerCase().trim()),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+const loginSchema = z.object({
+  email: z.string().email("Invalid email address").transform(v => v.toLowerCase().trim()),
+  password: z.string().min(1, "Password is required"),
+});
 
 export const authRouter = Router();
 
@@ -19,11 +30,13 @@ function generateToken(): string {
 
 // POST /auth/register
 authRouter.post("/register", async (req, res) => {
-  const { email, password } = req.body as { email?: string; password?: string };
-  if (!email || !password) {
-    res.status(400).json({ error: "email and password are required", code: "INVALID_REQUEST" });
+  const parsed = registerSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const msg = parsed.error.issues.map(i => i.message).join(", ");
+    res.status(400).json({ error: msg, code: "INVALID_REQUEST" });
     return;
   }
+  const { email, password } = parsed.data;
 
   try {
     const existing = await dbSelect<User>("app_users", { email });
@@ -57,11 +70,13 @@ authRouter.post("/register", async (req, res) => {
 
 // POST /auth/login
 authRouter.post("/login", async (req, res) => {
-  const { email, password } = req.body as { email?: string; password?: string };
-  if (!email || !password) {
-    res.status(400).json({ error: "email and password are required", code: "INVALID_REQUEST" });
+  const parsed = loginSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const msg = parsed.error.issues.map(i => i.message).join(", ");
+    res.status(400).json({ error: msg, code: "INVALID_REQUEST" });
     return;
   }
+  const { email, password } = parsed.data;
 
   try {
     const users = await dbSelect<User>("app_users", { email });
@@ -164,7 +179,13 @@ authRouter.get("/session/:code", async (req, res) => {
       res.status(404).json({ error: "Session not found or expired", code: "SESSION_NOT_FOUND" });
       return;
     }
-    res.json({ data: { status: session.status, session_id: session.session_id } });
+    res.json({
+      data: {
+        status: session.status,
+        session_id: session.session_id,
+        ...(session.status === "verified" && session.token ? { token: session.token } : {}),
+      },
+    });
   } catch (err) {
     console.error("[auth/session/:code]", err);
     res.status(500).json({ error: "Failed to check session", code: "INTERNAL_ERROR" });
@@ -214,14 +235,15 @@ authRouter.post("/session/:code/verify", requireAuth, async (req, res) => {
   }
 });
 
-// Legacy: POST /auth/verify — browser enters code (kept for CLI compat)
+// POST /auth/verify — browser calls after login to complete CLI pairing
 authRouter.post("/verify", requireAuth, async (req, res) => {
   const { session_code } = req.body as { session_code?: string };
   if (!session_code) {
     res.status(400).json({ error: "session_code is required", code: "INVALID_REQUEST" });
     return;
   }
-  const code = session_code.trim().replace("-", "").toUpperCase();
+  const code = session_code.trim().replace(/-/g, "").toUpperCase();
+  const userToken = req.headers.authorization!.slice(7);
 
   try {
     const session = await redis.jsonGet<AuthSession>(`auth:${code}`);
@@ -235,12 +257,11 @@ authRouter.post("/verify", requireAuth, async (req, res) => {
       status: "verified",
       user_id: req.userId,
       verified_at: new Date().toISOString(),
+      token: userToken,
     };
 
-    // One-time use — delete after verify
-    await redis.del(`auth:${code}`);
-    // Store under session_id for polling
-    await redis.jsonSet(`auth_verified:${session.session_id}`, updated, 600);
+    // Keep under code key so CLI can poll for it
+    await redis.jsonSet(`auth:${code}`, updated, 600);
 
     await redis.publish(
       `session:${session.session_id}`,
@@ -248,7 +269,6 @@ authRouter.post("/verify", requireAuth, async (req, res) => {
         type: "session_authenticated",
         sessionId: session.session_id,
         userId: req.userId,
-        token: req.headers.authorization!.slice(7),
       }),
     );
 

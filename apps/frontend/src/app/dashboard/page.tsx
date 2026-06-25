@@ -385,7 +385,7 @@ function CliReportView({ sessionId }: { sessionId: string }) {
         <div style={{ textAlign: "center", padding: "60px 0", color: C.muted, fontSize: 14 }}>
           {loadError
             ? "Could not load report. The scan may still be running."
-            : "No scans yet. Run: npx unideploy \"scan this project\" — or try: npx unideploy \"scan for secrets\" / npx unideploy \"check RLS\""}
+            : "No scans yet. Run: unideploy \"scan this project\" — or try: unideploy \"scan for secrets\" / unideploy \"check RLS\""}
         </div>
       </div>
     );
@@ -488,7 +488,7 @@ function CliReportView({ sessionId }: { sessionId: string }) {
             </button>
           ) : (
             <span style={{ fontFamily: C.mono, fontSize: 12, color: C.muted }}>
-              Run <strong style={{ color: C.text }}>npx unideploy &quot;fix the secrets issues&quot;</strong> in your terminal to apply
+              Run <strong style={{ color: C.text }}>unideploy &quot;fix the secrets issues&quot;</strong> in your terminal to apply
             </span>
           )}
         </div>

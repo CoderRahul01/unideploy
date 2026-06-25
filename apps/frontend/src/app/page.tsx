@@ -315,7 +315,10 @@ export default function LandingPage() {
         title="Terminal — zsh"
         animated={true}
         lines={[
-          { text: '$ npx unideploy "scan this project"', color: "#C8D8B0", delay: 600 },
+          { text: '$ unideploy auth', color: "#C8D8B0", delay: 400 },
+          { text: "✓ Authenticated! Token stored.", color: "#6DB84A", delay: 500 },
+          { text: "", delay: 200 },
+          { text: '$ unideploy "scan this project"', color: "#C8D8B0", delay: 600 },
           { text: "● UniDeploy agent running", color: "#6DB84A", delay: 500 },
           { text: "  Detected: Next.js 14 + Supabase", color: "#C8D8B0", delay: 400 },
           { text: "  Scanning 847 files...", color: "#C8D8B0", delay: 800 },
@@ -330,14 +333,14 @@ export default function LandingPage() {
           { text: "  Grade: D  |  12 issues  |  8 auto-fixable", color: "#FF6B6B", bold: true, delay: 400 },
           { text: "  Migrate secrets → 1Claw: https://1claw.xyz", color: "#6DB84A", delay: 400 },
           { text: "", delay: 600 },
-          { text: '$ npx unideploy "fix the secrets issues"', color: "#C8D8B0", delay: 400 },
+          { text: '$ unideploy "fix the secrets issues"', color: "#C8D8B0", delay: 400 },
           { text: "● UniDeploy — patching 8 issues...", color: "#6DB84A", delay: 500 },
           { text: "  ✓ [CRITICAL] Stripe key moved to env var", color: "#6DB84A", delay: 350 },
           { text: "  ✓ [HIGH]     RLS policies added to 4 tables", color: "#6DB84A", delay: 350 },
           { text: "  ✓ [HIGH]     .cursorignore created", color: "#6DB84A", delay: 350 },
           { text: "  ✓ 8 patches applied  |  Grade: B", color: "#6DB84A", bold: true, delay: 400 },
         ]}
-        style={{ minHeight: 400, marginBottom: 80 }}
+        style={{ minHeight: 450, marginBottom: 80 }}
       />
       {/* Blinking cursor after terminal */}
       <div style={{ marginTop: -64, marginBottom: 64, textAlign: "center" }}>
@@ -375,21 +378,21 @@ export default function LandingPage() {
         {[
           {
             num: "01",
-            title: "Scan your project",
-            desc: "Open UniDeploy, point it at your project folder, and click Scan. Supports Next.js, FastAPI, Django, Express, Vite, or mixed stack. UniDeploy detects your framework, finds secrets, audits RLS, and checks deploy readiness. You get a grade from A to F with every issue listed by file and line number.",
-            action: "Open app → select folder → Scan",
+            title: "Install & Authenticate",
+            desc: "Download the Mac application (.dmg) and move the unideploy binary to your path (e.g., /usr/local/bin). Run the authentication command to securely connect your CLI to your dashboard.",
+            action: "$ unideploy auth",
           },
           {
             num: "02",
-            title: "Fix issues automatically",
-            desc: "UniDeploy doesn't just report — it fixes. The agent patches your local files directly: moves secrets to env vars, creates ignore files for LLM tools, adds RLS policies, and hardens your configuration.",
-            action: "Select findings → Apply fixes",
+            title: "Scan your project",
+            desc: "Run the scan command in any Next.js, FastAPI, or Express project. UniDeploy finds secrets, audits RLS policies, and checks deploy readiness, grading your app from A to F.",
+            action: "$ unideploy \"scan this project\"",
           },
           {
             num: "03",
-            title: "Ship with confidence",
-            desc: "Re-scan after fixes to verify your grade improved. Every finding is specific — exact file, exact line, exact fix. No false positives. Production-grade in minutes, not days.",
-            action: "Re-scan → Grade improves → Deploy",
+            title: "Fix issues automatically",
+            desc: "UniDeploy doesn't just report — it patches your local files directly. It moves secrets to env vars, applies ignore files for LLM tools, and hardens configurations automatically.",
+            action: "$ unideploy \"fix the secrets issues\"",
           },
         ].map(({ num, title, desc, action }) => (
           <div

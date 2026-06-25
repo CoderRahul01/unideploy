@@ -1,6 +1,6 @@
 # UniDeploy — Agent Workspace Context
 
-Production-readiness agent for vibe-coded apps. Brand: UniDeploy / UniDeploy.in
+Production-readiness agent for vibe-coded apps. Brand: UniDeploy
 
 ## Architecture (Pi agent harness monorepo)
 

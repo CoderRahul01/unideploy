@@ -22,6 +22,7 @@ export interface AuthSession {
   created_at: string;
   user_id?: string;
   verified_at?: string;
+  token?: string;
 }
 
 // ── Scan ──────────────────────────────────────────────────────────────────────
@@ -42,6 +43,7 @@ export interface Finding {
 export interface ScanRecord {
   scan_id: string;
   session_id: string;
+  user_id?: string;
   status: "pending" | "running" | "complete" | "failed";
   project_name: string;
   framework: string;

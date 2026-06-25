@@ -3,7 +3,7 @@
  * Covers both the CLI session flow and the GitHub URL scan pipeline.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 // ── Shared types ─────────────────────────────────────────────────────────────
 
@@ -190,25 +190,28 @@ export interface AuthResponse {
 }
 
 export async function loginUser(email: string, password: string): Promise<AuthResponse> {
-  const res = await request<AuthResponse>("/auth/login", {
+  const res = await request<{ data: AuthResponse }>("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
-  localStorage.setItem("unideploy_token", res.token);
-  return res;
+  const user = res.data;
+  localStorage.setItem("unideploy_token", user.token);
+  return user;
 }
 
 export async function registerUser(email: string, password: string): Promise<AuthResponse> {
-  const res = await request<AuthResponse>("/auth/register", {
+  const res = await request<{ data: AuthResponse }>("/auth/register", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
-  localStorage.setItem("unideploy_token", res.token);
-  return res;
+  const user = res.data;
+  localStorage.setItem("unideploy_token", user.token);
+  return user;
 }
 
 export async function getCurrentUser(): Promise<AuthResponse> {
-  return request<AuthResponse>("/auth/me");
+  const res = await request<{ data: AuthResponse }>("/auth/me");
+  return res.data;
 }
 
 export function logoutUser() {

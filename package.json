@@ -18,7 +18,6 @@
     "dev:gateway": "npm run dev --workspace=apps/backend-node",
     "dev:frontend": "npm run dev --workspace=apps/frontend",
     "dev:desktop": "npm run dev --workspace=apps/desktop",
-    "dev:agent": "cd apps/backend && python main.py",
     "check": "npm run typecheck --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "typecheck:cli": "npm run typecheck --workspace=packages/cli",

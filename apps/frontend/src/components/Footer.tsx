@@ -11,8 +11,8 @@ const PRODUCT_LINKS = [
 ];
 
 const RESOURCE_LINKS = [
+  { label: "Getting Started", href: "/getting-started" },
   { label: "Documentation", href: "https://docs.unideploy.in" },
-  { label: "CLI reference", href: "https://docs.unideploy.in/cli/init-command" },
   { label: "Security", href: "/security" },
   { label: "Changelog", href: "/changelog" },
 ];
