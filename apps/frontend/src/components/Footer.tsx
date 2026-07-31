@@ -115,7 +115,7 @@ export default function Footer() {
               maxWidth: 200,
             }}
           >
-            UniDeploy · unideploy.in · Production-readiness for vibe-coded apps.
+            UniDeploy · unideploy.in · E2B Cloud Sandboxes & Open Source SaaS.
           </p>
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
             <a

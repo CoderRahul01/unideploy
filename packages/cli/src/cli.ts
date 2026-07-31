@@ -24,8 +24,8 @@ import { loadSkill, listSkills } from "./skills/loader.js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const GATEWAY_URL = process.env.UNIDEPLOY_API_URL || "http://localhost:3001";
-const APP_URL     = process.env.UNIDEPLOY_APP_URL  || "http://localhost:3000";
+const GATEWAY_URL = process.env.UNIDEPLOY_API_URL || "https://unideploy-api.rahulpandey-creates.workers.dev";
+const APP_URL     = process.env.UNIDEPLOY_APP_URL  || "https://unideploy.in";
 const AUTH_FILE   = path.join(os.homedir(), ".unideploy", "auth.json");
 
 // ── Auth helpers ──────────────────────────────────────────────────────────────

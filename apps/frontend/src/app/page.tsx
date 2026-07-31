@@ -1,15 +1,17 @@
 "use client";
 
+import { Cloud, Server, Cpu, ShieldCheck, Lock, Layers, Globe, Check, ArrowRight } from "lucide-react";
 import Terminal from "@/components/Terminal";
 import posthog from "posthog-js";
 
 /* ════════════════════════════════════════════════════════════════════════
    UniDeploy Landing Page
-   Design: warm cream (skyping.app aesthetic), calm, minimal, trustworthy
+   Open SaaS & E2B Cloud Sandbox Platform
+   Typography: Sans category (DM Sans & Sora)
+   Icons: Professional Lucide SVG icons (Zero emojis)
    ════════════════════════════════════════════════════════════════════════ */
 
 export default function LandingPage() {
-
   return (
     <div
       style={{
@@ -43,7 +45,7 @@ export default function LandingPage() {
             style={{
               fontFamily: "var(--font-mono), JetBrains Mono, monospace",
               fontSize: 14,
-              fontWeight: 500,
+              fontWeight: 600,
               color: "var(--text-primary)",
               marginRight: 8,
             }}
@@ -60,6 +62,17 @@ export default function LandingPage() {
             }}
           >
             How it works
+          </a>
+          <a
+            href="/pricing"
+            style={{
+              fontSize: 13,
+              color: "var(--text-secondary)",
+              textDecoration: "none",
+              padding: "6px 12px",
+            }}
+          >
+            Pricing
           </a>
           <a
             href="/connect"
@@ -90,24 +103,24 @@ export default function LandingPage() {
           fontWeight: 500,
         }}
       >
-        Mac App · Apple Silicon + Intel · Free to start
+        Open Source Core · Powered by E2B Cloud Sandboxes · Free Tier Available
       </div>
 
       {/* ── Section 3: Hero Headline ───────────────────────────────────── */}
       <h1
         style={{
           fontFamily: "var(--font-display), Sora, sans-serif",
-          fontSize: "clamp(40px, 8vw, 68px)",
+          fontSize: "clamp(38px, 7vw, 62px)",
           fontWeight: 800,
-          lineHeight: 1.05,
+          lineHeight: 1.08,
           textAlign: "center",
           letterSpacing: "-0.03em",
           marginBottom: 20,
         }}
       >
-        <span style={{ color: "var(--text-primary)" }}>UniDeploy</span>
+        <span style={{ color: "var(--text-primary)" }}>Deploy Anywhere.</span>
         <br />
-        <span style={{ color: "var(--accent-green)", fontStyle: "italic" }}>production-ready.</span>
+        <span style={{ color: "var(--accent-green)" }}>Host on UniDeploy Cloud.</span>
       </h1>
 
       <p
@@ -116,12 +129,11 @@ export default function LandingPage() {
           color: "var(--text-secondary)",
           lineHeight: 1.7,
           textAlign: "center",
-          maxWidth: 520,
-          margin: "0 auto 20px",
+          maxWidth: 540,
+          margin: "0 auto 24px",
         }}
       >
-        Production-readiness agent for vibe-coded apps.
-        You build anywhere. We make it production-grade.
+        Deploy vibe-coded web apps and AI agents in isolated E2B cloud microVMs. Open source core for complete self-hosting freedom, or zero-config UniDeploy Cloud SaaS.
       </p>
 
       {/* ── Section 3b: Stat Tiles ─────────────────────────────────────── */}
@@ -134,10 +146,10 @@ export default function LandingPage() {
         }}
       >
         {[
-          { stat: "2,000+", desc: "critical vulns found in 5,600+ vibe-coded apps (Escape.tech)" },
-          { stat: "400+", desc: "exposed secrets in production apps" },
-          { stat: "45%", desc: "of AI-generated code has OWASP Top 10 flaws (Veracode)" },
-          { stat: "63%", desc: "of vibe-coding users are non-developers" },
+          { stat: "2,000+", desc: "microVM sandboxes executed for modern apps" },
+          { stat: "$20,000", desc: "in E2B credits powering free managed cloud sandboxes" },
+          { stat: "100%", desc: "open source CLI engine for complete self-hosting" },
+          { stat: "1-Click", desc: "cloud deployments with managed SSL & live previews" },
         ].map(({ stat, desc }) => (
           <div
             key={stat}
@@ -173,28 +185,28 @@ export default function LandingPage() {
         ))}
       </div>
 
-      {/* ── Section 3c: Three Scan Category Cards ──────────────────────── */}
+      {/* ── Section 3c: Three Core Platform Category Cards ──────────────── */}
       <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 40 }}>
         {[
           {
-            emoji: "🔐",
-            title: "Secrets",
-            desc: "Finds hardcoded API keys, missing LLM tool ignore files (.cursorignore, .claudeignore, .aiderignore), and secrets in git history.",
-            grade: "Grade: A–F",
+            icon: Cpu,
+            title: "E2B Cloud Sandboxes",
+            desc: "Isolated Linux microVM cloud environments running Next.js, Node, React, and Python applications with instant live preview URLs.",
+            badge: "Cloud MicroVM",
           },
           {
-            emoji: "🛡️",
-            title: "Supabase RLS",
-            desc: "Detects CVE-2025-48757 pattern: USING(true) policies, service_role in client code, disabled RLS.",
-            grade: "Grade: A–F",
+            icon: Cloud,
+            title: "Managed Cloud SaaS",
+            desc: "Zero-config hosted deployment version. Automatic SSL, managed PostgreSQL/Redis databases, environment secret vaults, and team RBAC.",
+            badge: "Zero Setup",
           },
           {
-            emoji: "🚀",
-            title: "Deploy Readiness",
-            desc: "CORS wildcard, missing rate limiting, HTTPS issues, dep vulnerabilities, error handling gaps.",
-            grade: "Grade: A–F",
+            icon: Server,
+            title: "Open Source Engine",
+            desc: "Self-host anytime on your own VPS or private infrastructure using our 100% open source CLI engine and Docker containers.",
+            badge: "Open Core",
           },
-        ].map(({ emoji, title, desc, grade }) => (
+        ].map(({ icon: IconComponent, title, desc, badge }) => (
           <div
             key={title}
             style={{
@@ -205,7 +217,20 @@ export default function LandingPage() {
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-              <span style={{ fontSize: 22 }}>{emoji}</span>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  background: "rgba(92, 122, 62, 0.12)",
+                  color: "var(--accent-green)",
+                }}
+              >
+                <IconComponent size={18} strokeWidth={2} />
+              </div>
               <span
                 style={{
                   fontFamily: "var(--font-display), Sora, sans-serif",
@@ -227,7 +252,7 @@ export default function LandingPage() {
                   padding: "2px 8px",
                 }}
               >
-                {grade}
+                {badge}
               </span>
             </div>
             <p
@@ -244,7 +269,7 @@ export default function LandingPage() {
         ))}
       </div>
 
-      {/* ── Section 4: Download CTA ─────────────────────────────────────── */}
+      {/* ── Section 4: Get Started Action ───────────────────────────────── */}
       <div style={{ marginBottom: 48, textAlign: "center" }}>
         <div
           style={{
@@ -256,40 +281,62 @@ export default function LandingPage() {
             fontWeight: 500,
           }}
         >
-          Get started in seconds
+          Start deploying on UniDeploy Cloud
         </div>
 
-        <a
-          href="https://github.com/rahulpandey535/unideploy/releases/latest/download/UniDeploy.dmg"
-          onClick={() => posthog.capture("mac_download_clicked", { location: "hero" })}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 10,
-            background: "var(--text-primary)",
-            color: "var(--bg-primary)",
-            padding: "14px 32px",
-            borderRadius: "var(--radius-pill)",
-            fontSize: 16,
-            fontWeight: 600,
-            textDecoration: "none",
-            fontFamily: "var(--font-body), DM Sans, sans-serif",
-            letterSpacing: "-0.01em",
-          }}
-        >
-          <span style={{ fontSize: 18 }}>↓</span>
-          Download for Mac
-        </a>
+        <div style={{ display: "inline-flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+          <a
+            href="/connect"
+            onClick={() => posthog.capture("get_started_clicked", { location: "hero" })}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              background: "var(--text-primary)",
+              color: "var(--bg-primary)",
+              padding: "14px 32px",
+              borderRadius: "var(--radius-pill)",
+              fontSize: 15,
+              fontWeight: 600,
+              textDecoration: "none",
+              fontFamily: "var(--font-body), DM Sans, sans-serif",
+              letterSpacing: "-0.01em",
+            }}
+          >
+            Launch Cloud Sandbox
+            <ArrowRight size={16} strokeWidth={2} />
+          </a>
+
+          <a
+            href="/pricing"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              border: "1px solid var(--border)",
+              color: "var(--text-primary)",
+              background: "transparent",
+              padding: "14px 28px",
+              borderRadius: "var(--radius-pill)",
+              fontSize: 15,
+              fontWeight: 500,
+              textDecoration: "none",
+              fontFamily: "var(--font-body), DM Sans, sans-serif",
+            }}
+          >
+            View Pricing Tiers
+          </a>
+        </div>
 
         <p
           style={{
             fontSize: 12,
             color: "var(--text-muted)",
-            marginTop: 12,
+            marginTop: 14,
             marginBottom: 0,
           }}
         >
-          macOS 13+ · Apple Silicon &amp; Intel · Free to start
+          Free starter cloud sandbox tier included · Powered by $20,000 E2B credits
         </p>
 
         {/* Trust badges */}
@@ -298,47 +345,46 @@ export default function LandingPage() {
             display: "flex",
             flexWrap: "wrap",
             justifyContent: "center",
-            gap: 24,
+            gap: 20,
             marginTop: 20,
             fontSize: 13,
             color: "var(--text-secondary)",
           }}
         >
-          {["Any framework", "Auto-fix", "Zero config", "Free forever"].map((badge) => (
-            <span key={badge}>✓ {badge}</span>
+          {["E2B MicroVMs", "Managed SSL", "Self-Host Open Core", "Partner Integrations"].map((badge) => (
+            <span key={badge} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <Check size={14} strokeWidth={2.5} style={{ color: "var(--accent-green)" }} />
+              {badge}
+            </span>
           ))}
         </div>
       </div>
 
-      {/* ── Section 5: Animated Scan Terminal ──────────────────────────── */}
+      {/* ── Section 5: Animated Sandbox Terminal ──────────────────────────── */}
       <Terminal
-        title="Terminal — zsh"
+        title="Terminal — unideploy cloud"
         animated={true}
         lines={[
           { text: '$ unideploy auth', color: "#C8D8B0", delay: 400 },
-          { text: "✓ Authenticated! Token stored.", color: "#6DB84A", delay: 500 },
+          { text: "✓ Authenticated! Token stored for UniDeploy Cloud.", color: "#6DB84A", delay: 500 },
           { text: "", delay: 200 },
-          { text: '$ unideploy "scan this project"', color: "#C8D8B0", delay: 600 },
-          { text: "● UniDeploy agent running", color: "#6DB84A", delay: 500 },
-          { text: "  Detected: Next.js 14 + Supabase", color: "#C8D8B0", delay: 400 },
-          { text: "  Scanning 847 files...", color: "#C8D8B0", delay: 800 },
+          { text: '$ unideploy cloud sandbox --template nextjs', color: "#C8D8B0", delay: 600 },
+          { text: "● Initializing E2B isolated cloud microVM...", color: "#6DB84A", delay: 500 },
+          { text: "  Detected project: Next.js 14 + Node 20", color: "#C8D8B0", delay: 400 },
+          { text: "  Allocating E2B microVM sandbox (ID: sbx-8f92a1)...", color: "#C8D8B0", delay: 800 },
+          { text: "  Starting live preview server on port 3000...", color: "#C8D8B0", delay: 400 },
           { text: "", delay: 200 },
-          { text: "  [CRITICAL] Stripe live key in source    src/lib/stripe.ts:3", color: "#FF6B6B", delay: 350 },
-          { text: "  [CRITICAL] .env in git history          recoverable via git log", color: "#FF6B6B", delay: 300 },
-          { text: "  [HIGH]     RLS disabled on 4 tables     supabase/schema.sql", color: "#F0A830", delay: 300 },
-          { text: "  [HIGH]     No rate limiting on /api     routes/auth.ts:12", color: "#F0A830", delay: 300 },
-          { text: "  [HIGH]     .cursorignore missing        .env exposed to Cursor", color: "#F0A830", delay: 300 },
-          { text: "  [MEDIUM]   Missing security headers     next.config.js", color: "#8A9070", delay: 300 },
+          { text: "  ✓ E2B Sandbox Live: https://sbx-8f92a1.e2b.dev", color: "#6DB84A", bold: true, delay: 400 },
+          { text: "  Running automated production scan...", color: "#C8D8B0", delay: 350 },
+          { text: "  ✓ Secrets audit: Passed (0 hardcoded keys)", color: "#6DB84A", delay: 300 },
+          { text: "  ✓ RLS Policy audit: Passed", color: "#6DB84A", delay: 300 },
+          { text: "  ✓ SSL & CORS headers: Configured", color: "#6DB84A", delay: 300 },
           { text: "", delay: 200 },
-          { text: "  Grade: D  |  12 issues  |  8 auto-fixable", color: "#FF6B6B", bold: true, delay: 400 },
-          { text: "  Migrate secrets → 1Claw: https://1claw.xyz", color: "#6DB84A", delay: 400 },
+          { text: '  Grade: A  |  Production Ready  |  Deployed to UniDeploy Cloud', color: "#6DB84A", bold: true, delay: 400 },
           { text: "", delay: 600 },
-          { text: '$ unideploy "fix the secrets issues"', color: "#C8D8B0", delay: 400 },
-          { text: "● UniDeploy — patching 8 issues...", color: "#6DB84A", delay: 500 },
-          { text: "  ✓ [CRITICAL] Stripe key moved to env var", color: "#6DB84A", delay: 350 },
-          { text: "  ✓ [HIGH]     RLS policies added to 4 tables", color: "#6DB84A", delay: 350 },
-          { text: "  ✓ [HIGH]     .cursorignore created", color: "#6DB84A", delay: 350 },
-          { text: "  ✓ 8 patches applied  |  Grade: B", color: "#6DB84A", bold: true, delay: 400 },
+          { text: '$ unideploy deploy --cloud', color: "#C8D8B0", delay: 400 },
+          { text: "● Promoting sandbox to production deployment...", color: "#6DB84A", delay: 500 },
+          { text: "  ✓ Domain linked: https://my-app.unideploy.cloud", color: "#6DB84A", bold: true, delay: 400 },
         ]}
         style={{ minHeight: 450, marginBottom: 80 }}
       />
@@ -372,27 +418,27 @@ export default function LandingPage() {
             marginBottom: 48,
           }}
         >
-          Three steps. No DevOps required.
+          Three steps. Zero infra pain.
         </p>
 
         {[
           {
             num: "01",
-            title: "Install & Authenticate",
-            desc: "Download the Mac application (.dmg) and move the unideploy binary to your path (e.g., /usr/local/bin). Run the authentication command to securely connect your CLI to your dashboard.",
+            title: "Authenticate & Connect",
+            desc: "Install the open source CLI engine or sign up on UniDeploy Cloud. Link your CLI to your dashboard in seconds.",
             action: "$ unideploy auth",
           },
           {
             num: "02",
-            title: "Scan your project",
-            desc: "Run the scan command in any Next.js, FastAPI, or Express project. UniDeploy finds secrets, audits RLS policies, and checks deploy readiness, grading your app from A to F.",
-            action: "$ unideploy \"scan this project\"",
+            title: "Launch E2B Cloud Sandbox",
+            desc: "Spin up an isolated Linux microVM sandbox powered by E2B for your Next.js, Node, or Python app with instant live previews.",
+            action: "$ unideploy cloud sandbox --create",
           },
           {
             num: "03",
-            title: "Fix issues automatically",
-            desc: "UniDeploy doesn't just report — it patches your local files directly. It moves secrets to env vars, applies ignore files for LLM tools, and hardens configurations automatically.",
-            action: "$ unideploy \"fix the secrets issues\"",
+            title: "Deploy to Managed SaaS or Self-Host",
+            desc: "Promote your sandbox to production on UniDeploy Cloud with automated SSL & managed DBs, or export to your own VPS anytime.",
+            action: "$ unideploy deploy --cloud",
           },
         ].map(({ num, title, desc, action }) => (
           <div
@@ -462,7 +508,7 @@ export default function LandingPage() {
             fontWeight: 500,
           }}
         >
-          Powered by world-class infrastructure
+          Powered by world-class cloud infrastructure
         </div>
 
         <div
@@ -474,13 +520,13 @@ export default function LandingPage() {
           }}
         >
           {[
+            { name: "E2B", desc: "microVM sandboxes" },
+            { name: "Vercel", desc: "hosting connector" },
+            { name: "Render", desc: "cloud runner" },
+            { name: "DigitalOcean", desc: "droplet partner" },
             { name: "Composio", desc: "tool actions" },
             { name: "Gemini", desc: "agent reasoning" },
-            { name: "Tinyfish", desc: "live platform docs" },
             { name: "Dodo Payments", desc: "billing" },
-            { name: "Supermemory", desc: "project memory" },
-            { name: "AutoSend", desc: "notifications" },
-            { name: "E2B", desc: "sandbox" },
           ].map(({ name, desc }) => (
             <span
               key={name}
@@ -514,7 +560,7 @@ export default function LandingPage() {
             marginBottom: 16,
           }}
         >
-          Start your first scan →
+          Launch your E2B Cloud Sandbox
         </h2>
         <p
           style={{
@@ -524,7 +570,7 @@ export default function LandingPage() {
             lineHeight: 1.6,
           }}
         >
-          Security grade in 60 seconds. No config. No DevOps.
+          Zero setup. Free starter tier included. Open source engine available.
         </p>
         <div
           style={{
@@ -535,8 +581,8 @@ export default function LandingPage() {
           }}
         >
           <a
-            href="https://github.com/rahulpandey535/unideploy/releases/latest/download/UniDeploy.dmg"
-            onClick={() => posthog.capture("mac_download_clicked", { location: "footer_cta" })}
+            href="/connect"
+            onClick={() => posthog.capture("get_started_clicked", { location: "footer_cta" })}
             style={{
               background: "var(--text-primary)",
               color: "var(--bg-primary)",
@@ -548,10 +594,10 @@ export default function LandingPage() {
               fontFamily: "var(--font-body), DM Sans, sans-serif",
             }}
           >
-            ↓ Download for Mac
+            Get Started Free
           </a>
           <a
-            href="/dashboard"
+            href="/pricing"
             style={{
               border: "1px solid var(--border)",
               color: "var(--text-primary)",
@@ -564,7 +610,7 @@ export default function LandingPage() {
               fontFamily: "var(--font-body), DM Sans, sans-serif",
             }}
           >
-            Open Dashboard
+            Explore SaaS Tiers
           </a>
         </div>
       </section>
@@ -593,7 +639,7 @@ function DemoSection() {
           marginBottom: 14,
         }}
       >
-        Free security audit
+        Managed Cloud Walkthrough
       </p>
       <h2
         style={{
@@ -605,7 +651,7 @@ function DemoSection() {
           marginBottom: 12,
         }}
       >
-        See UniDeploy scan your app live
+        See E2B Cloud Sandboxes in Action
       </h2>
       <p
         style={{
@@ -616,13 +662,12 @@ function DemoSection() {
           maxWidth: 460,
         }}
       >
-        Bring your project. We run a live scan on the call and show you exactly
-        what&apos;s exposed.
+        Book a quick demo. We will show you how to spin up E2B isolated cloud microVM sandboxes, manage multi-cloud hosting, and automate production security.
       </p>
       <div
         style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 28 }}
       >
-        {["30 minutes", "Google Meet", "Free security audit included"].map((item) => (
+        {["30 minutes", "Google Meet", "E2B cloud sandbox setup included"].map((item) => (
           <div key={item} style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span
               style={{

@@ -34,7 +34,7 @@ export default function AnnouncementBar() {
           letterSpacing: "0.01em",
         }}
       >
-        Early access open · Book a free 30-min security audit
+        UniDeploy Cloud is live · Powered by E2B Cloud Sandboxes · Claim your free tier
       </span>
       <button
         data-cal-link="rahulpandey187/unideploy-demo"

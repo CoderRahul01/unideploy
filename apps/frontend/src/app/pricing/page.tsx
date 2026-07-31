@@ -20,50 +20,51 @@ type Tier = {
 
 const TIERS: Tier[] = [
   {
-    name: "Free",
+    name: "Community",
     monthly: 0,
     annual: 0,
     annualTotal: null,
-    description: "Unlimited scans, zero commitment. The only free scanner that actually finds what matters.",
-    cta: "Start free",
+    description: "100% Open Source CLI engine for developers who want to self-host on their own VPS.",
+    cta: "Self-host free",
+    ctaHref: "https://github.com/rahulpandey535/unideploy",
     features: [
-      "Unlimited scans",
-      "Full OWASP findings report",
-      "Secrets detection",
-      "1 project",
-      "CLI access",
+      "Open Source CLI engine",
+      "Unlimited self-hosted deployments",
+      "Docker stack configuration",
+      "Local security scanning",
+      "Community support",
     ],
   },
   {
-    name: "Builder",
+    name: "Cloud Starter",
+    monthly: 0,
+    annual: 0,
+    annualTotal: null,
+    description: "Powered by $20,000 E2B credits! Zero-setup cloud sandboxes for individuals & fast builders.",
+    cta: "Start free sandbox",
+    highlight: true,
+    features: [
+      "Everything in Community",
+      "3 concurrent E2B Cloud MicroVMs",
+      "Instant live web preview URLs",
+      "Automated production security scan",
+      "Managed SSL & custom domains",
+    ],
+  },
+  {
+    name: "Cloud Pro",
     monthly: 99,
     annual: 990,
     annualTotal: 990,
-    description: "For developers shipping to production. Auto-fixes critical issues before they become incidents.",
+    description: "For engineering teams needing high-performance persistent sandboxes and managed cloud infra.",
     cta: "Get started",
     features: [
-      "Everything in Free",
-      "Auto-fix PRs for critical issues",
-      "RLS policy correctness (not just presence)",
-      "Deploy configuration guidance",
-      "4 projects in dashboard",
-    ],
-  },
-  {
-    name: "Pro",
-    monthly: 199,
-    annual: 1990,
-    annualTotal: 1990,
-    description: "For teams that can't afford a security incident. Unlimited fixes, agent memory, priority queue.",
-    cta: "Get started",
-    highlight: true,
-    features: [
-      "Everything in Builder",
-      "Unlimited auto-fix PRs",
-      "Agent memory across scans",
-      "Unlimited projects",
-      "Priority agent queue",
-      "Cloud Run deploy config included",
+      "Everything in Cloud Starter",
+      "Unlimited E2B Cloud Sandboxes",
+      "Managed PostgreSQL & Redis DBs",
+      "Team RBAC & workspace secret vaults",
+      "Pro deployment templates & plugins",
+      "Priority E2B cloud runner queue",
     ],
   },
   {
@@ -71,15 +72,15 @@ const TIERS: Tier[] = [
     monthly: 299,
     annual: 2990,
     annualTotal: 2990,
-    description: "For regulated industries and teams with compliance requirements. Custom everything.",
-    cta: "Get started",
+    description: "Dedicated E2B microVM cluster, custom cloud provider routing, and 99.9% uptime SLA.",
+    cta: "Contact team",
     features: [
-      "Everything in Pro",
+      "Everything in Cloud Pro",
+      "Dedicated E2B microVM cluster",
+      "Custom hosting partner (AWS/GCP/Vercel)",
       "SOC 2 / HIPAA compliance track",
-      "Dedicated sandbox environment",
-      "Custom rule packs",
-      "SBOM + GDPR audit trail",
-      "SLA + Slack/Teams alerts",
+      "Custom rule packs & audit logs",
+      "24/7 SLA + Slack/Teams support",
     ],
   },
 ];
@@ -136,7 +137,7 @@ export default function PricingPage() {
               marginBottom: 16,
             }}
           >
-            Pricing
+            SaaS & Cloud Sandbox Pricing
           </span>
           <h1
             style={{
@@ -148,11 +149,11 @@ export default function PricingPage() {
               marginBottom: 12,
             }}
           >
-            Start free. Pay when it matters.
+            Self-host open source or deploy on UniDeploy Cloud.
           </h1>
-          <p style={{ fontSize: 15, color: "#6a7a5a", lineHeight: 1.6, maxWidth: 480, margin: "0 auto 28px" }}>
-            The free tier runs unlimited scans and surfaces real findings.
-            Upgrade when you&apos;re ready to fix them automatically.
+          <p style={{ fontSize: 15, color: "#6a7a5a", lineHeight: 1.6, maxWidth: 540, margin: "0 auto 28px" }}>
+            Self-hosting is 100% free with our open source CLI engine.
+            Or deploy on UniDeploy Cloud powered by E2B isolated microVM sandboxes.
           </p>
 
           {/* Toggle */}

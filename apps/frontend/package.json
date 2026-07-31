@@ -6,6 +6,7 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
+    "typecheck": "next build",
     "db:push": "drizzle-kit push",
     "lint": "eslint"
   },
