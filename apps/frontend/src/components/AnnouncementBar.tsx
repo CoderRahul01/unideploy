@@ -34,7 +34,7 @@ export default function AnnouncementBar() {
           letterSpacing: "0.01em",
         }}
       >
-        UniDeploy Cloud is live · Powered by E2B Cloud Sandboxes · Claim your free tier
+        UniDeploy Cloud is live · Managed Cloud Sandboxes & Zero-Config Deployments · Claim your free tier
       </span>
       <button
         data-cal-link="rahulpandey187/unideploy-demo"

@@ -40,12 +40,12 @@ const TIERS: Tier[] = [
     monthly: 0,
     annual: 0,
     annualTotal: null,
-    description: "Powered by $20,000 E2B credits! Zero-setup cloud sandboxes for individuals & fast builders.",
+    description: "Zero-setup managed cloud sandboxes for individuals & fast builders. Free to start.",
     cta: "Start free sandbox",
     highlight: true,
     features: [
       "Everything in Community",
-      "3 concurrent E2B Cloud MicroVMs",
+      "3 concurrent UniDeploy Cloud MicroVMs",
       "Instant live web preview URLs",
       "Automated production security scan",
       "Managed SSL & custom domains",
@@ -60,11 +60,11 @@ const TIERS: Tier[] = [
     cta: "Get started",
     features: [
       "Everything in Cloud Starter",
-      "Unlimited E2B Cloud Sandboxes",
+      "Unlimited UniDeploy Cloud Sandboxes",
       "Managed PostgreSQL & Redis DBs",
       "Team RBAC & workspace secret vaults",
       "Pro deployment templates & plugins",
-      "Priority E2B cloud runner queue",
+      "Priority cloud runner queue",
     ],
   },
   {
@@ -72,11 +72,11 @@ const TIERS: Tier[] = [
     monthly: 299,
     annual: 2990,
     annualTotal: 2990,
-    description: "Dedicated E2B microVM cluster, custom cloud provider routing, and 99.9% uptime SLA.",
+    description: "Dedicated cloud microVM cluster, custom cloud provider routing, and 99.9% uptime SLA.",
     cta: "Contact team",
     features: [
       "Everything in Cloud Pro",
-      "Dedicated E2B microVM cluster",
+      "Dedicated cloud microVM cluster",
       "Custom hosting partner (AWS/GCP/Vercel)",
       "SOC 2 / HIPAA compliance track",
       "Custom rule packs & audit logs",
@@ -153,7 +153,7 @@ export default function PricingPage() {
           </h1>
           <p style={{ fontSize: 15, color: "#6a7a5a", lineHeight: 1.6, maxWidth: 540, margin: "0 auto 28px" }}>
             Self-hosting is 100% free with our open source CLI engine.
-            Or deploy on UniDeploy Cloud powered by E2B isolated microVM sandboxes.
+            Or deploy on UniDeploy Cloud with zero-setup managed microVM sandboxes.
           </p>
 
           {/* Toggle */}

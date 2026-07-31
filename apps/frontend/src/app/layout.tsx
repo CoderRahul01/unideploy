@@ -30,26 +30,26 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "UniDeploy Cloud — E2B Cloud Sandboxes & Open Source SaaS",
+  title: "UniDeploy Cloud — Managed Cloud Sandboxes & Open Source SaaS",
   description:
-    "Deploy vibe-coded apps and AI agents in isolated E2B cloud sandboxes or self-host with our open source core.",
+    "Deploy vibe-coded apps and AI agents in isolated cloud sandboxes or self-host with our open source engine.",
   keywords: [
-    "E2B cloud sandboxes",
+    "cloud sandboxes",
     "managed cloud hosting",
     "open source SaaS",
     "vibe coding",
     "production readiness",
     "microVM sandboxes",
     "Next.js cloud hosting",
-    "AI code execution",
+    "AI deployment platform",
   ],
   verification: {
     google: "IdmvhsfXd8y0B4C7toMdLj28KF-4ykVU587BLDKLkJo",
   },
   openGraph: {
-    title: "UniDeploy Cloud — E2B Cloud Sandboxes & Open Source SaaS",
+    title: "UniDeploy Cloud — Managed Cloud Sandboxes & Open Source SaaS",
     description:
-      "Deploy vibe-coded apps and AI agents in isolated E2B cloud sandboxes or self-host with our open source core.",
+      "Deploy vibe-coded apps and AI agents in isolated cloud sandboxes or self-host with our open source engine.",
     url: "https://unideploy.in",
     siteName: "UniDeploy",
     type: "website",

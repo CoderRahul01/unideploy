@@ -6,7 +6,7 @@ import posthog from "posthog-js";
 
 /* ════════════════════════════════════════════════════════════════════════
    UniDeploy Landing Page
-   Open SaaS & E2B Cloud Sandbox Platform
+   Open SaaS & Managed Cloud Sandbox Platform
    Typography: Sans category (DM Sans & Sora)
    Icons: Professional Lucide SVG icons (Zero emojis)
    ════════════════════════════════════════════════════════════════════════ */
@@ -103,7 +103,7 @@ export default function LandingPage() {
           fontWeight: 500,
         }}
       >
-        Open Source Core · Powered by E2B Cloud Sandboxes · Free Tier Available
+        Open Source Core · Managed Cloud Sandboxes · Free Starter Tier
       </div>
 
       {/* ── Section 3: Hero Headline ───────────────────────────────────── */}
@@ -133,7 +133,7 @@ export default function LandingPage() {
           margin: "0 auto 24px",
         }}
       >
-        Deploy vibe-coded web apps and AI agents in isolated E2B cloud microVMs. Open source core for complete self-hosting freedom, or zero-config UniDeploy Cloud SaaS.
+        Deploy vibe-coded web apps and AI agents in isolated cloud microVM sandboxes. Open source engine for complete self-hosting freedom, or zero-config UniDeploy Cloud SaaS.
       </p>
 
       {/* ── Section 3b: Stat Tiles ─────────────────────────────────────── */}
@@ -146,8 +146,8 @@ export default function LandingPage() {
         }}
       >
         {[
-          { stat: "2,000+", desc: "microVM sandboxes executed for modern apps" },
-          { stat: "$20,000", desc: "in E2B credits powering free managed cloud sandboxes" },
+          { stat: "2,000+", desc: "cloud sandboxes executed for modern apps" },
+          { stat: "99.9%", desc: "uptime SLA on managed cloud infrastructure" },
           { stat: "100%", desc: "open source CLI engine for complete self-hosting" },
           { stat: "1-Click", desc: "cloud deployments with managed SSL & live previews" },
         ].map(({ stat, desc }) => (
@@ -190,8 +190,8 @@ export default function LandingPage() {
         {[
           {
             icon: Cpu,
-            title: "E2B Cloud Sandboxes",
-            desc: "Isolated Linux microVM cloud environments running Next.js, Node, React, and Python applications with instant live preview URLs.",
+            title: "UniDeploy Cloud Sandboxes",
+            desc: "Isolated Linux microVM cloud environments running Next.js, Node, React, and Python applications with instant live web preview URLs.",
             badge: "Cloud MicroVM",
           },
           {
@@ -336,7 +336,7 @@ export default function LandingPage() {
             marginBottom: 0,
           }}
         >
-          Free starter cloud sandbox tier included · Powered by $20,000 E2B credits
+          Free starter cloud sandbox tier included · Zero infrastructure pain
         </p>
 
         {/* Trust badges */}
@@ -351,7 +351,7 @@ export default function LandingPage() {
             color: "var(--text-secondary)",
           }}
         >
-          {["E2B MicroVMs", "Managed SSL", "Self-Host Open Core", "Partner Integrations"].map((badge) => (
+          {["Cloud MicroVMs", "Managed SSL", "Self-Host Open Core", "Partner Integrations"].map((badge) => (
             <span key={badge} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
               <Check size={14} strokeWidth={2.5} style={{ color: "var(--accent-green)" }} />
               {badge}
@@ -366,16 +366,16 @@ export default function LandingPage() {
         animated={true}
         lines={[
           { text: '$ unideploy auth', color: "#C8D8B0", delay: 400 },
-          { text: "✓ Authenticated! Token stored for UniDeploy Cloud.", color: "#6DB84A", delay: 500 },
+          { text: "✓ Authenticated! Connected to UniDeploy Cloud.", color: "#6DB84A", delay: 500 },
           { text: "", delay: 200 },
           { text: '$ unideploy cloud sandbox --template nextjs', color: "#C8D8B0", delay: 600 },
-          { text: "● Initializing E2B isolated cloud microVM...", color: "#6DB84A", delay: 500 },
+          { text: "● Initializing UniDeploy isolated cloud microVM...", color: "#6DB84A", delay: 500 },
           { text: "  Detected project: Next.js 14 + Node 20", color: "#C8D8B0", delay: 400 },
-          { text: "  Allocating E2B microVM sandbox (ID: sbx-8f92a1)...", color: "#C8D8B0", delay: 800 },
+          { text: "  Allocating cloud sandbox (ID: sbx-8f92a1)...", color: "#C8D8B0", delay: 800 },
           { text: "  Starting live preview server on port 3000...", color: "#C8D8B0", delay: 400 },
           { text: "", delay: 200 },
-          { text: "  ✓ E2B Sandbox Live: https://sbx-8f92a1.e2b.dev", color: "#6DB84A", bold: true, delay: 400 },
-          { text: "  Running automated production scan...", color: "#C8D8B0", delay: 350 },
+          { text: "  ✓ Cloud Sandbox Live: https://sbx-8f92a1.unideploy.cloud", color: "#6DB84A", bold: true, delay: 400 },
+          { text: "  Running automated production readiness scan...", color: "#C8D8B0", delay: 350 },
           { text: "  ✓ Secrets audit: Passed (0 hardcoded keys)", color: "#6DB84A", delay: 300 },
           { text: "  ✓ RLS Policy audit: Passed", color: "#6DB84A", delay: 300 },
           { text: "  ✓ SSL & CORS headers: Configured", color: "#6DB84A", delay: 300 },
@@ -430,8 +430,8 @@ export default function LandingPage() {
           },
           {
             num: "02",
-            title: "Launch E2B Cloud Sandbox",
-            desc: "Spin up an isolated Linux microVM sandbox powered by E2B for your Next.js, Node, or Python app with instant live previews.",
+            title: "Launch UniDeploy Cloud Sandbox",
+            desc: "Spin up an isolated Linux microVM sandbox for your Next.js, Node, or Python app with instant live previews.",
             action: "$ unideploy cloud sandbox --create",
           },
           {
@@ -520,7 +520,7 @@ export default function LandingPage() {
           }}
         >
           {[
-            { name: "E2B", desc: "microVM sandboxes" },
+            { name: "Cloudflare", desc: "edge API gateway" },
             { name: "Vercel", desc: "hosting connector" },
             { name: "Render", desc: "cloud runner" },
             { name: "DigitalOcean", desc: "droplet partner" },
@@ -560,7 +560,7 @@ export default function LandingPage() {
             marginBottom: 16,
           }}
         >
-          Launch your E2B Cloud Sandbox
+          Launch your UniDeploy Cloud Sandbox
         </h2>
         <p
           style={{
@@ -651,7 +651,7 @@ function DemoSection() {
           marginBottom: 12,
         }}
       >
-        See E2B Cloud Sandboxes in Action
+        See UniDeploy Cloud Sandboxes in Action
       </h2>
       <p
         style={{
@@ -662,12 +662,12 @@ function DemoSection() {
           maxWidth: 460,
         }}
       >
-        Book a quick demo. We will show you how to spin up E2B isolated cloud microVM sandboxes, manage multi-cloud hosting, and automate production security.
+        Book a quick demo. We will show you how to spin up isolated cloud microVM sandboxes, manage multi-cloud hosting, and automate production security.
       </p>
       <div
         style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 28 }}
       >
-        {["30 minutes", "Google Meet", "E2B cloud sandbox setup included"].map((item) => (
+        {["30 minutes", "Google Meet", "Managed cloud setup included"].map((item) => (
           <div key={item} style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span
               style={{
