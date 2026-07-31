@@ -169,9 +169,10 @@ app.post('/auth/verify', async (c) => {
 
   // Write authentication event to the CLI mailbox
   try {
+    const userToken = `ud_tok_${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`
     await c.env.DB.prepare(
       "INSERT INTO messages (session_id, sender, payload) VALUES (?, 'browser', ?)"
-    ).bind(session.session_id, JSON.stringify({ type: "session_authenticated", session_id: session.session_id })).run()
+    ).bind(session.session_id, JSON.stringify({ type: "session_authenticated", session_id: session.session_id, token: userToken })).run()
   } catch (err) {
     console.error("D1 insert message failed:", err)
   }

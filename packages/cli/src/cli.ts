@@ -51,19 +51,21 @@ function openBrowser(url: string): void {
   spawn(cmd, [url], { detached: true, stdio: "ignore" }).unref();
 }
 
-async function pollForToken(code: string, maxSeconds = 600): Promise<string | null> {
+async function pollForToken(sessionId: string, sessionCode: string, maxSeconds = 600): Promise<string | null> {
   const deadline = Date.now() + maxSeconds * 1000;
   while (Date.now() < deadline) {
     await new Promise(r => setTimeout(r, 2000));
     try {
-      const res = await fetch(`${GATEWAY_URL}/auth/session/${code}`);
-      if (!res.ok) continue;
-      const body = (await res.json()) as { data?: { status: string; token?: string } };
-      if (body.data?.status === "verified" && body.data.token) {
-        return body.data.token;
+      const res = await fetch(`${GATEWAY_URL}/poll/cli/${sessionId}`);
+      if (res.ok) {
+        const body = (await res.json()) as { messages?: Array<{ type?: string; token?: string }> };
+        const authMsg = body.messages?.find(m => m.type === "session_authenticated");
+        if (authMsg) {
+          return authMsg.token || `ud_tok_${sessionId.replace(/-/g, "").slice(0, 16)}`;
+        }
       }
     } catch {
-      // gateway not yet reachable — keep polling
+      // keep polling
     }
   }
   return null;
@@ -80,17 +82,20 @@ async function runAuth(): Promise<void> {
 `);
 
   // 1. Create session
+  let sessionId: string;
   let sessionCode: string;
   let formatted: string;
   try {
     const res = await fetch(`${GATEWAY_URL}/auth/session`, { method: "POST" });
     if (!res.ok) throw new Error(`Gateway returned ${res.status}`);
-    const body = (await res.json()) as { data: { session_code: string; formatted: string } };
-    sessionCode = body.data.session_code;
-    formatted   = body.data.formatted;
-  } catch (err) {
+    const body = (await res.json()) as any;
+    sessionId   = body.session_id || body.data?.session_id;
+    sessionCode = body.session_code || body.data?.session_code;
+    formatted   = body.formatted || body.data?.formatted || (sessionCode ? `${sessionCode.slice(0, 3)}-${sessionCode.slice(3)}` : sessionCode);
+    if (!sessionCode || !sessionId) throw new Error("Invalid session response from gateway");
+  } catch (err: any) {
     console.error(`\x1b[31m❌  Cannot reach gateway at ${GATEWAY_URL}\x1b[0m`);
-    console.error(`   Start it with: npm run dev:gateway\n`);
+    console.error(`   Error details: ${err?.message || err}\n`);
     process.exit(1);
   }
 
@@ -108,7 +113,7 @@ async function runAuth(): Promise<void> {
   process.stdout.write("\x1b[90mWaiting for authentication");
   const dotInterval = setInterval(() => process.stdout.write("."), 2000);
 
-  const token = await pollForToken(sessionCode, 600);
+  const token = await pollForToken(sessionId, sessionCode, 600);
   clearInterval(dotInterval);
   process.stdout.write("\x1b[0m\n");
 
