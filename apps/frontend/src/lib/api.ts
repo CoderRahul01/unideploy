@@ -3,7 +3,11 @@
  * Covers both the CLI session flow and the GitHub URL scan pipeline.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://unideploy-api.rahulpandey-creates.workers.dev";
+const DEFAULT_WORKER_API = "https://unideploy-api.rahulpandey-creates.workers.dev";
+const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+const API_BASE = (rawApiUrl.includes("onrender.com") || rawApiUrl.includes("localhost:3001") || !rawApiUrl)
+  ? DEFAULT_WORKER_API
+  : rawApiUrl;
 
 // ── Shared types ─────────────────────────────────────────────────────────────
 
