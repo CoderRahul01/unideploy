@@ -24,7 +24,7 @@ import { loadSkill, listSkills } from "./skills/loader.js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const GATEWAY_URL = process.env.UNIDEPLOY_API_URL || "https://unideploy-api.rahulpandey-creates.workers.dev";
+const API_URL     = process.env.UNIDEPLOY_API_URL || "https://unideploy-api.rahulpandey-creates.workers.dev";
 const APP_URL     = process.env.UNIDEPLOY_APP_URL  || "https://unideploy.in";
 const AUTH_FILE   = path.join(os.homedir(), ".unideploy", "auth.json");
 
@@ -56,7 +56,7 @@ async function pollForToken(sessionId: string, sessionCode: string, maxSeconds =
   while (Date.now() < deadline) {
     await new Promise(r => setTimeout(r, 2000));
     try {
-      const res = await fetch(`${GATEWAY_URL}/poll/cli/${sessionId}`);
+      const res = await fetch(`${API_URL}/poll/cli/${sessionId}`);
       if (res.ok) {
         const body = (await res.json()) as { messages?: Array<{ type?: string; token?: string }> };
         const authMsg = body.messages?.find(m => m.type === "session_authenticated");
@@ -86,16 +86,16 @@ async function runAuth(): Promise<void> {
   let sessionCode: string;
   let formatted: string;
   try {
-    const res = await fetch(`${GATEWAY_URL}/auth/session`, { method: "POST" });
-    if (!res.ok) throw new Error(`Gateway returned ${res.status}`);
+    const res = await fetch(`${API_URL}/auth/session`, { method: "POST" });
+    if (!res.ok) throw new Error(`API returned ${res.status}`);
     const body = (await res.json()) as any;
     sessionId   = body.session_id || body.data?.session_id;
     sessionCode = body.session_code || body.data?.session_code;
     formatted   = body.formatted || body.data?.formatted || (sessionCode ? `${sessionCode.slice(0, 3)}-${sessionCode.slice(3)}` : sessionCode);
-    if (!sessionCode || !sessionId) throw new Error("Invalid session response from gateway");
+    if (!sessionCode || !sessionId) throw new Error("Invalid session response from API");
   } catch (err: any) {
-    console.error(`\x1b[31m❌  Cannot reach gateway at ${GATEWAY_URL}\x1b[0m`);
-    console.error(`   Error details: ${err?.message || err}\n`);
+    console.error(`\x1b[31m❌  Unable to connect to UniDeploy Cloud API (${API_URL})\x1b[0m`);
+    console.error(`   Please check your network connection and try again.\n`);
     process.exit(1);
   }
 
