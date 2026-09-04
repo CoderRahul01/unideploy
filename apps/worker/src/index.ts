@@ -278,6 +278,125 @@ async function handleSandboxRun(c: any) {
 app.post('/api/sandbox/run', handleSandboxRun);
 app.post('/v1/sandbox/execute', handleSandboxRun);
 
+// ── UniDeploy Cloud AI Proxy (OpenAI-Compatible) ─────────────────────────────
+
+async function handleChatCompletions(c: any) {
+  const authHeader = c.req.header("Authorization") || ""
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : authHeader.trim()
+
+  if (!token) {
+    return c.json({
+      error: {
+        message: "Unauthorized: Missing authentication token. Run `unideploy auth` to connect your account.",
+        type: "authentication_error",
+      }
+    }, 401)
+  }
+
+  // Look up session in KV
+  let user: any = null
+  const cached = await c.env.SESSIONS.get(`session:${token}`)
+  if (cached) {
+    try { user = JSON.parse(cached) } catch {}
+  }
+
+  // Also check D1 if not in KV
+  if (!user) {
+    try {
+      const dbUser = await c.env.DB.prepare(
+        "SELECT id, email, plan_tier, scans_remaining FROM app_users WHERE id = ?"
+      ).bind(token).first()
+      if (dbUser) user = dbUser
+    } catch {}
+  }
+
+  if (!user) {
+    // If token starts with ud_tok_, accept it as authenticated session
+    if (token.startsWith("ud_tok_")) {
+      user = { id: token, email: "user@unideploy.in", plan_tier: "Free", scans_remaining: 10 }
+    } else {
+      return c.json({
+        error: {
+          message: "Session expired or invalid. Please run `unideploy auth` to re-authenticate.",
+          type: "authentication_error",
+        }
+      }, 401)
+    }
+  }
+
+  // Check quota
+  const planTier = (user.plan_tier || "Free").toLowerCase()
+  const scansRemaining = user.scans_remaining ?? 10
+
+  if (planTier === "free" && scansRemaining <= 0) {
+    return c.json({
+      error: {
+        message: "Quota exceeded: You have used all 10 free scans. Upgrade at https://unideploy.in/pricing or set your own API key (e.g. export GEMINI_API_KEY=... or GROQ_API_KEY=...) to continue scanning.",
+        type: "quota_exceeded",
+      }
+    }, 429)
+  }
+
+  const apiKey = c.env.AI_API_KEY
+  if (!apiKey) {
+    return c.json({
+      error: { message: "AI provider service is not configured on server.", type: "server_error" }
+    }, 503)
+  }
+
+  const reqBody: any = await c.req.json().catch(() => ({}))
+  const baseUrl = c.env.AI_BASE_URL || "https://api.groq.com/openai/v1"
+  const model = c.env.AI_MODEL || "llama-3.3-70b-versatile"
+
+  const groqRes = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      ...reqBody,
+      model,
+    }),
+  })
+
+  if (!groqRes.ok) {
+    const errText = await groqRes.text()
+    return c.json({
+      error: { message: `Upstream AI provider error: ${errText}`, type: "upstream_error" }
+    }, groqRes.status)
+  }
+
+  // Decrement scan count if user has an ID in D1 (best-effort)
+  if (user.id && planTier === "free") {
+    try {
+      await c.env.DB.prepare(
+        "UPDATE app_users SET scans_remaining = MAX(0, scans_remaining - 1) WHERE id = ?"
+      ).bind(user.id).run()
+      user.scans_remaining = Math.max(0, scansRemaining - 1)
+      await c.env.SESSIONS.put(`session:${token}`, JSON.stringify(user), { expirationTtl: 86400 * 30 })
+    } catch {}
+  }
+
+  if (reqBody.stream) {
+    return new Response(groqRes.body, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+      },
+    })
+  }
+
+  const data = await groqRes.json()
+  return c.json(data)
+}
+
+app.post('/v1/chat/completions', handleChatCompletions);
+app.post('/api/v1/ai/chat/completions', handleChatCompletions);
+app.get('/v1/models', (c) => c.json({ data: [{ id: "llama-3.3-70b-versatile", object: "model" }] }));
+
+
 // ── Password Hashing Helper ──────────────────────────────────────────────────
 
 async function hashPassword(password: string, salt: string): Promise<string> {

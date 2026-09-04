@@ -27,6 +27,25 @@ import { loadSkill, listSkills } from "./skills/loader.js";
 const API_URL     = process.env.UNIDEPLOY_API_URL || "https://unideploy-api.rahulpandey-creates.workers.dev";
 const APP_URL     = process.env.UNIDEPLOY_APP_URL  || "https://unideploy.in";
 const AUTH_FILE   = path.join(os.homedir(), ".unideploy", "auth.json");
+const CONFIG_FILE = path.join(os.homedir(), ".unideploy", "config.json");
+
+// ── Configuration helpers ─────────────────────────────────────────────────────
+
+function loadLocalConfig(): void {
+  try {
+    if (fs.existsSync(CONFIG_FILE)) {
+      const raw = fs.readFileSync(CONFIG_FILE, "utf8");
+      const cfg = JSON.parse(raw) as Record<string, string>;
+      for (const [key, val] of Object.entries(cfg)) {
+        if (typeof val === "string" && !process.env[key]) {
+          process.env[key] = val;
+        }
+      }
+    }
+  } catch {}
+}
+
+loadLocalConfig();
 
 // ── Auth helpers ──────────────────────────────────────────────────────────────
 
@@ -125,8 +144,25 @@ async function runAuth(): Promise<void> {
   // 4. Store token
   writeStoredAuth(token);
 
-  // 5. Success
+  // 5. Fetch account info
+  let planInfo = "Free Tier (10 cloud scans available)";
+  try {
+    const meRes = await fetch(`${API_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (meRes.ok) {
+      const meData = (await meRes.json()) as any;
+      const d = meData.data || meData;
+      if (d.plan_tier) {
+        planInfo = `${d.plan_tier} Tier (${d.scans_remaining ?? 10} scans remaining)`;
+      }
+    }
+  } catch {}
+
+  // 6. Success
   console.log(`\n\x1b[32m✓ Authenticated!\x1b[0m Token stored at \x1b[90m~/.unideploy/auth.json\x1b[0m
+  Plan:     \x1b[36m${planInfo}\x1b[0m
+  Cloud AI: \x1b[32mActive (Ready to scan)\x1b[0m
 
 \x1b[36m┌─────────────────────────────────────────────────┐
 │  UniDeploy  ·  unideploy.in                     │
@@ -142,20 +178,40 @@ async function runAuth(): Promise<void> {
 
 // ── `unideploy whoami` ────────────────────────────────────────────────────────
 
-function runWhoami(): void {
+async function runWhoami(): Promise<void> {
   const auth = readStoredAuth();
   if (!auth) {
     console.log(`\x1b[33mNot logged in.\x1b[0m Run \x1b[36munideploy auth\x1b[0m to connect your account.\n`);
-  } else {
-    console.log(`\x1b[32m✓ Logged in\x1b[0m — token stored at \x1b[90m~/.unideploy/auth.json\x1b[0m`);
-    if (auth.user_id) console.log(`  user_id: ${auth.user_id}`);
-    console.log();
+    return;
   }
+
+  console.log(`\x1b[32m✓ Logged in to UniDeploy Cloud\x1b[0m`);
+  try {
+    const res = await fetch(`${API_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${auth.token}` },
+    });
+    if (res.ok) {
+      const body = (await res.json()) as any;
+      const data = body.data || body;
+      console.log(`  Email:           ${data.email || "Registered User"}`);
+      console.log(`  Plan:            \x1b[36m${data.plan_tier || "Free"}\x1b[0m`);
+      console.log(`  Scans Remaining: \x1b[33m${data.scans_remaining ?? 10}\x1b[0m`);
+      if (data.plan_tier === "Free") {
+        console.log(`  Upgrade Plan:    \x1b[90mhttps://unideploy.in/pricing\x1b[0m`);
+      }
+    } else {
+      if (auth.user_id) console.log(`  User ID: ${auth.user_id}`);
+    }
+  } catch {
+    if (auth.user_id) console.log(`  User ID: ${auth.user_id}`);
+  }
+  console.log(`  Token:           ~/.unideploy/auth.json\n`);
 }
 
 // ── Model resolver ────────────────────────────────────────────────────────────
 
 function resolveModel() {
+  // 1. BYOK checks (Local keys take precedence if developer has configured them)
   if (process.env.ANTHROPIC_API_KEY) {
     const modelId = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
     return { model: getModel("anthropic", modelId as any), label: `${modelId} (Anthropic)` };
@@ -179,7 +235,42 @@ function resolveModel() {
     const modelId = process.env.NVIDIA_MODEL || "meta/llama-3.1-70b-instruct";
     return { model: getModel("nvidia", modelId as any), label: `${modelId} (NVIDIA NIM)` };
   }
-  console.error("\n❌  Set ANTHROPIC_API_KEY, GEMINI_API_KEY, GROQ_API_KEY, HF_TOKEN (or HUGGINGFACE_API_KEY), or NVIDIA_API_KEY\n");
+
+  // 2. UniDeploy Cloud AI (Default for authenticated users)
+  const auth = readStoredAuth();
+  if (auth?.token) {
+    process.env.OPENAI_API_KEY = auth.token;
+    const cloudModel: any = {
+      id: "llama-3.3-70b-versatile",
+      name: "UniDeploy Cloud AI (Llama 3.3 70B)",
+      api: "openai-completions",
+      provider: "openai",
+      baseUrl: `${API_URL}/v1`,
+      reasoning: false,
+      input: ["text"],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 131072,
+      maxTokens: 32768,
+    };
+    return { model: cloudModel, label: "UniDeploy Cloud AI (Zero-Config)" };
+  }
+
+  // 3. Not authenticated & No BYOK key
+  console.error(`
+\x1b[33m┌─────────────────────────────────────────────────────────────┐
+│  Welcome to UniDeploy!                                      │
+└─────────────────────────────────────────────────────────────┘\x1b[0m
+
+No AI credentials found. To start scanning:
+
+  \x1b[32m1. Connect your free UniDeploy account (includes 10 free scans):\x1b[0m
+     Run: \x1b[36munideploy auth\x1b[0m
+
+  \x1b[32m2. Or bring your own free API key (unlimited local scans):\x1b[0m
+     export GEMINI_API_KEY=...    \x1b[90m(Free at https://aistudio.google.com)\x1b[0m
+     export GROQ_API_KEY=...      \x1b[90m(Free at https://console.groq.com)\x1b[0m
+     export ANTHROPIC_API_KEY=...
+`);
   process.exit(1);
 }
 
@@ -219,7 +310,40 @@ async function main(): Promise<void> {
 
   // ── Named commands (no LLM needed) ────────────────────────────────────────
   if (cmd === "auth")   { await runAuth();   return; }
-  if (cmd === "whoami") { runWhoami();       return; }
+  if (cmd === "whoami") { await runWhoami(); return; }
+  if (cmd === "upgrade" || cmd === "pricing") {
+    console.log(`\x1b[36mOpening UniDeploy pricing: ${APP_URL}/pricing\x1b[0m\n`);
+    openBrowser(`${APP_URL}/pricing`);
+    return;
+  }
+  if (cmd === "config") {
+    const sub = args[1];
+    if (sub === "set" && args[2] && args[3]) {
+      const key = args[2].toUpperCase();
+      const val = args[3];
+      let cfg: Record<string, string> = {};
+      try { cfg = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8")); } catch {}
+      cfg[key] = val;
+      const dir = path.dirname(CONFIG_FILE);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), { mode: 0o600 });
+      console.log(`\x1b[32m✓ Configured ${key} in ~/.unideploy/config.json\x1b[0m\n`);
+      return;
+    }
+    try {
+      const raw = fs.readFileSync(CONFIG_FILE, "utf8");
+      const cfg = JSON.parse(raw);
+      console.log(`\x1b[36mUniDeploy Config (~/.unideploy/config.json):\x1b[0m`);
+      for (const [k, v] of Object.entries(cfg)) {
+        const masked = typeof v === "string" && v.length > 8 ? `${v.slice(0, 6)}****` : "****";
+        console.log(`  ${k}: ${masked}`);
+      }
+      console.log();
+    } catch {
+      console.log(`\x1b[90mNo custom keys stored in ~/.unideploy/config.json\x1b[0m\n`);
+    }
+    return;
+  }
   if (cmd === "logout") {
     try { fs.unlinkSync(AUTH_FILE); } catch {}
     console.log("\x1b[32m✓ Logged out\x1b[0m\n");
