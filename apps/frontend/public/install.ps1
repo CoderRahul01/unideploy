@@ -3,7 +3,7 @@
 
 $ErrorActionPreference = "Stop"
 
-$Owner = "rahulpandey535"
+$Owner = "CoderRahul01"
 $Repo = "unideploy"
 $InstallDir = "$env:LOCALAPPDATA\Programs\UniDeploy"
 $BinPath = "$InstallDir\unideploy.exe"
@@ -36,7 +36,7 @@ try {
 } catch {
     Write-Host "Direct binary download unavailable, falling back to npm package..." -ForegroundColor Gray
     if (Get-Command npm -ErrorAction SilentlyContinue) {
-        npm install -g @unideploy/cli
+        npm install -g unideploy
         Write-Host ""
         Write-Host "UniDeploy CLI installed via npm!" -ForegroundColor Green
         exit 0
@@ -44,7 +44,7 @@ try {
 }
 
 if (-not $DownloadSuccess -and -not (Test-Path $BinPath)) {
-    Write-Host "❌ Failed to download binary. Please install Node.js and run: npm install -g @unideploy/cli" -ForegroundColor Red
+    Write-Host "❌ Failed to download binary. Please install Node.js and run: npm install -g unideploy" -ForegroundColor Red
     exit 1
 }
 

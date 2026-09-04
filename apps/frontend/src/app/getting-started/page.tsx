@@ -102,7 +102,7 @@ export default function DocsPage() {
             </p>
             <div style={{ display: "flex", gap: 12 }}>
               <a
-                href="https://github.com/rahulpandey535/unideploy/releases/latest/download/UniDeploy-arm64.dmg"
+                href="https://github.com/CoderRahul01/unideploy/releases/latest/download/UniDeploy-arm64.dmg"
                 style={{
                   background: C.surface, border: `1px solid ${C.border}`, color: C.text,
                   padding: "12px 20px", borderRadius: 8, textDecoration: "none", fontSize: 13,
@@ -112,7 +112,7 @@ export default function DocsPage() {
                 Download DMG (Apple Silicon)
               </a>
               <a
-                href="https://github.com/rahulpandey535/unideploy/releases/latest/download/UniDeploy-x64.dmg"
+                href="https://github.com/CoderRahul01/unideploy/releases/latest/download/UniDeploy-x64.dmg"
                 style={{
                   background: C.surface, border: `1px solid ${C.border}`, color: C.text,
                   padding: "12px 20px", borderRadius: 8, textDecoration: "none", fontSize: 13,

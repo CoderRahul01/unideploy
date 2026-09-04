@@ -26,7 +26,7 @@ const TIERS: Tier[] = [
     annualTotal: null,
     description: "100% Open Source CLI engine for developers who want to self-host on their own VPS.",
     cta: "Self-host free",
-    ctaHref: "https://github.com/rahulpandey535/unideploy",
+    ctaHref: "https://github.com/CoderRahul01/unideploy",
     features: [
       "Open Source CLI engine",
       "Unlimited self-hosted deployments",
