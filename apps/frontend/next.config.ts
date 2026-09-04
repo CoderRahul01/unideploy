@@ -85,7 +85,7 @@ const configToExport = isProd
       tunnelRoute: "/monitoring",
 
       // Hides source maps from visitors
-      sourcemaps: false,
+      sourcemaps: { disable: true },
 
       // Automatically tree-shake Sentry logger statements to reduce bundle size
       disableLogger: true,

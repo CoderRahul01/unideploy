@@ -3,6 +3,7 @@ import { Twitter, Linkedin } from "lucide-react";
 import ProgramBadge from "./ProgramBadge";
 
 const PRODUCT_LINKS = [
+  { label: "Cloud Sandbox Hub", href: "/sandbox" },
   { label: "How it works", href: "/#how-it-works" },
   { label: "Pricing", href: "/pricing" },
   { label: "Book a demo", href: "/demo" },
@@ -11,6 +12,7 @@ const PRODUCT_LINKS = [
 ];
 
 const RESOURCE_LINKS = [
+  { label: "Sandbox Marketplace", href: "/sandbox" },
   { label: "Getting Started", href: "/getting-started" },
   { label: "Documentation", href: "https://docs.unideploy.in" },
   { label: "Security", href: "/security" },

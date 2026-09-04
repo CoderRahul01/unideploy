@@ -1,6 +1,7 @@
 name = "unideploy-api"
 main = "src/index.ts"
 compatibility_date = "2026-05-20"
+compatibility_flags = ["nodejs_compat"]
 
 [vars]
 AI_BASE_URL = "https://api.groq.com/openai/v1"

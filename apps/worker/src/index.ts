@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { stream } from 'hono/streaming'
+import { Sandbox } from '@e2b/code-interpreter'
 
 interface Env {
   DB: D1Database;
@@ -8,6 +9,7 @@ interface Env {
   AI_BASE_URL: string;
   AI_MODEL: string;
   AI_API_KEY?: string;
+  E2B_API_KEY?: string;
 }
 
 const app = new Hono<{ Bindings: Env }>()
@@ -96,6 +98,185 @@ app.get('/api/v1/status', (c) => c.json({
   scans_remaining: 999,
   last_scan: null,
 }))
+
+// ── E2B Cloud Sandbox Hub & Marketplace (Cloudflare Worker) ──────────────────
+
+const BLOCKED_PATTERNS = [
+  /stratum\+tcp/i,
+  /xmrig/i,
+  /minerd/i,
+  /cryptonight/i,
+  /:\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:/,
+  /rm\s+-rf\s+(\/|--no-preserve-root)/i,
+  /dd\s+if=\/dev\/zero\s+of=\/dev\/[sh]da/i,
+  /mkfs\./i,
+];
+
+app.get('/api/sandbox/templates', (c) => {
+  return c.json({
+    service: "UniDeploy Sandbox Marketplace (Cloudflare Worker)",
+    provider: "E2B Firecracker microVMs",
+    templates: [
+      {
+        id: "data-science",
+        name: "Data Science & Plot Engine",
+        badge: "Most Popular",
+        category: "data",
+        language: "python",
+        description: "Python 3.11 with Pandas, NumPy, and Matplotlib. Automatically renders charts & plots directly.",
+        specs: { cpu: "2 vCPUs", ram: "2 GB", os: "Debian 13 Firecracker" },
+        outputType: "chart",
+      },
+      {
+        id: "node-runtime",
+        name: "Node.js 20 & Modern JS",
+        badge: "Fastest",
+        category: "fullstack",
+        language: "js",
+        description: "Modern JavaScript engine with async/await, crypto, and ES modules.",
+        specs: { cpu: "2 vCPUs", ram: "2 GB", os: "Debian 13 Firecracker" },
+        outputType: "text",
+      },
+      {
+        id: "cloud-terminal",
+        name: "Linux Cloud Terminal (Bash)",
+        badge: "Root Shell",
+        category: "terminal",
+        language: "bash",
+        description: "Disposable Ubuntu/Debian microVM bash terminal with curl, git, python, and node.",
+        specs: { cpu: "2 vCPUs", ram: "2 GB", os: "Debian 13 Firecracker" },
+        outputType: "text",
+      },
+      {
+        id: "security-audit",
+        name: "UniDeploy Vulnerability Scan",
+        badge: "DevSecOps",
+        category: "security",
+        language: "python",
+        description: "Security scanner engine searching for hardcoded API keys, JWT secrets, and AWS tokens.",
+        specs: { cpu: "2 vCPUs", ram: "2 GB", os: "Debian 13 Firecracker" },
+        outputType: "json",
+      },
+      {
+        id: "web-scraper",
+        name: "Web Scraper & Metadata Extractor",
+        badge: "Automation",
+        category: "automation",
+        language: "python",
+        description: "Scrapes remote web endpoints, parses meta tags, open graph metadata, and headers.",
+        specs: { cpu: "2 vCPUs", ram: "2 GB", os: "Debian 13 Firecracker" },
+        outputType: "text",
+      },
+    ],
+  });
+});
+
+async function handleSandboxRun(c: any) {
+  try {
+    const body = await c.req.json().catch(() => null);
+    if (!body || !body.code) {
+      return c.json({ success: false, error: "Missing or invalid 'code' in request body." }, 400);
+    }
+
+    const { language = "python", code, timeoutMs = 30000 } = body;
+
+    // Safety validation
+    for (const pattern of BLOCKED_PATTERNS) {
+      if (pattern.test(code)) {
+        return c.json({
+          success: false,
+          error: "Security violation: execution payload matched restricted safety policy.",
+        }, 400);
+      }
+    }
+
+    const apiKey = c.env.E2B_API_KEY;
+    if (!apiKey) {
+      return c.json({
+        success: false,
+        error: "E2B_API_KEY is not configured on Cloudflare worker environment.",
+      }, 500);
+    }
+    const startTime = Date.now();
+    let sbx: any = null;
+
+    try {
+      sbx = await Sandbox.create({
+        apiKey,
+        timeoutMs: Math.min(Number(timeoutMs) || 30000, 60000),
+      });
+
+      const sandboxId = sbx.sandboxId;
+
+      if (language === "bash") {
+        const cmdResult = await sbx.commands.run(code, {
+          timeoutMs: Math.min(Number(timeoutMs) || 30000, 30000),
+        });
+        const durationMs = Date.now() - startTime;
+        const isSuccess = cmdResult.exitCode === 0;
+
+        return c.json({
+          success: isSuccess,
+          stdout: cmdResult.stdout || "",
+          stderr: cmdResult.stderr || (isSuccess ? "" : `Process exited with code ${cmdResult.exitCode}`),
+          durationMs,
+          sandboxId,
+        });
+      } else {
+        const lang = language === "python" ? "python" : "js";
+        const execution = await sbx.runCode(code, { language: lang });
+        const durationMs = Date.now() - startTime;
+
+        const stdoutPieces: string[] = [];
+        if (execution.logs?.stdout?.length) stdoutPieces.push(execution.logs.stdout.join(""));
+        if (execution.text) stdoutPieces.push(execution.text);
+
+        const stderrPieces: string[] = [];
+        if (execution.logs?.stderr?.length) stderrPieces.push(execution.logs.stderr.join(""));
+        if (execution.error) {
+          stderrPieces.push(`${execution.error.name}: ${execution.error.value}\n${execution.error.traceback || ""}`);
+        }
+
+        const results: Array<{ type: string; data: string }> = [];
+        if (execution.results?.length) {
+          for (const item of execution.results) {
+            if (item.png) results.push({ type: "image/png", data: item.png });
+            else if (item.svg) results.push({ type: "image/svg+xml", data: item.svg });
+            else if (item.text) results.push({ type: "text/plain", data: item.text });
+          }
+        }
+
+        return c.json({
+          success: !execution.error,
+          stdout: stdoutPieces.join("\n").trim(),
+          stderr: stderrPieces.join("\n").trim(),
+          results,
+          durationMs,
+          sandboxId,
+        });
+      }
+    } catch (err: any) {
+      return c.json({
+        success: false,
+        stdout: "",
+        stderr: err?.message || String(err),
+        durationMs: Date.now() - startTime,
+        error: err?.message || "Execution error",
+      }, 500);
+    } finally {
+      if (sbx) {
+        try {
+          await sbx.kill();
+        } catch {}
+      }
+    }
+  } catch (outerErr: any) {
+    return c.json({ success: false, error: outerErr?.message || "Internal server error" }, 500);
+  }
+}
+
+app.post('/api/sandbox/run', handleSandboxRun);
+app.post('/v1/sandbox/execute', handleSandboxRun);
 
 // ── Auth & Pairing Endpoints ──────────────────────────────────────────────────
 

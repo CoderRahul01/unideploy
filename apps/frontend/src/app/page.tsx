@@ -75,6 +75,29 @@ export default function LandingPage() {
             Pricing
           </a>
           <a
+            href="/sandbox"
+            style={{
+              fontSize: 13,
+              color: "var(--accent-green)",
+              fontWeight: 600,
+              textDecoration: "none",
+              padding: "6px 12px",
+            }}
+          >
+            Cloud Sandbox
+          </a>
+          <a
+            href="/download"
+            style={{
+              fontSize: 13,
+              color: "var(--text-secondary)",
+              textDecoration: "none",
+              padding: "6px 12px",
+            }}
+          >
+            Download
+          </a>
+          <a
             href="/connect"
             style={{
               fontSize: 13,
@@ -286,8 +309,8 @@ export default function LandingPage() {
 
         <div style={{ display: "inline-flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
           <a
-            href="/connect"
-            onClick={() => posthog.capture("get_started_clicked", { location: "hero" })}
+            href="/sandbox"
+            onClick={() => posthog.capture("launch_sandbox_clicked", { location: "hero" })}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -308,7 +331,8 @@ export default function LandingPage() {
           </a>
 
           <a
-            href="/pricing"
+            href="/connect"
+            onClick={() => posthog.capture("get_started_clicked", { location: "hero" })}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -324,7 +348,7 @@ export default function LandingPage() {
               fontFamily: "var(--font-body), DM Sans, sans-serif",
             }}
           >
-            View Pricing Tiers
+            Audit GitHub Repo
           </a>
         </div>
 
