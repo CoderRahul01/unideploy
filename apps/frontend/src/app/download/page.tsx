@@ -66,7 +66,7 @@ export default function DownloadPage() {
 
   const macCurlCommand = "curl -fsSL https://unideploy.in/install.sh | bash";
   const winPsCommand = "irm https://unideploy.in/install.ps1 | iex";
-  const npmCommand = "npm install -g @unideploy/cli";
+  const npmCommand = "npm install -g unideploy";
 
   return (
     <div
@@ -391,7 +391,7 @@ export default function DownloadPage() {
               >
                 <span>Or download standalone binary:</span>
                 <a
-                  href="https://github.com/rahulpandey535/unideploy/releases/latest/download/cli-arm64"
+                  href="https://github.com/CoderRahul01/unideploy/releases/latest/download/cli-arm64"
                   style={{
                     color: C.greenLight,
                     textDecoration: "none",
@@ -403,7 +403,7 @@ export default function DownloadPage() {
                 </a>
                 <span>·</span>
                 <a
-                  href="https://github.com/rahulpandey535/unideploy/releases/latest/download/cli-x64"
+                  href="https://github.com/CoderRahul01/unideploy/releases/latest/download/cli-x64"
                   style={{
                     color: C.greenLight,
                     textDecoration: "none",
@@ -495,7 +495,7 @@ export default function DownloadPage() {
               >
                 <span>Or download executable directly:</span>
                 <a
-                  href="https://github.com/rahulpandey535/unideploy/releases/latest/download/unideploy-windows-x64.exe"
+                  href="https://github.com/CoderRahul01/unideploy/releases/latest/download/unideploy-windows-x64.exe"
                   style={{
                     color: C.greenLight,
                     textDecoration: "none",
@@ -575,7 +575,7 @@ export default function DownloadPage() {
               </div>
 
               <div style={{ marginTop: 16, fontSize: 12, color: C.textMuted }}>
-                Or run without installing: <code>npx @unideploy/cli scan</code>
+                Or run without installing: <code>npx unideploy scan</code>
               </div>
             </div>
           )}

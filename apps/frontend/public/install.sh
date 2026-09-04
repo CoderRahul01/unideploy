@@ -4,7 +4,7 @@
 
 set -e
 
-OWNER="rahulpandey535"
+OWNER="CoderRahul01"
 REPO="unideploy"
 BINARY_NAME="unideploy"
 INSTALL_DIR="/usr/local/bin"
@@ -49,7 +49,7 @@ if curl -sL --fail -o "$TEMP_DIR/unideploy" "$DOWNLOAD_URL"; then
 else
   echo "Binary asset unavailable, falling back to npm package..."
   if command -v npm >/dev/null 2>&1; then
-    npm install -g @unideploy/cli
+    npm install -g unideploy
   else
     echo -e "\033[31m❌ Could not download binary and npm is not installed.\033[0m"
     exit 1

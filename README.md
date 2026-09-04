@@ -109,3 +109,11 @@ cd apps/backend && python -m uvicorn main:app --reload --port 8000
 # In a second terminal
 bash scripts/verify.sh
 ```
+
+## License
+
+UniDeploy is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md).
+
+- **Noncommercial / Personal / Educational Use**: 100% Free. You can view, clone, modify, and run UniDeploy for any noncommercial purpose.
+- **Commercial Use**: Requires a commercial subscription or enterprise license. See [Pricing](https://unideploy.in/pricing) or contact [sales@unideploy.in](mailto:sales@unideploy.in).
+

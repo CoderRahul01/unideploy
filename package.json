@@ -1,7 +1,8 @@
 {
-  "name": "unideploy",
-  "version": "0.1.0",
+  "name": "unideploy-monorepo",
+  "version": "0.2.4",
   "private": true,
+  "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "workspaces": [
     "packages/ai",
