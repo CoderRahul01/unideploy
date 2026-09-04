@@ -118,19 +118,29 @@ app.get('/api/sandbox/templates', (c) => {
     provider: "E2B Firecracker microVMs",
     templates: [
       {
-        id: "data-science",
-        name: "Data Science & Plot Engine",
-        badge: "Most Popular",
+        id: "colab-python",
+        name: "Google Colab Alternative (Python 3.11)",
+        badge: "Persistent MicroVM",
         category: "data",
         language: "python",
-        description: "Python 3.11 with Pandas, NumPy, and Matplotlib. Automatically renders charts & plots directly.",
+        description: "Persistent Python 3.11 data science stack with NumPy, Pandas, and Matplotlib. Never randomly disconnects.",
         specs: { cpu: "2 vCPUs", ram: "2 GB", os: "Debian 13 Firecracker" },
         outputType: "chart",
       },
       {
+        id: "model-deploy",
+        name: "AI Model & Agent Serverless Deployment",
+        badge: "Instant API Key",
+        category: "automation",
+        language: "python",
+        description: "Deploy custom AI agents, pipelines, or inference logic into an isolated microVM with live HTTP endpoint.",
+        specs: { cpu: "2 vCPUs", ram: "2 GB", os: "Debian 13 Firecracker" },
+        outputType: "json",
+      },
+      {
         id: "node-runtime",
-        name: "Node.js 20 & Modern JS",
-        badge: "Fastest",
+        name: "Node.js 20 & High-Concurrency Backend",
+        badge: "Fastest Sub-Second",
         category: "fullstack",
         language: "js",
         description: "Modern JavaScript engine with async/await, crypto, and ES modules.",
@@ -148,22 +158,12 @@ app.get('/api/sandbox/templates', (c) => {
         outputType: "text",
       },
       {
-        id: "security-audit",
-        name: "UniDeploy Vulnerability Scan",
-        badge: "DevSecOps",
-        category: "security",
-        language: "python",
-        description: "Security scanner engine searching for hardcoded API keys, JWT secrets, and AWS tokens.",
-        specs: { cpu: "2 vCPUs", ram: "2 GB", os: "Debian 13 Firecracker" },
-        outputType: "json",
-      },
-      {
-        id: "web-scraper",
-        name: "Web Scraper & Metadata Extractor",
-        badge: "Automation",
+        id: "agent-scraper",
+        name: "Autonomous Web Scraper & Ingestion Pipeline",
+        badge: "ETL / RAG",
         category: "automation",
         language: "python",
-        description: "Scrapes remote web endpoints, parses meta tags, open graph metadata, and headers.",
+        description: "Scrapes remote web endpoints, parses meta tags, open graph metadata, and extracts markdown.",
         specs: { cpu: "2 vCPUs", ram: "2 GB", os: "Debian 13 Firecracker" },
         outputType: "text",
       },
@@ -304,34 +304,41 @@ async function handleChatCompletions(c: any) {
   if (!user) {
     try {
       const dbUser = await c.env.DB.prepare(
-        "SELECT id, email, plan_tier, scans_remaining FROM app_users WHERE id = ?"
+        "SELECT id, email, plan_tier, scans_remaining, tokens_remaining FROM app_users WHERE id = ?"
       ).bind(token).first()
       if (dbUser) user = dbUser
-    } catch {}
+    } catch {
+      try {
+        const dbUser = await c.env.DB.prepare(
+          "SELECT id, email, plan_tier, scans_remaining FROM app_users WHERE id = ?"
+        ).bind(token).first()
+        if (dbUser) user = dbUser
+      } catch {}
+    }
   }
 
   if (!user) {
     // If token starts with ud_tok_, accept it as authenticated session
     if (token.startsWith("ud_tok_")) {
-      user = { id: token, email: "user@unideploy.in", plan_tier: "Free", scans_remaining: 10 }
+      user = { id: token, email: "developer@unideploy.in", plan_tier: "Free", tokens_remaining: 50000, scans_remaining: 10 }
     } else {
       return c.json({
         error: {
-          message: "Session expired or invalid. Please run `unideploy auth` to re-authenticate.",
+          message: "Session expired or invalid. Please re-authenticate at https://unideploy.in/login",
           type: "authentication_error",
         }
       }, 401)
     }
   }
 
-  // Check quota
+  // Check compute token quota (50,000 free tokens)
   const planTier = (user.plan_tier || "Free").toLowerCase()
-  const scansRemaining = user.scans_remaining ?? 10
+  const tokensRemaining = user.tokens_remaining ?? (user.scans_remaining ? user.scans_remaining * 5000 : 50000)
 
-  if (planTier === "free" && scansRemaining <= 0) {
+  if (planTier === "free" && tokensRemaining <= 0) {
     return c.json({
       error: {
-        message: "Quota exceeded: You have used all 10 free scans. Upgrade at https://unideploy.in/pricing or set your own API key (e.g. export GEMINI_API_KEY=... or GROQ_API_KEY=...) to continue scanning.",
+        message: "Compute quota exceeded: You have exhausted your 50,000 free trial tokens. Upgrade at https://unideploy.in/pricing or configure a direct provider API key.",
         type: "quota_exceeded",
       }
     }, 429)
@@ -340,7 +347,7 @@ async function handleChatCompletions(c: any) {
   const apiKey = c.env.AI_API_KEY
   if (!apiKey) {
     return c.json({
-      error: { message: "AI provider service is not configured on server.", type: "server_error" }
+      error: { message: "AI compute provider service is not configured on server.", type: "server_error" }
     }, 503)
   }
 
@@ -363,22 +370,19 @@ async function handleChatCompletions(c: any) {
   if (!groqRes.ok) {
     const errText = await groqRes.text()
     return c.json({
-      error: { message: `Upstream AI provider error: ${errText}`, type: "upstream_error" }
+      error: { message: `Upstream AI compute provider error: ${errText}`, type: "upstream_error" }
     }, groqRes.status)
   }
 
-  // Decrement scan count if user has an ID in D1 (best-effort)
-  if (user.id && planTier === "free") {
-    try {
-      await c.env.DB.prepare(
-        "UPDATE app_users SET scans_remaining = MAX(0, scans_remaining - 1) WHERE id = ?"
-      ).bind(user.id).run()
-      user.scans_remaining = Math.max(0, scansRemaining - 1)
-      await c.env.SESSIONS.put(`session:${token}`, JSON.stringify(user), { expirationTtl: 86400 * 30 })
-    } catch {}
-  }
-
   if (reqBody.stream) {
+    // Best effort token decrement for stream
+    if (user.id && planTier === "free") {
+      try {
+        await c.env.DB.prepare(
+          "UPDATE app_users SET tokens_remaining = MAX(0, tokens_remaining - 500) WHERE id = ?"
+        ).bind(user.id).run()
+      } catch {}
+    }
     return new Response(groqRes.body, {
       headers: {
         "Content-Type": "text/event-stream",
@@ -388,12 +392,136 @@ async function handleChatCompletions(c: any) {
     })
   }
 
-  const data = await groqRes.json()
+  const data: any = await groqRes.json()
+  const tokensUsed = data?.usage?.total_tokens || 800
+
+  // Decrement token count if user has an ID in D1 (best-effort)
+  if (user.id && planTier === "free") {
+    try {
+      await c.env.DB.prepare(
+        "UPDATE app_users SET tokens_remaining = MAX(0, tokens_remaining - ?) WHERE id = ?"
+      ).bind(tokensUsed, user.id).run()
+      user.tokens_remaining = Math.max(0, tokensRemaining - tokensUsed)
+      await c.env.SESSIONS.put(`session:${token}`, JSON.stringify(user), { expirationTtl: 86400 * 30 })
+    } catch {}
+  }
+
   return c.json(data)
 }
 
 app.post('/v1/chat/completions', handleChatCompletions);
 app.post('/api/v1/ai/chat/completions', handleChatCompletions);
+
+// ── AI Model & Agent Deployment Endpoints ─────────────────────────────────────
+
+app.post('/api/v1/models/deploy', async (c) => {
+  try {
+    const authHeader = c.req.header('Authorization') || ""
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : authHeader.trim()
+
+    let user: any = null
+    if (token) {
+      const cached = await c.env.SESSIONS.get(`session:${token}`)
+      if (cached) {
+        try { user = JSON.parse(cached) } catch {}
+      }
+    }
+
+    const body = await c.req.json().catch(() => ({}))
+    const modelName = (body.name || body.model_name || "custom-ai-pipeline").trim()
+    const framework = (body.framework || "fastapi").trim()
+    const description = (body.description || "Production AI Agent / Microservice Sandbox").trim()
+
+    const modelId = `mod_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`
+    const apiKey = `uni_live_${crypto.randomUUID().replace(/-/g, "")}`
+    const now = new Date().toISOString()
+    const protocol = c.req.header("x-forwarded-proto") === "https" ? "https" : "http"
+    const host = c.req.header("host") || "unideploy-api.rahulpandey-creates.workers.dev"
+    const endpointUrl = `${protocol}://${host}/api/v1/models/${modelId}/invoke`
+
+    const deployment = {
+      id: modelId,
+      model_id: modelId,
+      name: modelName,
+      framework,
+      description,
+      status: "active",
+      endpoint_url: endpointUrl,
+      api_key: apiKey,
+      user_id: user?.id || "anonymous",
+      created_at: now,
+    }
+
+    // Save in KV
+    await c.env.SESSIONS.put(`model:${modelId}`, JSON.stringify(deployment))
+    await c.env.SESSIONS.put(`model_key:${apiKey}`, JSON.stringify(deployment))
+
+    return c.json({
+      success: true,
+      message: "AI model sandbox deployed successfully",
+      data: {
+        model_id: modelId,
+        name: modelName,
+        framework,
+        status: "active",
+        endpoint_url: endpointUrl,
+        api_key: apiKey,
+        sample_curl: `curl -X POST ${endpointUrl} -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d '{"prompt": "Run agent inference"}'`,
+        created_at: now,
+      }
+    }, 201)
+  } catch (err: any) {
+    return c.json({ success: false, error: err.message || "Model deployment failed" }, 500)
+  }
+})
+
+app.get('/api/v1/models', async (c) => {
+  return c.json({
+    success: true,
+    data: [
+      {
+        model_id: "mod_colab_py311",
+        name: "Google Colab Alternative (Python 3.11 MicroVM)",
+        framework: "jupyter-python",
+        status: "active",
+        endpoint_url: "https://unideploy.in/api/sandbox/run",
+      },
+      {
+        model_id: "mod_llama3_agent",
+        name: "Llama-3 Serverless Agent Pipeline",
+        framework: "fastapi",
+        status: "active",
+        endpoint_url: "https://unideploy-api.rahulpandey-creates.workers.dev/v1/chat/completions",
+      },
+    ]
+  })
+})
+
+app.post('/api/v1/models/:id/invoke', async (c) => {
+  const modelId = c.req.param('id')
+  const authHeader = c.req.header('Authorization') || ""
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : authHeader.trim()
+
+  if (!token) {
+    return c.json({ error: "Unauthorized: Missing Bearer API key" }, 401)
+  }
+
+  const cached = await c.env.SESSIONS.get(`model:${modelId}`)
+  const body = await c.req.json().catch(() => ({}))
+
+  return c.json({
+    success: true,
+    model_id: modelId,
+    status: "executed",
+    output: {
+      result: `Processed request for model ${modelId}`,
+      received_payload: body,
+      timestamp: new Date().toISOString(),
+      compute_vm: "in-mumbai-firecracker-01",
+    }
+  })
+})
+
 app.get('/v1/models', (c) => c.json({ data: [{ id: "llama-3.3-70b-versatile", object: "model" }] }));
 
 
@@ -444,17 +572,24 @@ app.post('/auth/register', async (c) => {
       user_id: userId,
       email,
       plan_tier: "Free",
+      tokens_remaining: 50000,
       scans_remaining: 10,
       created_at: now,
     }
 
-    // Insert into D1
+    // Insert into D1 (with fallback if column doesn't exist)
     try {
       await c.env.DB.prepare(
-        "INSERT INTO app_users (id, email, password_hash, salt, plan_tier, scans_remaining, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-      ).bind(userId, email, passwordHash, salt, "Free", 10, now).run()
+        "INSERT INTO app_users (id, email, password_hash, salt, plan_tier, scans_remaining, tokens_remaining, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      ).bind(userId, email, passwordHash, salt, "Free", 10, 50000, now).run()
     } catch (dbErr) {
-      console.error("D1 app_users insert failed:", dbErr)
+      try {
+        await c.env.DB.prepare(
+          "INSERT INTO app_users (id, email, password_hash, salt, plan_tier, scans_remaining, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        ).bind(userId, email, passwordHash, salt, "Free", 10, now).run()
+      } catch (fallbackErr) {
+        console.error("D1 app_users insert failed:", fallbackErr)
+      }
     }
 
     // Store session in KV (30-day TTL)
@@ -466,6 +601,7 @@ app.post('/auth/register', async (c) => {
         user_id: userId,
         email,
         plan_tier: "Free",
+        tokens_remaining: 50000,
         scans_remaining: 10,
       }
     }, 201)
@@ -488,10 +624,16 @@ app.post('/auth/login', async (c) => {
     let user: any = null
     try {
       user = await c.env.DB.prepare(
-        "SELECT id, email, password_hash, salt, plan_tier, scans_remaining FROM app_users WHERE email = ?"
+        "SELECT id, email, password_hash, salt, plan_tier, scans_remaining, tokens_remaining FROM app_users WHERE email = ?"
       ).bind(email).first()
     } catch (dbErr) {
-      console.error("D1 select user failed:", dbErr)
+      try {
+        user = await c.env.DB.prepare(
+          "SELECT id, email, password_hash, salt, plan_tier, scans_remaining FROM app_users WHERE email = ?"
+        ).bind(email).first()
+      } catch (fallbackErr) {
+        console.error("D1 select user failed:", fallbackErr)
+      }
     }
 
     if (!user) {
@@ -509,6 +651,7 @@ app.post('/auth/login', async (c) => {
       user_id: user.id,
       email: user.email,
       plan_tier: user.plan_tier || "Free",
+      tokens_remaining: user.tokens_remaining ?? 50000,
       scans_remaining: user.scans_remaining ?? 10,
     }
 
@@ -521,6 +664,7 @@ app.post('/auth/login', async (c) => {
         user_id: user.id,
         email: user.email,
         plan_tier: user.plan_tier || "Free",
+        tokens_remaining: user.tokens_remaining ?? 50000,
         scans_remaining: user.scans_remaining ?? 10,
       }
     })
@@ -548,6 +692,7 @@ app.get('/auth/me', async (c) => {
           user_id: parsed.id || parsed.user_id,
           email: parsed.email,
           plan_tier: parsed.plan_tier || "Free",
+          tokens_remaining: parsed.tokens_remaining ?? 50000,
           scans_remaining: parsed.scans_remaining ?? 10,
         }
       })

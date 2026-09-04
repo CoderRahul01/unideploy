@@ -126,7 +126,7 @@ export default function LandingPage() {
           fontWeight: 500,
         }}
       >
-        Open Source Core · Managed Cloud Sandboxes · Free Starter Tier
+        E2B Cloud Compute Sandboxes · Google Colab Alternative · 50,000 Free Trial Tokens
       </div>
 
       {/* ── Section 3: Hero Headline ───────────────────────────────────── */}
@@ -141,9 +141,9 @@ export default function LandingPage() {
           marginBottom: 20,
         }}
       >
-        <span style={{ color: "var(--text-primary)" }}>Deploy Anywhere.</span>
+        <span style={{ color: "var(--text-primary)" }}>Instant Cloud Sandboxes.</span>
         <br />
-        <span style={{ color: "var(--accent-green)" }}>Host on UniDeploy Cloud.</span>
+        <span style={{ color: "var(--accent-green)" }}>Deploy AI Models & Agents.</span>
       </h1>
 
       <p
@@ -156,7 +156,7 @@ export default function LandingPage() {
           margin: "0 auto 24px",
         }}
       >
-        Deploy vibe-coded web apps and AI agents in isolated cloud microVM sandboxes. Open source engine for complete self-hosting freedom, or zero-config UniDeploy Cloud SaaS.
+        The high-performance compute marketplace for AI engineers, data scientists, and developers in India. Run Python data notebooks without Google Colab disconnects, launch E2B microVMs, and deploy models with instant API keys.
       </p>
 
       {/* ── Section 3b: Stat Tiles ─────────────────────────────────────── */}
@@ -169,10 +169,10 @@ export default function LandingPage() {
         }}
       >
         {[
-          { stat: "2,000+", desc: "cloud sandboxes executed for modern apps" },
-          { stat: "99.9%", desc: "uptime SLA on managed cloud infrastructure" },
-          { stat: "100%", desc: "open source CLI engine for complete self-hosting" },
-          { stat: "1-Click", desc: "cloud deployments with managed SSL & live previews" },
+          { stat: "50,000", desc: "free trial compute & AI tokens on signup" },
+          { stat: "< 2s", desc: "microVM boot time powered by E2B Firecracker" },
+          { stat: "₹499", desc: "starter plan with UPI, RuPay & card support" },
+          { stat: "1-Click", desc: "native Mac desktop app & cloud model deployment" },
         ].map(({ stat, desc }) => (
           <div
             key={stat}
@@ -180,17 +180,17 @@ export default function LandingPage() {
               border: "1px solid var(--border)",
               borderRadius: 10,
               padding: "16px 14px",
-              textAlign: "center",
               background: "rgba(255,255,255,0.3)",
+              textAlign: "center",
             }}
           >
             <div
               style={{
                 fontFamily: "var(--font-display), Sora, sans-serif",
                 fontSize: 24,
-                fontWeight: 800,
+                fontWeight: 700,
                 color: "var(--text-primary)",
-                marginBottom: 6,
+                marginBottom: 4,
               }}
             >
               {stat}
@@ -213,21 +213,21 @@ export default function LandingPage() {
         {[
           {
             icon: Cpu,
-            title: "UniDeploy Cloud Sandboxes",
-            desc: "Isolated Linux microVM cloud environments running Next.js, Node, React, and Python applications with instant live web preview URLs.",
-            badge: "Cloud MicroVM",
+            title: "Google Colab Alternative (Python ML)",
+            desc: "Persistent Jupyter-style Python 3.11 execution with NumPy, Pandas, and Matplotlib. Automatically renders charts & plots with zero random disconnects.",
+            badge: "Colab Alternative",
           },
           {
             icon: Cloud,
-            title: "Managed Cloud SaaS",
-            desc: "Zero-config hosted deployment version. Automatic SSL, managed PostgreSQL/Redis databases, environment secret vaults, and team RBAC.",
-            badge: "Zero Setup",
+            title: "AI Model & Agent Deployment",
+            desc: "Deploy AI models and autonomous agents into dedicated cloud microVMs. Generate instant API keys to integrate your hosted model into any application.",
+            badge: "Instant API Keys",
           },
           {
             icon: Server,
-            title: "Open Source Engine",
-            desc: "Self-host anytime on your own VPS or private infrastructure using our 100% open source CLI engine and Docker containers.",
-            badge: "Open Core",
+            title: "Native Mac Desktop App (.dmg)",
+            desc: "A sleek native macOS client. Launch cloud sandboxes from your dock, monitor real-time token usage, and manage deployed models in 1 click.",
+            badge: "macOS Native",
           },
         ].map(({ icon: IconComponent, title, desc, badge }) => (
           <div

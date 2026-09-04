@@ -52,5 +52,19 @@ CREATE TABLE IF NOT EXISTS app_users (
   salt TEXT NOT NULL,
   plan_tier TEXT NOT NULL DEFAULT 'Free',
   scans_remaining INTEGER NOT NULL DEFAULT 10,
+  tokens_remaining INTEGER NOT NULL DEFAULT 50000,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Deployed AI Model & Agent Microservices
+CREATE TABLE IF NOT EXISTS deployed_models (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  model_name TEXT NOT NULL,
+  framework TEXT NOT NULL,
+  endpoint_url TEXT NOT NULL,
+  api_key TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active',
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(user_id) REFERENCES app_users(id) ON DELETE CASCADE
 );

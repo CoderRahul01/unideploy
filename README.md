@@ -1,119 +1,60 @@
 # UniDeploy
 
-**Production-readiness for vibe-coded apps.**
+**The AI Cloud Sandbox & Model Deployment Platform.**
 
-[www.unideploy.in](https://www.unideploy.in) · [API docs](https://api.unideploy.in/docs)
+[www.unideploy.in](https://www.unideploy.in) · [Sandbox Hub](https://www.unideploy.in/sandbox) · [Download for Mac](https://www.unideploy.in/download)
 
 ---
 
-## What it does
+## What is UniDeploy?
 
-UniDeploy scans apps built with Lovable, Bolt, V0, Claude Code, or Cursor
-and finds production-readiness issues before they become breaches.
+UniDeploy provides instant, isolated cloud microVM compute environments powered by E2B Firecracker technology and a native macOS desktop application. Run complex Python data science codebases, test autonomous AI agents, and deploy AI models with instant API keys — all without infrastructure overhead, Google Colab disconnects, or local hardware constraints.
 
-One command. Any framework. Security grade in 60 seconds.
+## Key Features
 
-```bash
-npx unideploy@latest init
-```
+- ⚡ **Instant Cloud Sandboxes**: Disposable and persistent Linux microVMs booting in under 2 seconds.
+- 🐍 **Google Colab Alternative**: Python 3.11 with NumPy, Pandas, Matplotlib, and auto-rendering visualizations that never randomly disconnect.
+- 🍏 **Native Mac Desktop App (`.dmg`)**: Launch microVMs, manage deployed models, and inspect token usage from your dock.
+- 🤖 **AI Model & Agent Deployment**: 1-click model deployment with instant API keys to query your cloud endpoints from any code.
+- 🇮🇳 **Optimised for Indian Developers**: Low-latency edge execution, INR pricing via Dodo Payments (UPI, RuPay, Netbanking, Cards), and 50,000 free trial tokens on signup.
 
 ## Architecture
 
 ```
-CLI (TypeScript/npm)
-└─► FastAPI backend (Google Cloud Run)
-    └─► AnalyzerAgent (Gemini ADK -> Agent Runtime)
-    └─► InsForge (PostgreSQL + Auth)
-    └─► WebSocket bridge (CLI <-> Browser)
+apps/
+  frontend/         Next.js web platform, template marketplace, and dashboard (Vercel)
+  worker/           Cloudflare Worker edge gateway, AI completions proxy, & D1/KV storage
+  desktop/          Native macOS desktop application (.dmg)
+  mcp/              Model Context Protocol (MCP) server for external agent integration
 
-Frontend (Next.js -> Vercel)
-└─► /connect    (session code entry)
-└─► /dashboard  (live scan results)
-
-MCP Server (@unideploy/mcp)
-└─► Works in Cursor, Claude Code, Windsurf
+packages/
+  cli/              @unideploy/cli — lightweight client for cloud sandbox execution
 ```
 
-## Stack
+## Quick Start
 
-| Layer | Technology |
-|---|---|
-| Frontend | Next.js 14, Vercel |
-| Backend | FastAPI, Google Cloud Run |
-| Agents | Google ADK, Gemini 2.5 Flash/Pro, Agent Runtime |
-| Database + Auth | InsForge (PostgreSQL + JWT) |
-| Tool actions | Composio |
-| Payments | Dodo Payments |
-| Memory | Supermemory |
-| Email | AutoSend |
+### 1. Launch in Browser (Web Marketplace)
+Visit [unideploy.in/sandbox](https://www.unideploy.in/sandbox) to test code in interactive microVMs.
 
-## Local development
+### 2. Download for macOS
+Download `UniDeploy.dmg` from [unideploy.in/download](https://www.unideploy.in/download) for a native macOS experience.
 
+### 3. Or Use the CLI
 ```bash
-# 1. Clone
-git clone https://github.com/CoderRahul01/unideploy
-cd unideploy
-
-# 2. Backend
-cd apps/backend
-cp .env.template .env.development
-# Fill in your keys in .env.development
-pip install -r requirements.txt
-python -m uvicorn main:app --reload --port 8000
-
-# 3. Frontend
-cd apps/frontend
-cp .env.template .env.local
-# Set NEXT_PUBLIC_API_URL=http://localhost:8000
-npm install && npm run dev
-
-# 4. CLI (in any project directory)
-cd /your-project
-UNIDEPLOY_API_URL=http://localhost:8000 npx ts-node /path/to/unideploy/apps/cli/src/index.ts init
+npm install -g unideploy
+unideploy auth      # Connect your account & activate 50,000 free trial tokens
+unideploy whoami    # View plan tier and remaining token credits
 ```
 
-## Deployment
+## Plans & Pricing (Tailored for India)
 
-```bash
-# 1. Store secrets in GCP
-bash scripts/setup-gcp-secrets.sh
+- **Free Trial**: ₹0 / first month — 50,000 trial tokens, 3 concurrent cloud sandboxes.
+- **Starter**: ₹499 / month — 500k tokens, 20 compute hours.
+- **Pro**: ₹1,499 / month — 2.5M tokens, 80 compute hours, 3 deployed model endpoints with API keys.
+- **Team**: ₹4,999 / month — 10M tokens, dedicated compute pool, team collaboration.
 
-# 2. Deploy backend to Cloud Run
-bash scripts/deploy-backend.sh
-
-# 3. Deploy agents to Agent Runtime
-bash scripts/deploy-agents.sh
-
-# 4. Update Vercel env vars
-bash scripts/setup-vercel-env.sh
-
-# 5. Redeploy frontend
-vercel --prod
-```
-
-## Agent Studio
-
-After running `deploy-agents.sh`, view agents at:
-https://console.cloud.google.com/vertex-ai/agents
-
-You should see: **UniDeploy Scanner** with sub-agents:
-- UniDeployAnalyzer (gemini-2.5-flash)
-- UniDeployAutoFix (gemini-2.5-pro)
-
-## Verify locally
-
-```bash
-# Start backend
-cd apps/backend && python -m uvicorn main:app --reload --port 8000
-
-# In a second terminal
-bash scripts/verify.sh
-```
+Payments are seamlessly handled via Dodo Payments with support for UPI, RuPay, Indian cards, and international credit cards.
 
 ## License
 
-UniDeploy is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md).
-
-- **Noncommercial / Personal / Educational Use**: 100% Free. You can view, clone, modify, and run UniDeploy for any noncommercial purpose.
-- **Commercial Use**: Requires a commercial subscription or enterprise license. See [Pricing](https://unideploy.in/pricing) or contact [sales@unideploy.in](mailto:sales@unideploy.in).
-
+PolyForm Noncommercial 1.0.0 with commercial licensing grant. See [LICENSE.md](LICENSE.md).

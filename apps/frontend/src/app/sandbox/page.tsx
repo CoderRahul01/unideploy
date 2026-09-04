@@ -325,7 +325,7 @@ console.log(result.stdout);`;
                 textDecoration: "none",
               }}
             >
-              Auditor
+              Marketplace
             </Link>
             <Link
               href="/pricing"

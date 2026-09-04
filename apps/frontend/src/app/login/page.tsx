@@ -57,7 +57,7 @@ function LoginPageContent() {
             {isLogin ? "Welcome back" : "Create an account"}
           </h1>
           <p style={{ color: "#6A7A5A", fontSize: 14 }}>
-            {isLogin ? "Sign in to your unideploy account" : "Start scanning your vibe-coded apps"}
+            {isLogin ? "Sign in to your UniDeploy account" : "Get started with 50,000 free compute tokens"}
           </p>
         </div>
 

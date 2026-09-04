@@ -200,7 +200,7 @@ export default function DownloadPage() {
             margin: 0,
           }}
         >
-          Get UniDeploy on Mac &amp; Windows
+          Download UniDeploy for Mac &amp; Cloud
         </h1>
 
         <p
@@ -208,12 +208,11 @@ export default function DownloadPage() {
             fontSize: 16,
             color: C.textSecondary,
             margin: "12px auto 0",
-            maxWidth: 580,
+            maxWidth: 620,
             lineHeight: 1.6,
           }}
         >
-          Run production audits, auto-fixes, and isolated cloud sandboxes directly from your local terminal.
-          Instantly connects with our Cloudflare Worker server.
+          Run persistent Python ML notebooks without Colab disconnects, launch cloud sandboxes in 1 click, and deploy AI models with instant API keys. Includes 50,000 free trial tokens.
         </p>
 
         {/* ── OS Tabs Selector ───────────────────────────────────────── */}
@@ -247,7 +246,7 @@ export default function DownloadPage() {
             }}
           >
             <Apple size={16} />
-            <span>macOS</span>
+            <span>macOS (.dmg)</span>
           </button>
 
           <button
@@ -291,7 +290,7 @@ export default function DownloadPage() {
             }}
           >
             <Terminal size={16} />
-            <span>npm / Cross-Platform</span>
+            <span>npm / CLI</span>
           </button>
         </div>
       </section>
@@ -316,12 +315,80 @@ export default function DownloadPage() {
           {/* macOS TAB CONTENT */}
           {selectedOS === "mac" && (
             <div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#FFFFFF" }}>
-                  1-Click Terminal Command (Apple Silicon &amp; Intel)
-                </span>
-                <span style={{ fontSize: 11, fontFamily: C.mono, color: C.greenLight }}>
-                  Recommended
+              {/* Native DMG Download Banner */}
+              <div
+                style={{
+                  background: "linear-gradient(135deg, rgba(109, 184, 74, 0.12) 0%, rgba(20, 30, 22, 0.6) 100%)",
+                  border: `1px solid ${C.borderActive}`,
+                  borderRadius: 12,
+                  padding: "24px 28px",
+                  marginBottom: 24,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 16,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+                  <div>
+                    <h2 style={{ fontFamily: C.display, fontSize: 20, fontWeight: 700, color: "#FFFFFF", margin: 0 }}>
+                      UniDeploy Native Desktop for Mac
+                    </h2>
+                    <p style={{ fontSize: 13, color: C.textSecondary, margin: "4px 0 0" }}>
+                      Dock integration, 1-click cloud microVM sandboxes, and local model deployment manager.
+                    </p>
+                  </div>
+                  <span style={{ fontSize: 11, fontFamily: C.mono, color: C.greenLight, background: "rgba(109, 184, 74, 0.2)", padding: "4px 10px", borderRadius: 6, fontWeight: 700 }}>
+                    50,000 FREE TOKENS
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 4 }}>
+                  <a
+                    href="https://github.com/CoderRahul01/unideploy/releases/latest/download/UniDeploy-arm64.dmg"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      background: C.greenBright,
+                      color: "#0B0F0C",
+                      padding: "12px 22px",
+                      borderRadius: 8,
+                      fontSize: 14,
+                      fontWeight: 700,
+                      textDecoration: "none",
+                      boxShadow: "0 4px 16px rgba(34, 197, 94, 0.3)",
+                    }}
+                  >
+                    <Download size={16} />
+                    <span>Download for Apple Silicon (.dmg)</span>
+                  </a>
+
+                  <a
+                    href="https://github.com/CoderRahul01/unideploy/releases/latest/download/UniDeploy-x64.dmg"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      background: C.surfaceCard,
+                      color: C.text,
+                      border: `1px solid ${C.borderHover}`,
+                      padding: "12px 22px",
+                      borderRadius: 8,
+                      fontSize: 14,
+                      fontWeight: 600,
+                      textDecoration: "none",
+                    }}
+                  >
+                    <Download size={16} />
+                    <span>Intel Mac (.dmg)</span>
+                  </a>
+                </div>
+              </div>
+
+              {/* Terminal One-liner */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: C.textSecondary }}>
+                  Or install via Terminal one-liner:
                 </span>
               </div>
 
@@ -376,43 +443,6 @@ export default function DownloadPage() {
                     </>
                   )}
                 </button>
-              </div>
-
-              <div
-                style={{
-                  marginTop: 20,
-                  display: "flex",
-                  gap: 12,
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                  fontSize: 13,
-                  color: C.textMuted,
-                }}
-              >
-                <span>Or download standalone binary:</span>
-                <a
-                  href="https://github.com/CoderRahul01/unideploy/releases/latest/download/cli-arm64"
-                  style={{
-                    color: C.greenLight,
-                    textDecoration: "none",
-                    fontFamily: C.mono,
-                    fontSize: 12,
-                  }}
-                >
-                  macOS ARM64 (M1/M2/M3/M4) ↓
-                </a>
-                <span>·</span>
-                <a
-                  href="https://github.com/CoderRahul01/unideploy/releases/latest/download/cli-x64"
-                  style={{
-                    color: C.greenLight,
-                    textDecoration: "none",
-                    fontFamily: C.mono,
-                    fontSize: 12,
-                  }}
-                >
-                  macOS x64 (Intel) ↓
-                </a>
               </div>
             </div>
           )}

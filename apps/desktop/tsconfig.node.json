@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "skipLibCheck": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "strict": true,
+    "outDir": "dist"
+  },
+  "include": ["src/main.ts", "src/preload.ts", "vite.config.ts"]
+}

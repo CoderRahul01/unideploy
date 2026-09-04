@@ -20,54 +20,91 @@ export interface SandboxTemplate {
 
 export const TEMPLATES: SandboxTemplate[] = [
   {
-    id: "data-science",
-    name: "Data Science & Plot Engine",
-    badge: "Most Popular",
+    id: "colab-python",
+    name: "Google Colab Alternative (Python 3.11)",
+    badge: "Persistent MicroVM",
     category: "data",
     language: "python",
     description:
-      "Python 3.11 with Pandas, NumPy, and Matplotlib. Automatically renders charts & plots directly in your browser or returns base64 images.",
+      "Persistent Python 3.11 data science stack with NumPy, Pandas, and Matplotlib. Never randomly disconnects or drops kernel state. Renders high-DPI charts directly in your browser.",
     specs: { cpu: "2 vCPUs", ram: "2 GB", os: "Debian 13 Firecracker" },
     outputType: "chart",
     starterCode: `import matplotlib.pyplot as plt
 import numpy as np
 
-# Generate sample growth trajectory
-months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep']
-active_users = [1200, 2400, 4800, 9100, 16200, 28500, 47000, 72000, 105000]
-api_calls = [x * 14 for x in active_users]
+# UniDeploy Cloud Sandbox - Persistent Python 3.11 Data Science Kernel
+# Unlike Google Colab, your execution state never disconnects unexpectedly.
+
+time_steps = np.linspace(0, 10, 100)
+signal = np.sin(time_steps) * np.exp(-0.1 * time_steps)
+noise = np.random.normal(0, 0.05, 100)
+measured = signal + noise
 
 plt.style.use('dark_background')
-fig, ax1 = plt.subplots(figsize=(7, 3.5), dpi=120)
+fig, ax = plt.subplots(figsize=(8, 4), dpi=130)
 
-color = '#10b981'
-ax1.set_xlabel('Timeline (2026)', color='#9ca3af', fontsize=10)
-ax1.set_ylabel('Active Agents', color=color, fontsize=10)
-line1 = ax1.plot(months, active_users, color=color, marker='o', linewidth=2.5, label='Active Agents')
-ax1.tick_params(axis='y', labelcolor=color)
+ax.plot(time_steps, signal, color='#22C55E', linewidth=2.5, label='Damped Wave (Ground Truth)')
+ax.scatter(time_steps, measured, color='#60a5fa', s=16, alpha=0.7, label='Measured Data Points')
 
-ax2 = ax1.twinx()
-color2 = '#60a5fa'
-ax2.set_ylabel('Sandbox Runs (x1000)', color=color2, fontsize=10)
-line2 = ax2.plot(months, [x / 1000 for x in api_calls], color=color2, marker='s', linestyle='--', linewidth=2, label='Runs (k)')
-ax2.tick_params(axis='y', labelcolor=color2)
+ax.set_title('UniDeploy Persistent Python Compute Engine', color='#f3f4f6', fontsize=12, pad=12, fontweight='bold')
+ax.set_xlabel('Time (seconds)', color='#9ca3af', fontsize=10)
+ax.set_ylabel('Amplitude', color='#9ca3af', fontsize=10)
+ax.grid(True, linestyle='--', alpha=0.2)
+ax.legend(facecolor='#161F16', edgecolor='#202E22')
 
-plt.title('UniDeploy Cloud Sandbox Growth', color='#f3f4f6', fontsize=12, pad=12, fontweight='bold')
 fig.tight_layout()
 plt.show()
 
-print(f"Total simulated runs: {sum(api_calls):,}")
-print(f"Peak monthly active agents: {max(active_users):,}")
+print(f"Computed {len(time_steps)} steps with mean signal amplitude: {np.mean(signal):.4f}")
+print("Status: Kernel session active and persistent across re-runs.")
+`,
+  },
+  {
+    id: "model-deploy",
+    name: "AI Model & Agent Serverless Deployment",
+    badge: "Instant API Key",
+    category: "automation",
+    language: "python",
+    description:
+      "Deploy custom AI agents, pipelines, or inference logic into an isolated microVM. Exposes a live HTTP endpoint with bearer API key authentication.",
+    specs: { cpu: "2 vCPUs", ram: "2 GB", os: "Debian 13 Firecracker" },
+    outputType: "json",
+    starterCode: `import json
+import uuid
+from datetime import datetime
+
+# Simulating a microVM agent endpoint deployment
+def deploy_model_endpoint(model_name, framework="fastapi"):
+    endpoint_id = f"mod_{uuid.uuid4().hex[:12]}"
+    api_key = f"uni_live_{uuid.uuid4().hex}"
+    
+    deployment_record = {
+        "status": "DEPLOYED",
+        "model_id": endpoint_id,
+        "model_name": model_name,
+        "framework": framework,
+        "api_key": api_key[:14] + "..." + api_key[-4:],
+        "endpoint_url": f"https://api.unideploy.in/v1/models/{endpoint_id}/invoke",
+        "compute_region": "in-mumbai-zone1",
+        "created_at": datetime.utcnow().isoformat() + "Z",
+        "latency_sla_ms": 45,
+        "supported_methods": ["POST"],
+        "sample_curl": f"curl -X POST https://api.unideploy.in/v1/models/{endpoint_id}/invoke -H 'Authorization: Bearer {api_key}' -d '{\\"prompt\\": \\"Hello model\\"}'"
+    }
+    return deployment_record
+
+deployment = deploy_model_endpoint("llama-3-agent-pipeline", framework="fastapi")
+print(json.dumps(deployment, indent=2))
 `,
   },
   {
     id: "node-runtime",
-    name: "Node.js 20 & Modern JS",
-    badge: "Fastest",
+    name: "Node.js 20 & High-Concurrency Backend",
+    badge: "Fastest Sub-Second",
     category: "fullstack",
     language: "js",
     description:
-      "Modern JavaScript engine with async/await, crypto, and ES modules for data pipelines and backend algorithms.",
+      "Modern JavaScript engine with async/await, crypto, and ES modules for microservices, webhooks, and backend algorithms.",
     specs: { cpu: "2 vCPUs", ram: "2 GB", os: "Debian 13 Firecracker" },
     outputType: "text",
     starterCode: `// High-performance token and signature generation
@@ -84,12 +121,12 @@ function generateSecureSession(tenantId) {
     tenantId,
     token: \`uni_sbx_\${hash.slice(0, 24)}\`,
     issuedAt: new Date(timestamp).toISOString(),
-    sandboxRegion: 'us-east-firecracker',
+    sandboxRegion: 'in-mumbai-firecracker',
     status: 'allocated'
   };
 }
 
-const sessions = ['acme-corp', 'fintech-agent', 'vibe-deployer'].map(generateSecureSession);
+const sessions = ['acme-corp', 'fintech-agent', 'model-service'].map(generateSecureSession);
 console.log('Allocated MicroVM Sessions:');
 console.table(sessions);
 `,
@@ -109,7 +146,7 @@ echo "=== System & Kernel ==="
 uname -a
 echo ""
 echo "=== CPU & Memory Info ==="
-lscpu | grep "Model name\|CPU(s):"
+lscpu | grep "Model name\\|CPU(s):"
 free -h
 echo ""
 echo "=== Installed Runtimes ==="
@@ -120,63 +157,13 @@ curl --version | head -n 1
 `,
   },
   {
-    id: "security-audit",
-    name: "UniDeploy Vulnerability Scan",
-    badge: "DevSecOps",
-    category: "security",
-    language: "python",
-    description:
-      "Security scanner engine searching for hardcoded API keys, JWT secrets, AWS tokens, and unauthenticated endpoints.",
-    specs: { cpu: "2 vCPUs", ram: "2 GB", os: "Debian 13 Firecracker" },
-    outputType: "json",
-    starterCode: `import re
-import json
-
-SAMPLE_CONFIG = """
-const config = {
-  dbUrl: "postgres://admin:superSecretPassword123@db.prod.internal:5432/main",
-  stripeKey: "PLACEHOLDER_STRIPE_SECRET_KEY_EXPOSED_9999",
-  awsSecret: "AKIA_SAMPLE_AWS_ACCESS_KEY_DO_NOT_USE",
-  supabaseAnon: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.fake_signature",
-  enableDebug: true
-};
-"""
-
-PATTERNS = {
-  "Stripe Secret Key (Exposed)": r"PLACEHOLDER_STRIPE_[0-9A-Z_]+",
-  "PostgreSQL URI Password": r"postgres://[^:]+:([^@]+)@",
-  "AWS Key (Exposed)": r"AKIA_[0-9A-Z_]+",
-}
-
-findings = []
-for name, regex in PATTERNS.items():
-    matches = re.finditer(regex, SAMPLE_CONFIG)
-    for m in matches:
-        findings.append({
-            "severity": "CRITICAL",
-            "type": name,
-            "match": m.group(0)[:8] + "..." + m.group(0)[-4:],
-            "remediation": "Move credential into secret store (e.g. Doppler, Infisical, or GCP Secret Manager)"
-        })
-
-report = {
-    "status": "COMPLETED",
-    "scanned_lines": len(SAMPLE_CONFIG.splitlines()),
-    "critical_findings": len(findings),
-    "findings": findings
-}
-
-print(json.dumps(report, indent=2))
-`,
-  },
-  {
-    id: "web-scraper",
-    name: "Web Scraper & Metadata Extractor",
-    badge: "Automation",
+    id: "agent-scraper",
+    name: "Autonomous Web Scraper & Ingestion Pipeline",
+    badge: "ETL / RAG",
     category: "automation",
     language: "python",
     description:
-      "Scrapes remote web endpoints, parses meta tags, open graph metadata, and security headers.",
+      "Scrapes remote web endpoints, parses meta tags, open graph metadata, and extracts clean markdown for LLM ingestion.",
     specs: { cpu: "2 vCPUs", ram: "2 GB", os: "Debian 13 Firecracker" },
     outputType: "text",
     starterCode: `import urllib.request

@@ -30,26 +30,26 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "UniDeploy Cloud — Managed Cloud Sandboxes & Open Source SaaS",
+  title: "UniDeploy Cloud — Managed Cloud Sandboxes & AI Model Deployment",
   description:
-    "Deploy vibe-coded apps and AI agents in isolated cloud sandboxes or self-host with our open source engine.",
+    "Launch isolated cloud microVM sandboxes, run persistent Python data science environments, and deploy AI models with instant API keys.",
   keywords: [
     "cloud sandboxes",
-    "managed cloud hosting",
-    "open source SaaS",
-    "vibe coding",
-    "production readiness",
+    "Google Colab alternative",
+    "AI model deployment",
     "microVM sandboxes",
-    "Next.js cloud hosting",
-    "AI deployment platform",
+    "E2B Firecracker",
+    "Python data science",
+    "serverless AI endpoints",
+    "developer marketplace",
   ],
   verification: {
     google: "IdmvhsfXd8y0B4C7toMdLj28KF-4ykVU587BLDKLkJo",
   },
   openGraph: {
-    title: "UniDeploy Cloud — Managed Cloud Sandboxes & Open Source SaaS",
+    title: "UniDeploy Cloud — Managed Cloud Sandboxes & AI Model Deployment",
     description:
-      "Deploy vibe-coded apps and AI agents in isolated cloud sandboxes or self-host with our open source engine.",
+      "Launch isolated cloud microVM sandboxes, run persistent Python data science environments, and deploy AI models with instant API keys.",
     url: "https://unideploy.in",
     siteName: "UniDeploy",
     type: "website",

@@ -20,67 +20,67 @@ type Tier = {
 
 const TIERS: Tier[] = [
   {
-    name: "Community",
+    name: "Free Trial",
     monthly: 0,
     annual: 0,
     annualTotal: null,
-    description: "100% Open Source CLI engine for developers who want to self-host on their own VPS.",
-    cta: "Self-host free",
-    ctaHref: "https://github.com/CoderRahul01/unideploy",
+    description: "50,000 free tokens for students, indie builders & AI tinkerers. No credit card required.",
+    cta: "Start free trial",
+    ctaHref: "/auth",
     features: [
-      "Open Source CLI engine",
-      "Unlimited self-hosted deployments",
-      "Docker stack configuration",
-      "Local security scanning",
-      "Community support",
+      "50,000 free compute & AI tokens",
+      "3 concurrent cloud microVMs",
+      "Google Colab-alternative Python runner",
+      "Native Mac Desktop App (.dmg) access",
+      "Community Discord support",
     ],
   },
   {
-    name: "Cloud Starter",
-    monthly: 0,
-    annual: 0,
-    annualTotal: null,
-    description: "Zero-setup managed cloud sandboxes for individuals & fast builders. Free to start.",
-    cta: "Start free sandbox",
+    name: "Starter",
+    monthly: 499,
+    annual: 4790,
+    annualTotal: 4790,
+    description: "For active builders and students running data notebooks, AI agents, and scripts.",
+    cta: "Subscribe for ₹499",
+    features: [
+      "500,000 tokens / month",
+      "20 compute hours on Firecracker microVMs",
+      "5 concurrent sandboxes with persistent storage",
+      "1 deployed model endpoint with API key",
+      "Fast UPI, RuPay & Card checkout via Dodo",
+    ],
+  },
+  {
+    name: "Pro",
+    monthly: 1499,
+    annual: 14390,
+    annualTotal: 14390,
+    description: "For AI engineers, freelancers, and startups deploying production models and autonomous agents.",
+    cta: "Upgrade to Pro",
     highlight: true,
     features: [
-      "Everything in Community",
-      "3 concurrent UniDeploy Cloud MicroVMs",
-      "Instant live web preview URLs",
-      "Automated production security scan",
-      "Managed SSL & custom domains",
+      "2,500,000 tokens / month",
+      "80 compute hours on high-speed microVMs",
+      "Unlimited disposable sandboxes",
+      "3 deployed model endpoints with dedicated API keys",
+      "Priority runner queue (4 vCPU, 8 GB RAM)",
+      "Priority chat & email support",
     ],
   },
   {
-    name: "Cloud Pro",
-    monthly: 99,
-    annual: 990,
-    annualTotal: 990,
-    description: "For engineering teams needing high-performance persistent sandboxes and managed cloud infra.",
-    cta: "Get started",
+    name: "Team",
+    monthly: 4999,
+    annual: 47990,
+    annualTotal: 47990,
+    description: "For agencies, research labs, and teams needing pooled compute credits and multi-seat access.",
+    cta: "Get Team Plan",
     features: [
-      "Everything in Cloud Starter",
-      "Unlimited UniDeploy Cloud Sandboxes",
-      "Managed PostgreSQL & Redis DBs",
-      "Team RBAC & workspace secret vaults",
-      "Pro deployment templates & plugins",
-      "Priority cloud runner queue",
-    ],
-  },
-  {
-    name: "Enterprise",
-    monthly: 299,
-    annual: 2990,
-    annualTotal: 2990,
-    description: "Dedicated cloud microVM cluster, custom cloud provider routing, and 99.9% uptime SLA.",
-    cta: "Contact team",
-    features: [
-      "Everything in Cloud Pro",
-      "Dedicated cloud microVM cluster",
-      "Custom hosting partner (AWS/GCP/Vercel)",
-      "SOC 2 / HIPAA compliance track",
-      "Custom rule packs & audit logs",
-      "24/7 SLA + Slack/Teams support",
+      "10,000,000 tokens / month",
+      "300 compute hours pooled across team",
+      "Unlimited deployed model endpoints",
+      "Multi-seat workspace & shared API keys",
+      "Dedicated runner instances",
+      "Direct priority WhatsApp / Slack channel",
     ],
   },
 ];
@@ -137,7 +137,7 @@ export default function PricingPage() {
               marginBottom: 16,
             }}
           >
-            SaaS & Cloud Sandbox Pricing
+            Cloud Compute & Sandbox Credits
           </span>
           <h1
             style={{
@@ -149,11 +149,10 @@ export default function PricingPage() {
               marginBottom: 12,
             }}
           >
-            Self-host open source or deploy on UniDeploy Cloud.
+            Instant Cloud Sandboxes & AI Model Deployments.
           </h1>
           <p style={{ fontSize: 15, color: "#6a7a5a", lineHeight: 1.6, maxWidth: 540, margin: "0 auto 28px" }}>
-            Self-hosting is 100% free with our open source CLI engine.
-            Or deploy on UniDeploy Cloud with zero-setup managed microVM sandboxes.
+            High-speed E2B Firecracker microVMs with zero configuration. Get 50,000 free tokens on signup, with simple UPI & Card billing.
           </p>
 
           {/* Toggle */}
