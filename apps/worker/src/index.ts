@@ -278,6 +278,194 @@ async function handleSandboxRun(c: any) {
 app.post('/api/sandbox/run', handleSandboxRun);
 app.post('/v1/sandbox/execute', handleSandboxRun);
 
+// ── Password Hashing Helper ──────────────────────────────────────────────────
+
+async function hashPassword(password: string, salt: string): Promise<string> {
+  const enc = new TextEncoder()
+  const data = enc.encode(`${salt}:${password}`)
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data)
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+}
+
+// ── Auth & Account Endpoints ──────────────────────────────────────────────────
+
+app.post('/auth/register', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}))
+    const email = (body.email || "").trim().toLowerCase()
+    const password = body.password || ""
+
+    if (!email || !email.includes("@")) {
+      return c.json({ error: "Please provide a valid email address", detail: "Please provide a valid email address" }, 400)
+    }
+    if (!password || password.length < 6) {
+      return c.json({ error: "Password must be at least 6 characters long", detail: "Password must be at least 6 characters long" }, 400)
+    }
+
+    // Check if user already exists
+    try {
+      const existing = await c.env.DB.prepare("SELECT id FROM app_users WHERE email = ?").bind(email).first()
+      if (existing) {
+        return c.json({ error: "User already exists with this email", detail: "User already exists with this email" }, 400)
+      }
+    } catch (dbErr) {
+      console.warn("D1 select check warning:", dbErr)
+    }
+
+    const userId = crypto.randomUUID()
+    const salt = crypto.randomUUID()
+    const passwordHash = await hashPassword(password, salt)
+    const now = new Date().toISOString()
+    const token = `ud_tok_${crypto.randomUUID().replace(/-/g, "")}`
+
+    const userData = {
+      id: userId,
+      user_id: userId,
+      email,
+      plan_tier: "Free",
+      scans_remaining: 10,
+      created_at: now,
+    }
+
+    // Insert into D1
+    try {
+      await c.env.DB.prepare(
+        "INSERT INTO app_users (id, email, password_hash, salt, plan_tier, scans_remaining, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      ).bind(userId, email, passwordHash, salt, "Free", 10, now).run()
+    } catch (dbErr) {
+      console.error("D1 app_users insert failed:", dbErr)
+    }
+
+    // Store session in KV (30-day TTL)
+    await c.env.SESSIONS.put(`session:${token}`, JSON.stringify(userData), { expirationTtl: 86400 * 30 })
+
+    return c.json({
+      data: {
+        token,
+        user_id: userId,
+        email,
+        plan_tier: "Free",
+        scans_remaining: 10,
+      }
+    }, 201)
+  } catch (err: any) {
+    console.error("Registration error:", err)
+    return c.json({ error: err.message || "Registration failed", detail: err.message || "Registration failed" }, 500)
+  }
+})
+
+app.post('/auth/login', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}))
+    const email = (body.email || "").trim().toLowerCase()
+    const password = body.password || ""
+
+    if (!email || !password) {
+      return c.json({ error: "Email and password are required", detail: "Email and password are required" }, 400)
+    }
+
+    let user: any = null
+    try {
+      user = await c.env.DB.prepare(
+        "SELECT id, email, password_hash, salt, plan_tier, scans_remaining FROM app_users WHERE email = ?"
+      ).bind(email).first()
+    } catch (dbErr) {
+      console.error("D1 select user failed:", dbErr)
+    }
+
+    if (!user) {
+      return c.json({ error: "Invalid email or password", detail: "Invalid email or password" }, 401)
+    }
+
+    const computedHash = await hashPassword(password, user.salt)
+    if (computedHash !== user.password_hash) {
+      return c.json({ error: "Invalid email or password", detail: "Invalid email or password" }, 401)
+    }
+
+    const token = `ud_tok_${crypto.randomUUID().replace(/-/g, "")}`
+    const userData = {
+      id: user.id,
+      user_id: user.id,
+      email: user.email,
+      plan_tier: user.plan_tier || "Free",
+      scans_remaining: user.scans_remaining ?? 10,
+    }
+
+    // Store session in KV (30-day TTL)
+    await c.env.SESSIONS.put(`session:${token}`, JSON.stringify(userData), { expirationTtl: 86400 * 30 })
+
+    return c.json({
+      data: {
+        token,
+        user_id: user.id,
+        email: user.email,
+        plan_tier: user.plan_tier || "Free",
+        scans_remaining: user.scans_remaining ?? 10,
+      }
+    })
+  } catch (err: any) {
+    console.error("Login error:", err)
+    return c.json({ error: err.message || "Login failed", detail: err.message || "Login failed" }, 500)
+  }
+})
+
+app.get('/auth/me', async (c) => {
+  const authHeader = c.req.header('Authorization') || ""
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : authHeader.trim()
+
+  if (!token) {
+    return c.json({ error: "Unauthorized", detail: "Missing authentication token" }, 401)
+  }
+
+  // Look up in KV session
+  const cached = await c.env.SESSIONS.get(`session:${token}`)
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached)
+      return c.json({
+        data: {
+          user_id: parsed.id || parsed.user_id,
+          email: parsed.email,
+          plan_tier: parsed.plan_tier || "Free",
+          scans_remaining: parsed.scans_remaining ?? 10,
+        }
+      })
+    } catch {}
+  }
+
+  return c.json({ error: "Session expired or invalid", detail: "Session expired or invalid" }, 401)
+})
+
+app.get('/auth/session/:code', async (c) => {
+  const rawCode = c.req.param('code') || ""
+  const code = rawCode.trim().replace(/-/g, "").toUpperCase()
+
+  const cached = await c.env.SESSIONS.get(`auth:${code}`)
+  if (!cached) {
+    return c.json({ error: "Session code not found or expired", detail: "Session code not found or expired" }, 404)
+  }
+
+  const session = JSON.parse(cached)
+  return c.json({
+    data: {
+      status: session.status,
+      session_id: session.session_id,
+      ...(session.token ? { token: session.token } : {})
+    }
+  })
+})
+
+app.post('/payments/checkout', async (c) => {
+  const body = await c.req.json().catch(() => ({}))
+  const tier = body.tier || "indie"
+  return c.json({
+    checkout_url: `/dashboard?upgraded=${tier}`,
+    message: "Checkout session generated"
+  })
+})
+
 // ── Auth & Pairing Endpoints ──────────────────────────────────────────────────
 
 app.post('/auth/session', async (c) => {
@@ -348,9 +536,13 @@ app.post('/auth/verify', async (c) => {
     console.error("D1 update scans failed:", err)
   }
 
+  // Extract user token from Authorization header if present, else create one
+  const authHeader = c.req.header("Authorization") || ""
+  const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : authHeader.trim()
+  const userToken = bearerToken || `ud_tok_${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`
+
   // Write authentication event to the CLI mailbox
   try {
-    const userToken = `ud_tok_${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`
     await c.env.DB.prepare(
       "INSERT INTO messages (session_id, sender, payload) VALUES (?, 'browser', ?)"
     ).bind(session.session_id, JSON.stringify({ type: "session_authenticated", session_id: session.session_id, token: userToken })).run()

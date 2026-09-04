@@ -43,3 +43,14 @@ CREATE TABLE IF NOT EXISTS messages (
   payload TEXT NOT NULL,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+-- App users
+CREATE TABLE IF NOT EXISTS app_users (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  salt TEXT NOT NULL,
+  plan_tier TEXT NOT NULL DEFAULT 'Free',
+  scans_remaining INTEGER NOT NULL DEFAULT 10,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
