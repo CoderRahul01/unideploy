@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@e2b/code-interpreter": "^1.5.1",
     "hono": "^4.0.0"
   },
   "devDependencies": {

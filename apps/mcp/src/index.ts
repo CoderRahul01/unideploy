@@ -149,6 +149,49 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         required: ["scan_id", "secret_name"],
       },
     },
+    {
+      name: "run_sandbox_code",
+      description:
+        "Execute Python or JavaScript code inside an isolated E2B cloud microVM sandbox. Returns stdout, stderr, execution duration, and image artifacts if charts were generated.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          language: {
+            type: "string",
+            enum: ["python", "js"],
+            description: "Runtime language (default: python)",
+          },
+          code: {
+            type: "string",
+            description: "Source code to execute in the cloud sandbox",
+          },
+          timeout_ms: {
+            type: "number",
+            description: "Execution timeout in milliseconds (max 30000)",
+          },
+        },
+        required: ["code"],
+      },
+    },
+    {
+      name: "run_sandbox_bash",
+      description:
+        "Execute a bash shell command inside a disposable Debian 13 Firecracker microVM. Completely isolated from the host machine. Safe for running untrusted scripts, network diagnostic curls, and builds.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          command: {
+            type: "string",
+            description: "Bash command line to execute",
+          },
+          timeout_ms: {
+            type: "number",
+            description: "Execution timeout in milliseconds (max 30000)",
+          },
+        },
+        required: ["command"],
+      },
+    },
   ],
 }));
 
@@ -349,6 +392,70 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             ``,
             `After rotation, re-run scan_repo to confirm the secret no longer appears.`,
           ].join("\n"),
+        }],
+      };
+    }
+
+    case "run_sandbox_code": {
+      const result = await apiPost<any>("/api/sandbox/run", {
+        language: a.language ?? "python",
+        code: a.code,
+        timeoutMs: a.timeout_ms ?? 30000,
+      });
+
+      const outputLines: string[] = [
+        `Status       : ${result.success ? "SUCCESS" : "FAILED"}`,
+        `Duration     : ${(result.durationMs / 1000).toFixed(2)}s`,
+        `Sandbox ID   : ${result.sandboxId ?? "disposable"}`,
+        ``,
+      ];
+
+      if (result.stdout) {
+        outputLines.push(`── Standard Output ──`, result.stdout, ``);
+      }
+      if (result.stderr) {
+        outputLines.push(`── Standard Error / Diagnostics ──`, result.stderr, ``);
+      }
+      if (result.results && result.results.length > 0) {
+        outputLines.push(
+          `── Visual Artifacts ──`,
+          `Captured ${result.results.length} visual/chart artifact(s).`
+        );
+      }
+
+      return {
+        content: [{
+          type: "text",
+          text: outputLines.join("\n").trim(),
+        }],
+      };
+    }
+
+    case "run_sandbox_bash": {
+      const result = await apiPost<any>("/api/sandbox/run", {
+        language: "bash",
+        code: a.command,
+        timeoutMs: a.timeout_ms ?? 30000,
+      });
+
+      const outputLines: string[] = [
+        `Status       : ${result.success ? "SUCCESS" : "FAILED"}`,
+        `Duration     : ${(result.durationMs / 1000).toFixed(2)}s`,
+        `Sandbox ID   : ${result.sandboxId ?? "disposable"}`,
+        ``,
+      ];
+
+      if (result.stdout) {
+        outputLines.push(`── Standard Output ──`, result.stdout, ``);
+      }
+      if (result.stderr) {
+        outputLines.push(`── Standard Error ──`, result.stderr, ``);
+      }
+
+      return {
+        content: [{
+          type: "text",
+          text: outputLines.join("\n").trim(),
         }],
       };
     }
