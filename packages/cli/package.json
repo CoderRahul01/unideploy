@@ -1,12 +1,19 @@
 {
-  "name": "@unideploy/cli",
-  "version": "0.1.0",
+  "name": "unideploy",
+  "version": "0.2.4",
   "description": "Production-readiness agent for vibe-coded apps — Pi agent harness",
   "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "bin": {
     "unideploy": "./dist/cli.js"
   },
+  "files": [
+    "dist/cli.js",
+    "dist/cli.d.ts",
+    "dist/tools",
+    "dist/skills",
+    "LICENSE.md"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json && chmod +x dist/cli.js",
     "build:dmg": "bash scripts/build-dmg.sh",
