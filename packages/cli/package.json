@@ -2,6 +2,7 @@
   "name": "@unideploy/cli",
   "version": "0.1.0",
   "description": "Production-readiness agent for vibe-coded apps — Pi agent harness",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "bin": {
     "unideploy": "./dist/cli.js"
