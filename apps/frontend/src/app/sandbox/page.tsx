@@ -27,8 +27,22 @@ import {
   X,
   CreditCard,
   CheckCircle2,
+  BookmarkCheck,
+  Plus,
+  Trash2,
+  Folder,
+  Save,
 } from "lucide-react";
 import { TEMPLATES, SandboxTemplate } from "@/app/api/sandbox/templates/route";
+
+export interface SavedSandbox {
+  id: string;
+  name: string;
+  code: string;
+  language: "python" | "js" | "bash";
+  createdAt: string;
+  updatedAt: string;
+}
 
 // ── Design Tokens Matching UniDeploy ─────────────────────────────────────────
 
@@ -71,6 +85,14 @@ export default function SandboxPage() {
   // Daily Free Quota Tracking (3 runs / day)
   const [runsLeft, setRunsLeft] = useState<number>(3);
 
+  // Custom Saved Sandboxes & Workspace Mode
+  const [viewMode, setViewMode] = useState<"templates" | "my-sandboxes">("templates");
+  const [savedSandboxes, setSavedSandboxes] = useState<SavedSandbox[]>([]);
+  const [saveModalOpen, setSaveModalOpen] = useState<boolean>(false);
+  const [saveName, setSaveName] = useState<string>("");
+  const [activeSavedId, setActiveSavedId] = useState<string | null>(null);
+  const [saveSuccessToast, setSaveSuccessToast] = useState<string | null>(null);
+
   // Upgrade Modal State
   const [upgradeModal, setUpgradeModal] = useState<{
     open: boolean;
@@ -98,6 +120,113 @@ export default function SandboxPage() {
     }
   }, []);
 
+  // Load saved sandboxes from localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("unideploy_saved_sandboxes");
+      if (stored) {
+        setSavedSandboxes(JSON.parse(stored));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Check URL query parameters for template selection
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tmplId = params.get("template");
+      if (tmplId) {
+        const found = TEMPLATES.find((t) => t.id === tmplId);
+        if (found) {
+          setSelectedTemplate(found);
+          setCode(found.starterCode);
+          setLanguage(found.language);
+          setActiveTab(found.outputType === "chart" ? "visuals" : "console");
+        }
+      }
+    }
+  }, []);
+
+  const persistSavedSandboxes = (items: SavedSandbox[]) => {
+    setSavedSandboxes(items);
+    try {
+      localStorage.setItem("unideploy_saved_sandboxes", JSON.stringify(items));
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleOpenSaveModal = () => {
+    if (activeSavedId) {
+      const existing = savedSandboxes.find((s) => s.id === activeSavedId);
+      if (existing) {
+        setSaveName(existing.name);
+      }
+    } else {
+      setSaveName(selectedTemplate.name + " (Custom)");
+    }
+    setSaveModalOpen(true);
+  };
+
+  const handleSaveSandbox = (name: string) => {
+    const cleanName = name.trim() || "Untitled Custom Sandbox";
+    const now = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+    let updatedList: SavedSandbox[];
+    if (activeSavedId) {
+      updatedList = savedSandboxes.map((s) => {
+        if (s.id === activeSavedId) {
+          return { ...s, name: cleanName, code, language, updatedAt: now };
+        }
+        return s;
+      });
+    } else {
+      const newId = "sbx_" + Math.random().toString(36).substring(2, 9);
+      const newSandbox: SavedSandbox = {
+        id: newId,
+        name: cleanName,
+        code,
+        language,
+        createdAt: now,
+        updatedAt: now,
+      };
+      updatedList = [newSandbox, ...savedSandboxes];
+      setActiveSavedId(newId);
+    }
+    persistSavedSandboxes(updatedList);
+    setSaveModalOpen(false);
+    setSaveSuccessToast(`Saved "${cleanName}" to your workspace!`);
+    setTimeout(() => setSaveSuccessToast(null), 3000);
+  };
+
+  const handleLoadSavedSandbox = (item: SavedSandbox) => {
+    setActiveSavedId(item.id);
+    setCode(item.code);
+    setLanguage(item.language);
+    setExecutionResult(null);
+    setActiveTab("console");
+  };
+
+  const handleDeleteSavedSandbox = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const filtered = savedSandboxes.filter((s) => s.id !== id);
+    persistSavedSandboxes(filtered);
+    if (activeSavedId === id) {
+      setActiveSavedId(null);
+    }
+  };
+
+  const handleNewBlankSandbox = () => {
+    setActiveSavedId(null);
+    setCode("# Custom Python Sandbox\n# Write your code or data pipeline below:\n\nprint('Hello from UniDeploy Cloud Sandbox!')\n");
+    setLanguage("python");
+    setExecutionResult(null);
+    setActiveTab("console");
+    setViewMode("my-sandboxes");
+  };
+
   // Execution Result State
   const [executionResult, setExecutionResult] = useState<{
     success?: boolean;
@@ -123,6 +252,7 @@ export default function SandboxPage() {
   }, [isRunning]);
 
   const handleSelectTemplate = (template: SandboxTemplate) => {
+    setActiveSavedId(null);
     setSelectedTemplate(template);
     setCode(template.starterCode);
     setLanguage(template.language);
@@ -404,16 +534,6 @@ console.log(result.stdout);`;
                 fontWeight: 600,
               }}
             >
-              Download
-            </Link>
-            <Link
-              href="/"
-              style={{
-                fontSize: 13,
-                color: C.textSecondary,
-                textDecoration: "none",
-              }}
-            >
               Marketplace
             </Link>
             <Link
@@ -425,6 +545,16 @@ console.log(result.stdout);`;
               }}
             >
               Pricing
+            </Link>
+            <Link
+              href="/getting-started"
+              style={{
+                fontSize: 13,
+                color: C.textSecondary,
+                textDecoration: "none",
+              }}
+            >
+              Docs
             </Link>
           </div>
         </div>
@@ -519,111 +649,364 @@ console.log(result.stdout);`;
           </div>
         </div>
 
-        {/* ── Template Marketplace Switcher ─────────────────────────── */}
+        {/* ── View Switcher: Marketplace Templates vs My Saved Sandboxes ── */}
         <div>
           <div
             style={{
-              fontSize: 11,
-              fontFamily: C.mono,
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
-              color: C.textMuted,
-              marginBottom: 12,
-            }}
-          >
-            Select Sandbox Environment:
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 14,
+              flexWrap: "wrap",
               gap: 12,
             }}
           >
-            {TEMPLATES.map((tmpl) => {
-              const isSelected = selectedTemplate.id === tmpl.id;
-              return (
+            <div
+              style={{
+                display: "inline-flex",
+                gap: 6,
+                background: C.surface,
+                padding: 4,
+                borderRadius: 10,
+                border: `1px solid ${C.border}`,
+              }}
+            >
+              <button
+                onClick={() => setViewMode("templates")}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "6px 14px",
+                  borderRadius: 7,
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  fontFamily: C.font,
+                  background: viewMode === "templates" ? "rgba(109, 184, 74, 0.2)" : "transparent",
+                  color: viewMode === "templates" ? "#FFFFFF" : C.textMuted,
+                  borderWidth: 1,
+                  borderStyle: "solid",
+                  borderColor: viewMode === "templates" ? C.borderActive : "transparent",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <Boxes size={14} color={viewMode === "templates" ? C.greenLight : C.textMuted} />
+                <span>Marketplace Templates ({TEMPLATES.length})</span>
+              </button>
+
+              <button
+                onClick={() => setViewMode("my-sandboxes")}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "6px 14px",
+                  borderRadius: 7,
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  fontFamily: C.font,
+                  background: viewMode === "my-sandboxes" ? "rgba(109, 184, 74, 0.2)" : "transparent",
+                  color: viewMode === "my-sandboxes" ? "#FFFFFF" : C.textMuted,
+                  borderWidth: 1,
+                  borderStyle: "solid",
+                  borderColor: viewMode === "my-sandboxes" ? C.borderActive : "transparent",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <BookmarkCheck size={14} color={viewMode === "my-sandboxes" ? C.greenLight : C.textMuted} />
+                <span>My Saved Sandboxes ({savedSandboxes.length})</span>
+              </button>
+            </div>
+
+            {viewMode === "my-sandboxes" && (
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <button
-                  key={tmpl.id}
-                  onClick={() => handleSelectTemplate(tmpl)}
+                  onClick={handleNewBlankSandbox}
                   style={{
-                    textAlign: "left",
-                    padding: "16px 16px 14px",
-                    borderRadius: 12,
-                    background: isSelected ? "rgba(22, 33, 22, 0.95)" : C.surface,
-                    border: isSelected ? `1.5px solid ${C.green}` : `1px solid ${C.border}`,
-                    boxShadow: isSelected ? `0 0 16px ${C.greenGlow}` : "none",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "6px 12px",
+                    borderRadius: 7,
+                    background: C.surfaceCard,
+                    border: `1px solid ${C.borderHover}`,
+                    color: C.greenLight,
+                    fontSize: 12,
+                    fontWeight: 600,
                     cursor: "pointer",
-                    transition: "all 0.15s ease",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                    minHeight: 110,
+                    fontFamily: C.font,
                   }}
                 >
-                  <div>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        marginBottom: 8,
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 10,
-                          fontFamily: C.mono,
-                          fontWeight: 700,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.06em",
-                          color: isSelected ? C.greenLight : C.textMuted,
-                          background: isSelected ? "rgba(109, 184, 74, 0.2)" : "rgba(255,255,255,0.05)",
-                          padding: "2px 8px",
-                          borderRadius: 4,
-                        }}
-                      >
-                        {tmpl.badge}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontFamily: C.mono,
-                          color: C.textMuted,
-                        }}
-                      >
-                        {tmpl.specs.cpu}
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 14,
-                        fontWeight: 700,
-                        color: "#FFFFFF",
-                        fontFamily: C.font,
-                        lineHeight: 1.3,
-                      }}
-                    >
-                      {tmpl.name}
-                    </div>
-                  </div>
+                  <Plus size={13} />
+                  <span>New Blank Sandbox</span>
+                </button>
+                <button
+                  onClick={() =>
+                    setUpgradeModal({
+                      open: true,
+                      title: "Persistent Cloud Sync & Storage",
+                      subtitle:
+                        "Sync all your custom sandboxes to your private cloud storage with persistent 20GB SSD volumes and background execution on the Starter tier (₹499/mo).",
+                      highlightTier: "starter",
+                    })
+                  }
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "6px 12px",
+                    borderRadius: 7,
+                    background: "rgba(109, 184, 74, 0.12)",
+                    border: `1px solid rgba(109, 184, 74, 0.3)`,
+                    color: C.greenLight,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    fontFamily: C.font,
+                  }}
+                >
+                  <Lock size={12} color={C.greenLight} />
+                  <span>Sync to Cloud (₹499)</span>
+                </button>
+              </div>
+            )}
+          </div>
 
-                  <div
+          {/* VIEW: MARKETPLACE TEMPLATES */}
+          {viewMode === "templates" && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: 12,
+              }}
+            >
+              {TEMPLATES.map((tmpl) => {
+                const isSelected = selectedTemplate.id === tmpl.id && !activeSavedId;
+                return (
+                  <button
+                    key={tmpl.id}
+                    onClick={() => handleSelectTemplate(tmpl)}
                     style={{
-                      fontSize: 12,
-                      color: C.textSecondary,
-                      lineHeight: 1.4,
-                      marginTop: 6,
+                      textAlign: "left",
+                      padding: "16px 16px 14px",
+                      borderRadius: 12,
+                      background: isSelected ? "rgba(22, 33, 22, 0.95)" : C.surface,
+                      border: isSelected ? `1.5px solid ${C.green}` : `1px solid ${C.border}`,
+                      boxShadow: isSelected ? `0 0 16px ${C.greenGlow}` : "none",
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      minHeight: 110,
                     }}
                   >
-                    {tmpl.description.slice(0, 75)}...
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                    <div>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          marginBottom: 8,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontFamily: C.mono,
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.06em",
+                            color: isSelected ? C.greenLight : C.textMuted,
+                            background: isSelected ? "rgba(109, 184, 74, 0.2)" : "rgba(255,255,255,0.05)",
+                            padding: "2px 8px",
+                            borderRadius: 4,
+                          }}
+                        >
+                          {tmpl.badge}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontFamily: C.mono,
+                            color: C.textMuted,
+                          }}
+                        >
+                          {tmpl.specs.cpu}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 700,
+                          color: "#FFFFFF",
+                          fontFamily: C.font,
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        {tmpl.name}
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: C.textSecondary,
+                        lineHeight: 1.4,
+                        marginTop: 6,
+                      }}
+                    >
+                      {tmpl.description.slice(0, 75)}...
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* VIEW: MY SAVED SANDBOXES */}
+          {viewMode === "my-sandboxes" && (
+            <div>
+              {savedSandboxes.length === 0 ? (
+                <div
+                  style={{
+                    background: C.surface,
+                    borderRadius: 14,
+                    border: `1px dashed ${C.borderHover}`,
+                    padding: "36px 24px",
+                    textAlign: "center",
+                  }}
+                >
+                  <Folder size={36} color={C.textMuted} style={{ margin: "0 auto 12px", opacity: 0.7 }} />
+                  <h4 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 700, color: "#FFFFFF" }}>
+                    No Saved Sandboxes Yet
+                  </h4>
+                  <p style={{ margin: "0 auto 20px", fontSize: 13, color: C.textSecondary, maxWidth: 460, lineHeight: 1.5 }}>
+                    Customize any code in the editor or start fresh, then click &ldquo;Save Sandbox&rdquo; in the editor header to save your work.
+                  </p>
+                  <button
+                    onClick={handleNewBlankSandbox}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "8px 18px",
+                      borderRadius: 8,
+                      background: C.greenBright,
+                      color: "#06230C",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      border: "none",
+                      cursor: "pointer",
+                      fontFamily: C.font,
+                    }}
+                  >
+                    <Plus size={14} />
+                    <span>Create Blank Sandbox</span>
+                  </button>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                    gap: 12,
+                  }}
+                >
+                  {savedSandboxes.map((item) => {
+                    const isActive = activeSavedId === item.id;
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => handleLoadSavedSandbox(item)}
+                        style={{
+                          textAlign: "left",
+                          padding: "16px 16px 14px",
+                          borderRadius: 12,
+                          background: isActive ? "rgba(22, 33, 22, 0.95)" : C.surface,
+                          border: isActive ? `1.5px solid ${C.green}` : `1px solid ${C.border}`,
+                          boxShadow: isActive ? `0 0 16px ${C.greenGlow}` : "none",
+                          cursor: "pointer",
+                          display: "flex",
+                          flexDirection: "column",
+                          justifyContent: "space-between",
+                          minHeight: 120,
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontFamily: C.mono,
+                                fontWeight: 700,
+                                textTransform: "uppercase",
+                                color: C.greenLight,
+                                background: "rgba(109, 184, 74, 0.15)",
+                                padding: "2px 7px",
+                                borderRadius: 4,
+                              }}
+                            >
+                              {item.language.toUpperCase()}
+                            </span>
+                            <span style={{ fontSize: 11, fontFamily: C.mono, color: C.textMuted }}>
+                              {item.updatedAt}
+                            </span>
+                          </div>
+
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "#FFFFFF", fontFamily: C.font, marginBottom: 4 }}>
+                            {item.name}
+                          </div>
+
+                          <div
+                            style={{
+                              fontSize: 11,
+                              fontFamily: C.mono,
+                              color: C.textMuted,
+                              background: C.surfaceInput,
+                              padding: "4px 8px",
+                              borderRadius: 4,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {item.code.slice(0, 50).replace(/\n/g, " ")}...
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
+                          <span style={{ fontSize: 11, color: isActive ? C.greenLight : C.textSecondary, fontWeight: 600 }}>
+                            {isActive ? "● Loaded in Editor" : "Click to Open"}
+                          </span>
+                          <button
+                            onClick={(e) => handleDeleteSavedSandbox(item.id, e)}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              color: C.textMuted,
+                              cursor: "pointer",
+                              padding: 4,
+                              borderRadius: 4,
+                            }}
+                            title="Delete saved sandbox"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </section>
 
@@ -686,8 +1069,25 @@ console.log(result.stdout);`;
                       color: "#FFFFFF",
                     }}
                   >
-                    {getActiveFileName()}
+                    {activeSavedId
+                      ? savedSandboxes.find((s) => s.id === activeSavedId)?.name || getActiveFileName()
+                      : getActiveFileName()}
                   </span>
+                  {activeSavedId && (
+                    <span
+                      style={{
+                        fontFamily: C.mono,
+                        fontSize: 9,
+                        color: C.greenLight,
+                        background: "rgba(109, 184, 74, 0.2)",
+                        padding: "1px 5px",
+                        borderRadius: 3,
+                        fontWeight: 700,
+                      }}
+                    >
+                      SAVED
+                    </span>
+                  )}
                   <span
                     style={{
                       fontFamily: C.mono,
@@ -704,7 +1104,60 @@ console.log(result.stdout);`;
                 </div>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button
+                  onClick={handleOpenSaveModal}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                    padding: "4px 10px",
+                    borderRadius: 6,
+                    background: "rgba(109, 184, 74, 0.14)",
+                    border: `1px solid rgba(109, 184, 74, 0.35)`,
+                    color: C.greenBright,
+                    fontSize: 11,
+                    fontFamily: C.mono,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                  title="Save this code to your workspace"
+                >
+                  <BookmarkCheck size={12} color={C.greenBright} />
+                  <span>{activeSavedId ? "Save Changes" : "Save Sandbox"}</span>
+                </button>
+
+                <button
+                  onClick={() =>
+                    setUpgradeModal({
+                      open: true,
+                      title: "Extended 5-Minute Execution Timeouts",
+                      subtitle:
+                        "Free sandboxes have a strict 30-second ceiling. Unlock 5-minute sustained microVM execution for data pipelines, AI models, and scrapers on the Starter tier (₹499/mo).",
+                      highlightTier: "starter",
+                    })
+                  }
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    padding: "4px 8px",
+                    borderRadius: 6,
+                    background: "transparent",
+                    border: `1px solid ${C.border}`,
+                    color: C.textMuted,
+                    fontSize: 11,
+                    fontFamily: C.mono,
+                    cursor: "pointer",
+                  }}
+                  title="Click to unlock 5-minute timeouts"
+                >
+                  <Timer size={12} color={C.amber} />
+                  <span>30s Limit</span>
+                  <Lock size={10} color={C.textMuted} />
+                </button>
+
                 <button
                   onClick={() =>
                     setUpgradeModal({
@@ -1994,6 +2447,192 @@ console.log(result.stdout);`;
               </Link>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Save Sandbox Modal ────────────────────────────────────── */}
+      {saveModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.75)",
+            backdropFilter: "blur(8px)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+          onClick={() => setSaveModalOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: 480,
+              background: C.surface,
+              borderRadius: 16,
+              border: `1px solid ${C.borderActive}`,
+              boxShadow: "0 24px 60px rgba(0, 0, 0, 0.7)",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                padding: "20px 24px",
+                borderBottom: `1px solid ${C.border}`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <BookmarkCheck size={18} color={C.greenBright} />
+                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#FFFFFF", fontFamily: C.display }}>
+                  {activeSavedId ? "Update Saved Sandbox" : "Save Sandbox to Workspace"}
+                </h3>
+              </div>
+              <button
+                onClick={() => setSaveModalOpen(false)}
+                style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer" }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: "20px 24px" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 12,
+                  fontFamily: C.mono,
+                  color: C.textSecondary,
+                  marginBottom: 8,
+                }}
+              >
+                Sandbox Name:
+              </label>
+              <input
+                type="text"
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                placeholder="e.g. My Custom Financial Analyzer"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveSandbox(saveName);
+                }}
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  background: C.surfaceInput,
+                  border: `1px solid ${C.borderHover}`,
+                  color: "#FFFFFF",
+                  fontFamily: C.font,
+                  fontSize: 14,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+
+              {/* Upsell Callout for Cloud Sync */}
+              <div
+                style={{
+                  marginTop: 16,
+                  padding: "12px 14px",
+                  borderRadius: 8,
+                  background: "rgba(109, 184, 74, 0.08)",
+                  border: `1px solid rgba(109, 184, 74, 0.25)`,
+                  fontSize: 12,
+                  color: C.textSecondary,
+                  lineHeight: 1.5,
+                }}
+              >
+                <span style={{ color: C.greenLight, fontWeight: 600 }}>☁️ Cloud Sync &amp; Persistent SSD: </span>
+                Saved in your browser workspace. Upgrade to{" "}
+                <Link
+                  href="/pricing"
+                  onClick={() => setSaveModalOpen(false)}
+                  style={{ color: C.greenBright, fontWeight: 700, textDecoration: "underline" }}
+                >
+                  Starter (₹499/mo)
+                </Link>{" "}
+                to sync sandboxes across devices with 20GB persistent disk and live model deployment keys.
+              </div>
+            </div>
+
+            <div
+              style={{
+                padding: "14px 24px",
+                borderTop: `1px solid ${C.border}`,
+                background: C.surfaceInput,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                gap: 10,
+              }}
+            >
+              <button
+                onClick={() => setSaveModalOpen(false)}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 6,
+                  background: "transparent",
+                  border: `1px solid ${C.border}`,
+                  color: C.textMuted,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleSaveSandbox(saveName)}
+                style={{
+                  padding: "8px 18px",
+                  borderRadius: 6,
+                  background: C.greenBright,
+                  border: "none",
+                  color: "#06230C",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  boxShadow: "0 2px 8px rgba(34, 197, 94, 0.25)",
+                }}
+              >
+                {activeSavedId ? "Save Changes" : "Save to Workspace"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Save Success Toast ────────────────────────────────────── */}
+      {saveSuccessToast && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 24,
+            right: 24,
+            background: "rgba(18, 28, 19, 0.95)",
+            border: `1px solid ${C.greenBright}`,
+            color: "#FFFFFF",
+            padding: "12px 18px",
+            borderRadius: 10,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            boxShadow: "0 10px 25px rgba(0, 0, 0, 0.6)",
+            zIndex: 99999,
+            fontSize: 13,
+            fontWeight: 600,
+            backdropFilter: "blur(8px)",
+          }}
+        >
+          <CheckCircle2 size={16} color={C.greenBright} />
+          <span>{saveSuccessToast}</span>
         </div>
       )}
 

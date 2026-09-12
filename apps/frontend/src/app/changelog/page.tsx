@@ -16,7 +16,7 @@ const ENTRIES: Entry[] = [
     date: "September 2026",
     changes: [
       "AI Cloud Sandboxes live — sub-2s isolated microVMs with Python 3.13, NumPy, Pandas & Matplotlib",
-      "Native macOS Desktop application (.dmg) for Apple Silicon (arm64) and Intel (x64)",
+      "100% Cloud-native Sandbox Marketplace with custom project workspace & 1-click cloud launching",
       "Instant 1-click Python script to live HTTPS endpoint deployment with dedicated API keys",
       "Dodo Payments billing integration supporting UPI, RuPay, and international cards",
       "Model Context Protocol (MCP) server for Cursor, Claude Desktop, and autonomous agents",

@@ -17,7 +17,6 @@ import {
   ExternalLink,
   Sparkles,
   Code2,
-  Download,
   Terminal as TerminalIcon,
   CheckCircle2,
 } from "lucide-react";
@@ -111,7 +110,7 @@ export default function LandingPage() {
             Pricing
           </a>
           <Link
-            href="/download"
+            href="/sandbox"
             style={{
               fontSize: 13,
               color: "var(--text-secondary)",
@@ -119,7 +118,7 @@ export default function LandingPage() {
               padding: "6px 12px",
             }}
           >
-            Mac App
+            Marketplace
           </Link>
           <Link
             href="/sandbox"
@@ -228,8 +227,8 @@ export default function LandingPage() {
           </Link>
 
           <Link
-            href="/download"
-            onClick={() => posthog.capture("download_mac_clicked", { location: "hero" })}
+            href="/sandbox"
+            onClick={() => posthog.capture("browse_marketplace_clicked", { location: "hero" })}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -244,8 +243,8 @@ export default function LandingPage() {
               textDecoration: "none",
             }}
           >
-            <Download size={16} />
-            <span>Download Mac App (.dmg)</span>
+            <Sparkles size={16} color="var(--accent-green)" />
+            <span>Browse Sandbox Marketplace</span>
           </Link>
 
           <a
@@ -747,7 +746,7 @@ export default function LandingPage() {
                   <Check size={14} color="var(--accent-green)" /> Google Colab alternative runner
                 </li>
                 <li style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Check size={14} color="var(--accent-green)" /> Native Mac app (.dmg) access
+                  <Check size={14} color="var(--accent-green)" /> Instant Cloud Sandbox Marketplace
                 </li>
               </ul>
             </div>
@@ -992,7 +991,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Section: Native Mac Desktop App ────────────────────────────── */}
+      {/* ── Section: Cloud-First Marketplace ────────────────────────────── */}
       <section
         style={{
           marginBottom: 80,
@@ -1022,8 +1021,8 @@ export default function LandingPage() {
               marginBottom: 8,
             }}
           >
-            <Download size={13} color="var(--accent-green)" />
-            <span>macOS Native Client</span>
+            <Sparkles size={13} color="var(--accent-green)" />
+            <span>100% Cloud-First Marketplace</span>
           </div>
           <h3
             style={{
@@ -1035,16 +1034,16 @@ export default function LandingPage() {
               letterSpacing: "-0.02em",
             }}
           >
-            Launch cloud sandboxes straight from your Mac menu bar
+            Launch cloud sandboxes straight from your browser
           </h3>
           <p style={{ margin: 0, fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.6 }}>
-            Stop burning your MacBook battery on heavy local Docker containers. The UniDeploy native desktop app lets you run Python scripts, test agent tools, and monitor token usage in 1 click.
+            Zero local downloads, battery drain, or heavy Docker configurations. UniDeploy runs isolated microVMs with sub-2s boot times, persistent cloud memory, and 1-click REST API deployment.
           </p>
         </div>
 
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <Link
-            href="/download"
+            href="/sandbox"
             style={{
               padding: "12px 22px",
               borderRadius: 10,
@@ -1058,11 +1057,11 @@ export default function LandingPage() {
               gap: 8,
             }}
           >
-            <Download size={16} />
-            <span>Download for macOS</span>
+            <span>Launch Cloud Sandbox</span>
+            <ArrowRight size={16} strokeWidth={2.5} />
           </Link>
           <Link
-            href="/download"
+            href="/pricing"
             style={{
               padding: "12px 18px",
               borderRadius: 10,
@@ -1073,7 +1072,7 @@ export default function LandingPage() {
               textDecoration: "none",
             }}
           >
-            View Specs (.dmg)
+            View Pricing Plans
           </Link>
         </div>
       </section>

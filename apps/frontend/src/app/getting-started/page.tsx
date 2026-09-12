@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import posthog from "posthog-js";
-import { Terminal, Download, Play, Zap, Shield, Cpu, Key, ArrowRight, Check, Copy } from "lucide-react";
+import { Terminal, Play, Zap, Shield, Cpu, Key, ArrowRight, Check, Copy } from "lucide-react";
 
 const C = {
   bg: "#0B0F0C",
@@ -70,9 +70,6 @@ export default function GettingStartedPage() {
             <Link href="/pricing" style={{ fontSize: 13, color: C.textSecondary, textDecoration: "none" }}>
               Pricing
             </Link>
-            <Link href="/download" style={{ fontSize: 13, color: C.textSecondary, textDecoration: "none" }}>
-              Download
-            </Link>
             <Link href="/dashboard" style={{ fontSize: 13, color: C.textSecondary, textDecoration: "none" }}>
               Dashboard
             </Link>
@@ -124,14 +121,14 @@ export default function GettingStartedPage() {
 
           <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 24 }}>
             <div style={{ width: 36, height: 36, borderRadius: 8, background: "rgba(109, 184, 74, 0.15)", display: "flex", alignItems: "center", justifyContent: "center", color: C.greenLight, marginBottom: 16 }}>
-              <Download size={18} />
+              <Zap size={18} />
             </div>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: "#FFFFFF", marginBottom: 8 }}>2. Native Mac Desktop (.dmg)</h3>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: "#FFFFFF", marginBottom: 8 }}>2. Template Marketplace</h3>
             <p style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.5, marginBottom: 16 }}>
-              Dock app for macOS Apple Silicon and Intel. Launch persistent microVMs and manage API endpoints in 1 click.
+              Browse pre-configured microVM sandboxes for Python, scraping, agent code interpreters, and model deployment. Fork &amp; edit in 1 click.
             </p>
-            <Link href="/download" style={{ fontSize: 12, color: C.greenLight, fontFamily: C.mono, fontWeight: 700, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}>
-              Download macOS App <ArrowRight size={13} />
+            <Link href="/sandbox" style={{ fontSize: 12, color: C.greenLight, fontFamily: C.mono, fontWeight: 700, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}>
+              Browse Marketplace <ArrowRight size={13} />
             </Link>
           </div>
 

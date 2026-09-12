@@ -31,7 +31,7 @@ const TIERS: Tier[] = [
       "50,000 free compute & AI tokens",
       "3 daily cloud microVM sessions",
       "Google Colab-alternative Python runner",
-      "Native Mac Desktop App (.dmg) access",
+      "Instant Cloud Sandbox Marketplace access",
       "Community Discord & GitHub support",
     ],
   },
