@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import posthog from "posthog-js";
-import { Terminal, Play, Zap, Shield, Cpu, Key, ArrowRight, Check, Copy } from "lucide-react";
+import { Terminal, Play, Zap, Cpu, Key, ArrowRight, Check, Copy } from "lucide-react";
 
 const C = {
   bg: "#0B0F0C",

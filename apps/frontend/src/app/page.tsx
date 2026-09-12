@@ -3,22 +3,14 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import {
-  Cloud,
-  Server,
   Cpu,
-  ShieldCheck,
   Lock,
-  Layers,
   Globe,
   Check,
   ArrowRight,
-  Zap,
   Play,
-  ExternalLink,
   Sparkles,
   Code2,
-  Terminal as TerminalIcon,
-  CheckCircle2,
 } from "lucide-react";
 import Terminal from "@/components/Terminal";
 import posthog from "posthog-js";

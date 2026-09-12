@@ -9,7 +9,6 @@ import {
   Copy,
   Check,
   Cpu,
-  Layers,
   Sparkles,
   BarChart3,
   Shield,
@@ -18,8 +17,6 @@ import {
   AlertCircle,
   Timer,
   Terminal,
-  ExternalLink,
-  ChevronRight,
   Zap,
   Globe,
   Lock,
@@ -31,7 +28,6 @@ import {
   Plus,
   Trash2,
   Folder,
-  Save,
 } from "lucide-react";
 import { TEMPLATES, SandboxTemplate } from "@/app/api/sandbox/templates/route";
 
@@ -304,15 +300,16 @@ export default function SandboxPage() {
         return next;
       });
 
-      if (data.results && data.results.some((r: any) => r.type.startsWith("image/"))) {
+      if (data.results && data.results.some((r: { type: string; data: string }) => r.type.startsWith("image/"))) {
         setActiveTab("visuals");
       } else {
         setActiveTab("console");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "Failed to reach sandbox server";
       setExecutionResult({
         success: false,
-        stderr: err?.message || "Failed to reach sandbox server",
+        stderr: errorMsg,
         durationMs: 0,
       });
       setActiveTab("console");
@@ -1193,7 +1190,7 @@ console.log(result.stdout);`;
 
                 <select
                   value={language}
-                  onChange={(e) => setLanguage(e.target.value as any)}
+                  onChange={(e) => setLanguage(e.target.value as "python" | "js" | "bash")}
                   style={{
                     background: C.surfaceInput,
                     color: C.text,

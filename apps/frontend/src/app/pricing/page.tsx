@@ -108,8 +108,9 @@ export default function PricingPage() {
       if (res.checkout_url) {
         window.location.href = res.checkout_url;
       }
-    } catch (err: any) {
-      alert("Checkout failed: " + err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "An unexpected error occurred";
+      alert("Checkout failed: " + message);
     } finally {
       setLoadingTier(null);
     }

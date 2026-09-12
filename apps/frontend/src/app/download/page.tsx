@@ -9,9 +9,6 @@ import {
   ArrowRight,
   Shield,
   Sparkles,
-  ExternalLink,
-  CheckCircle2,
-  Lock,
   Cpu,
   Zap,
   Code2,
@@ -20,7 +17,7 @@ import {
   Layers,
   BarChart3,
   Bot,
-  Play
+  Play,
 } from "lucide-react";
 import { TEMPLATES } from "@/app/api/sandbox/templates/route";
 
@@ -48,8 +45,10 @@ const C = {
   display: "var(--font-display), Sora, sans-serif",
 };
 
+type CategoryType = "all" | "data" | "agents" | "apis" | "shell";
+
 export default function MarketplacePage() {
-  const [selectedCategory, setSelectedCategory] = useState<"all" | "data" | "agents" | "apis" | "shell">("all");
+  const [selectedCategory, setSelectedCategory] = useState<CategoryType>("all");
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
 
   const handleCopy = (text: string, id: string) => {
@@ -243,19 +242,21 @@ export default function MarketplacePage() {
             justifyContent: "center",
           }}
         >
-          {[
-            { id: "all", label: "All Templates", icon: Boxes },
-            { id: "data", label: "Python & Data Science", icon: BarChart3 },
-            { id: "agents", label: "AI Agents & Interpreters", icon: Bot },
-            { id: "apis", label: "APIs & Microservices", icon: Zap },
-            { id: "shell", label: "Linux Cloud Shell", icon: Terminal },
-          ].map((cat) => {
+          {(
+            [
+              { id: "all", label: "All Templates", icon: Boxes },
+              { id: "data", label: "Python & Data Science", icon: BarChart3 },
+              { id: "agents", label: "AI Agents & Interpreters", icon: Bot },
+              { id: "apis", label: "APIs & Microservices", icon: Zap },
+              { id: "shell", label: "Linux Cloud Shell", icon: Terminal },
+            ] as const
+          ).map((cat) => {
             const Icon = cat.icon;
             const isSelected = selectedCategory === cat.id;
             return (
               <button
                 key={cat.id}
-                onClick={() => setSelectedCategory(cat.id as any)}
+                onClick={() => setSelectedCategory(cat.id)}
                 style={{
                   display: "flex",
                   alignItems: "center",
