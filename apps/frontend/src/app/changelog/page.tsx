@@ -12,19 +12,26 @@ type Entry = {
 
 const ENTRIES: Entry[] = [
   {
+    version: "v0.2.0",
+    date: "September 2026",
+    changes: [
+      "AI Cloud Sandboxes live — sub-2s isolated microVMs with Python 3.13, NumPy, Pandas & Matplotlib",
+      "100% Cloud-native Sandbox Marketplace with custom project workspace & 1-click cloud launching",
+      "Instant 1-click Python script to live HTTPS endpoint deployment with dedicated API keys",
+      "Dodo Payments billing integration supporting UPI, RuPay, and international cards",
+      "Model Context Protocol (MCP) server for Cursor, Claude Desktop, and autonomous agents",
+      "Interactive Web Sandbox with real-time base64 visualisations and console streaming",
+      "Device pairing via `unideploy auth` and 6-digit session codes on Cloudflare KV edge",
+    ],
+  },
+  {
     version: "v0.1.0",
     date: "May 2026",
     changes: [
       "CLI published to npm — `npm install -g unideploy`",
-      "13-rule security scanner live (RLS, secrets, auth logic, headers, BOLA)",
-      "GitHub URL scan flow — submit any public or private repo URL",
-      "WebSocket CLI session pairing via `unideploy init`",
-      "Gemini-powered remediation plans per finding",
-      "Auto-fix PR creation via GitHub integration (Builder plan and above)",
-      "Dashboard live at unideploy.vercel.app",
-      "GitHub Actions CI integration — gates merges on CRITICAL findings",
-      "MCP tools for IDE-level scan access",
-      "Agent Engine deployed on Vertex AI (Orchestrator → Analyzer + AutoFix)",
+      "Initial edge gateway deployment on Cloudflare Workers and D1 database",
+      "Device pairing via `unideploy auth`",
+      "MCP tools for IDE-level code execution",
     ],
   },
 ];

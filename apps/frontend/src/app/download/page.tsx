@@ -1,23 +1,25 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import {
-  Apple,
   Terminal,
   Copy,
   Check,
-  Download,
   ArrowRight,
   Shield,
   Sparkles,
-  ExternalLink,
-  Laptop,
-  CheckCircle2,
-  Lock,
   Cpu,
-  RefreshCw
+  Zap,
+  Code2,
+  Boxes,
+  Database,
+  Layers,
+  BarChart3,
+  Bot,
+  Play,
 } from "lucide-react";
+import { TEMPLATES } from "@/app/api/sandbox/templates/route";
 
 const C = {
   bg: "#0B0F0C",
@@ -35,38 +37,34 @@ const C = {
   greenBright: "#22C55E",
   greenLight: "#86EFAC",
   greenGlow: "rgba(109, 184, 74, 0.15)",
+  amber: "#F0A830",
+  blue: "#60A5FA",
+  purple: "#C084FC",
   font: "var(--font-body), DM Sans, sans-serif",
   mono: "var(--font-mono), JetBrains Mono, monospace",
   display: "var(--font-display), Sora, sans-serif",
 };
 
-export default function DownloadPage() {
-  const [selectedOS, setSelectedOS] = useState<"mac" | "windows" | "npm">("mac");
-  const [copiedScript, setCopiedScript] = useState<string | null>(null);
+type CategoryType = "all" | "data" | "agents" | "apis" | "shell";
 
-  // Auto-detect OS on mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const ua = window.navigator.userAgent.toLowerCase();
-      if (ua.includes("win")) {
-        setSelectedOS("windows");
-      } else if (ua.includes("mac")) {
-        setSelectedOS("mac");
-      } else {
-        setSelectedOS("npm");
-      }
-    }
-  }, []);
+export default function MarketplacePage() {
+  const [selectedCategory, setSelectedCategory] = useState<CategoryType>("all");
+  const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
 
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
-    setCopiedScript(id);
-    setTimeout(() => setCopiedScript(null), 2000);
+    setCopiedCmd(id);
+    setTimeout(() => setCopiedCmd(null), 2000);
   };
 
-  const macCurlCommand = "curl -fsSL https://unideploy.in/install.sh | bash";
-  const winPsCommand = "irm https://unideploy.in/install.ps1 | iex";
-  const npmCommand = "npm install -g unideploy";
+  const filteredTemplates = TEMPLATES.filter((tmpl) => {
+    if (selectedCategory === "all") return true;
+    if (selectedCategory === "data") return tmpl.id === "colab-python";
+    if (selectedCategory === "agents") return tmpl.id === "agent-code-interpreter" || tmpl.id === "agent-scraper";
+    if (selectedCategory === "apis") return tmpl.id === "model-deploy";
+    if (selectedCategory === "shell") return tmpl.id === "cloud-terminal";
+    return true;
+  });
 
   return (
     <div
@@ -91,7 +89,7 @@ export default function DownloadPage() {
       >
         <div
           style={{
-            maxWidth: 1080,
+            maxWidth: 1140,
             margin: "0 auto",
             padding: "0 24px",
             height: 56,
@@ -128,7 +126,7 @@ export default function DownloadPage() {
                 border: "1px solid rgba(109, 184, 74, 0.25)",
               }}
             >
-              Download
+              Cloud Marketplace
             </span>
           </div>
 
@@ -140,19 +138,33 @@ export default function DownloadPage() {
                 color: C.greenLight,
                 textDecoration: "none",
                 fontWeight: 600,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
               }}
             >
-              Web Sandbox
+              <Zap size={14} />
+              <span>Launch Sandbox</span>
             </Link>
             <Link
-              href="/connect"
+              href="/pricing"
               style={{
                 fontSize: 13,
                 color: C.textSecondary,
                 textDecoration: "none",
               }}
             >
-              Connect Machine
+              Pricing
+            </Link>
+            <Link
+              href="/getting-started"
+              style={{
+                fontSize: 13,
+                color: C.textSecondary,
+                textDecoration: "none",
+              }}
+            >
+              Docs
             </Link>
           </div>
         </div>
@@ -161,9 +173,9 @@ export default function DownloadPage() {
       {/* ── Hero Section ──────────────────────────────────────────────── */}
       <section
         style={{
-          maxWidth: 860,
+          maxWidth: 960,
           margin: "0 auto",
-          padding: "56px 24px 32px",
+          padding: "56px 24px 28px",
           textAlign: "center",
         }}
       >
@@ -178,129 +190,364 @@ export default function DownloadPage() {
             fontFamily: C.mono,
             textTransform: "uppercase",
             letterSpacing: "0.06em",
-            marginBottom: 12,
+            marginBottom: 14,
             background: "rgba(109, 184, 74, 0.1)",
-            padding: "4px 12px",
+            padding: "5px 14px",
             borderRadius: 999,
-            border: "1px solid rgba(109, 184, 74, 0.2)",
+            border: "1px solid rgba(109, 184, 74, 0.25)",
           }}
         >
           <Sparkles size={13} color={C.greenLight} />
-          <span>Cloudflare Edge · E2B MicroVM Sandboxes</span>
+          <span>100% Cloud-Native · Zero Local Device Downloads · Sub-2s MicroVMs</span>
         </div>
 
         <h1
           style={{
             fontFamily: C.display,
-            fontSize: 38,
+            fontSize: 42,
             fontWeight: 800,
             color: "#FFFFFF",
             letterSpacing: "-0.03em",
-            lineHeight: 1.2,
-            margin: 0,
+            lineHeight: 1.18,
+            margin: "0 0 16px",
           }}
         >
-          Download UniDeploy for Mac &amp; Cloud
+          AI Cloud Sandbox &amp; Template Marketplace
         </h1>
 
         <p
           style={{
             fontSize: 16,
             color: C.textSecondary,
-            margin: "12px auto 0",
-            maxWidth: 620,
-            lineHeight: 1.6,
+            margin: "0 auto",
+            maxWidth: 680,
+            lineHeight: 1.65,
           }}
         >
-          Run persistent Python ML notebooks without Colab disconnects, launch cloud sandboxes in 1 click, and deploy AI models with instant API keys. Includes 50,000 free trial tokens.
+          Discover, customize, and launch pre-configured Firecracker microVM sandboxes instantly in your browser.
+          No local setup, zero battery drain, and no Docker memory hogs. Build custom scripts, save them to your workspace, or deploy them as 24/7 REST APIs.
         </p>
 
-        {/* ── OS Tabs Selector ───────────────────────────────────────── */}
+        {/* ── Category Filters ───────────────────────────────────────── */}
         <div
           style={{
             display: "inline-flex",
             gap: 6,
             background: C.surface,
-            padding: 4,
-            borderRadius: 10,
+            padding: 5,
+            borderRadius: 12,
             border: `1px solid ${C.border}`,
             marginTop: 36,
+            flexWrap: "wrap",
+            justifyContent: "center",
           }}
         >
-          <button
-            onClick={() => setSelectedOS("mac")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "8px 20px",
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 600,
-              fontFamily: C.font,
-              border: "none",
-              cursor: "pointer",
-              background: selectedOS === "mac" ? C.surfaceCard : "transparent",
-              color: selectedOS === "mac" ? "#FFFFFF" : C.textMuted,
-              boxShadow: selectedOS === "mac" ? `0 0 12px ${C.greenGlow}` : "none",
-            }}
-          >
-            <Apple size={16} />
-            <span>macOS (.dmg)</span>
-          </button>
-
-          <button
-            onClick={() => setSelectedOS("windows")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "8px 20px",
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 600,
-              fontFamily: C.font,
-              border: "none",
-              cursor: "pointer",
-              background: selectedOS === "windows" ? C.surfaceCard : "transparent",
-              color: selectedOS === "windows" ? "#FFFFFF" : C.textMuted,
-              boxShadow: selectedOS === "windows" ? `0 0 12px ${C.greenGlow}` : "none",
-            }}
-          >
-            <Laptop size={16} />
-            <span>Windows</span>
-          </button>
-
-          <button
-            onClick={() => setSelectedOS("npm")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "8px 20px",
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 600,
-              fontFamily: C.font,
-              border: "none",
-              cursor: "pointer",
-              background: selectedOS === "npm" ? C.surfaceCard : "transparent",
-              color: selectedOS === "npm" ? "#FFFFFF" : C.textMuted,
-              boxShadow: selectedOS === "npm" ? `0 0 12px ${C.greenGlow}` : "none",
-            }}
-          >
-            <Terminal size={16} />
-            <span>npm / CLI</span>
-          </button>
+          {(
+            [
+              { id: "all", label: "All Templates", icon: Boxes },
+              { id: "data", label: "Python & Data Science", icon: BarChart3 },
+              { id: "agents", label: "AI Agents & Interpreters", icon: Bot },
+              { id: "apis", label: "APIs & Microservices", icon: Zap },
+              { id: "shell", label: "Linux Cloud Shell", icon: Terminal },
+            ] as const
+          ).map((cat) => {
+            const Icon = cat.icon;
+            const isSelected = selectedCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  fontFamily: C.font,
+                  border: "none",
+                  cursor: "pointer",
+                  background: isSelected ? "rgba(109, 184, 74, 0.18)" : "transparent",
+                  color: isSelected ? "#FFFFFF" : C.textMuted,
+                  boxShadow: isSelected ? `0 0 12px ${C.greenGlow}` : "none",
+                  borderWidth: 1,
+                  borderStyle: "solid",
+                  borderColor: isSelected ? C.borderActive : "transparent",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <Icon size={15} color={isSelected ? C.greenLight : C.textMuted} />
+                <span>{cat.label}</span>
+              </button>
+            );
+          })}
         </div>
       </section>
 
-      {/* ── Main Installer Card ───────────────────────────────────────── */}
+      {/* ── Marketplace Templates Grid ────────────────────────────────── */}
       <section
         style={{
-          maxWidth: 860,
+          maxWidth: 1140,
           margin: "0 auto",
-          padding: "0 24px",
+          padding: "24px 24px 48px",
+        }}
+      >
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
+            gap: 20,
+          }}
+        >
+          {filteredTemplates.map((tmpl) => (
+            <div
+              key={tmpl.id}
+              style={{
+                background: C.surface,
+                borderRadius: 14,
+                border: `1px solid ${C.border}`,
+                padding: "24px",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                transition: "all 0.2s ease",
+                boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
+              }}
+            >
+              <div>
+                {/* Header: Badge & Specs */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontFamily: C.mono,
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                      color: C.greenLight,
+                      background: "rgba(109, 184, 74, 0.15)",
+                      padding: "3px 9px",
+                      borderRadius: 6,
+                      border: "1px solid rgba(109, 184, 74, 0.25)",
+                    }}
+                  >
+                    {tmpl.badge}
+                  </span>
+                  <span style={{ fontSize: 11, fontFamily: C.mono, color: C.textMuted }}>
+                    {tmpl.specs.cpu} · {tmpl.specs.ram}
+                  </span>
+                </div>
+
+                <h3
+                  style={{
+                    fontFamily: C.display,
+                    fontSize: 18,
+                    fontWeight: 700,
+                    color: "#FFFFFF",
+                    margin: "0 0 10px",
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {tmpl.name}
+                </h3>
+
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: C.textSecondary,
+                    margin: "0 0 16px",
+                    lineHeight: 1.55,
+                  }}
+                >
+                  {tmpl.description}
+                </p>
+
+                {/* MicroVM Runtime Specs */}
+                <div
+                  style={{
+                    background: C.surfaceInput,
+                    borderRadius: 8,
+                    padding: "10px 12px",
+                    border: `1px solid ${C.border}`,
+                    marginBottom: 20,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 14,
+                    fontSize: 11,
+                    fontFamily: C.mono,
+                    color: C.textMuted,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <Cpu size={13} color={C.greenLight} />
+                    <span>{tmpl.specs.os}</span>
+                  </div>
+                  <div style={{ width: 1, height: 12, background: C.border }} />
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <Zap size={13} color={C.amber} />
+                    <span>Sub-2s Boot</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: "flex", gap: 10 }}>
+                <Link
+                  href={`/sandbox?template=${tmpl.id}`}
+                  style={{
+                    flex: 1,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    padding: "10px 16px",
+                    borderRadius: 8,
+                    background: C.greenBright,
+                    color: "#06230C",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    textDecoration: "none",
+                    boxShadow: "0 2px 10px rgba(34, 197, 94, 0.25)",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  <Play size={13} fill="#06230C" />
+                  <span>Launch in Cloud</span>
+                </Link>
+
+                <Link
+                  href={`/sandbox?template=${tmpl.id}`}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "10px 14px",
+                    borderRadius: 8,
+                    background: C.surfaceCard,
+                    border: `1px solid ${C.borderHover}`,
+                    color: C.textSecondary,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    textDecoration: "none",
+                  }}
+                  title="Open in editor to customize and save"
+                >
+                  <Code2 size={15} />
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Architecture Comparison: Zero Local Load ──────────────────── */}
+      <section
+        style={{
+          maxWidth: 1140,
+          margin: "0 auto",
+          padding: "36px 24px 64px",
+        }}
+      >
+        <div
+          style={{
+            background: "linear-gradient(135deg, rgba(18, 28, 19, 0.7) 0%, rgba(13, 20, 14, 0.7) 100%)",
+            border: `1px solid ${C.border}`,
+            borderRadius: 16,
+            padding: "36px 36px",
+          }}
+        >
+          <div style={{ maxWidth: 680, marginBottom: 32 }}>
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 11,
+                fontFamily: C.mono,
+                fontWeight: 700,
+                color: C.greenLight,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                marginBottom: 8,
+              }}
+            >
+              <Shield size={13} color={C.greenLight} />
+              <span>Zero Local Footprint</span>
+            </div>
+            <h2
+              style={{
+                fontFamily: C.display,
+                fontSize: 26,
+                fontWeight: 800,
+                color: "#FFFFFF",
+                margin: "0 0 10px",
+                letterSpacing: "-0.02em",
+              }}
+            >
+              Why Run 100% in UniDeploy Cloud Sandboxes?
+            </h2>
+            <p style={{ margin: 0, fontSize: 14, color: C.textSecondary, lineHeight: 1.6 }}>
+              Local Docker daemons consume 10GB–16GB of system RAM, drain laptop battery life, and pollute system Python paths. UniDeploy offloads everything to dedicated Firecracker microVMs.
+            </p>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+              gap: 20,
+            }}
+          >
+            <div style={{ background: C.surface, padding: 20, borderRadius: 12, border: `1px solid ${C.border}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: C.greenBright }}>
+                <Zap size={16} />
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#FFFFFF" }}>Sub-2s Cloud Boot</span>
+              </div>
+              <p style={{ margin: 0, fontSize: 13, color: C.textMuted, lineHeight: 1.5 }}>
+                Firecracker microVMs spin up isolated Linux environments faster than local Docker Desktop can even initialize.
+              </p>
+            </div>
+
+            <div style={{ background: C.surface, padding: 20, borderRadius: 12, border: `1px solid ${C.border}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: C.blue }}>
+                <Layers size={16} />
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#FFFFFF" }}>Zero Battery Drain</span>
+              </div>
+              <p style={{ margin: 0, fontSize: 13, color: C.textMuted, lineHeight: 1.5 }}>
+                Heavy matrix computations, Pandas merges, and web scraping run in the cloud without heating your laptop or throttling CPU.
+              </p>
+            </div>
+
+            <div style={{ background: C.surface, padding: 20, borderRadius: 12, border: `1px solid ${C.border}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: C.purple }}>
+                <Database size={16} />
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#FFFFFF" }}>Zero Colab Disconnects</span>
+              </div>
+              <p style={{ margin: 0, fontSize: 13, color: C.textMuted, lineHeight: 1.5 }}>
+                Unlike free Google Colab sessions that disconnect when you step away, UniDeploy preserves your variables and outputs.
+              </p>
+            </div>
+
+            <div style={{ background: C.surface, padding: 20, borderRadius: 12, border: `1px solid ${C.border}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: C.amber }}>
+                <Shield size={16} />
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#FFFFFF" }}>100% Host Isolation</span>
+              </div>
+              <p style={{ margin: 0, fontSize: 13, color: C.textMuted, lineHeight: 1.5 }}>
+                Safely run untrusted LLM-generated code or web scrapers with zero access to your machine&apos;s local files or credentials.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── CLI Terminal Cloud Runner ─────────────────────────────────── */}
+      <section
+        style={{
+          maxWidth: 1140,
+          margin: "0 auto",
+          padding: "0 24px 64px",
         }}
       >
         <div
@@ -309,454 +556,163 @@ export default function DownloadPage() {
             borderRadius: 16,
             border: `1px solid ${C.border}`,
             padding: 32,
-            boxShadow: "0 24px 48px rgba(0,0,0,0.5)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 20,
           }}
         >
-          {/* macOS TAB CONTENT */}
-          {selectedOS === "mac" && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
             <div>
-              {/* Native DMG Download Banner */}
-              <div
-                style={{
-                  background: "linear-gradient(135deg, rgba(109, 184, 74, 0.12) 0%, rgba(20, 30, 22, 0.6) 100%)",
-                  border: `1px solid ${C.borderActive}`,
-                  borderRadius: 12,
-                  padding: "24px 28px",
-                  marginBottom: 24,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 16,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-                  <div>
-                    <h2 style={{ fontFamily: C.display, fontSize: 20, fontWeight: 700, color: "#FFFFFF", margin: 0 }}>
-                      UniDeploy Native Desktop for Mac
-                    </h2>
-                    <p style={{ fontSize: 13, color: C.textSecondary, margin: "4px 0 0" }}>
-                      Dock integration, 1-click cloud microVM sandboxes, and local model deployment manager.
-                    </p>
-                  </div>
-                  <span style={{ fontSize: 11, fontFamily: C.mono, color: C.greenLight, background: "rgba(109, 184, 74, 0.2)", padding: "4px 10px", borderRadius: 6, fontWeight: 700 }}>
-                    50,000 FREE TOKENS
-                  </span>
-                </div>
-
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 4 }}>
-                  <a
-                    href="https://github.com/CoderRahul01/unideploy/releases/latest/download/UniDeploy-arm64.dmg"
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 8,
-                      background: C.greenBright,
-                      color: "#0B0F0C",
-                      padding: "12px 22px",
-                      borderRadius: 8,
-                      fontSize: 14,
-                      fontWeight: 700,
-                      textDecoration: "none",
-                      boxShadow: "0 4px 16px rgba(34, 197, 94, 0.3)",
-                    }}
-                  >
-                    <Download size={16} />
-                    <span>Download for Apple Silicon (.dmg)</span>
-                  </a>
-
-                  <a
-                    href="https://github.com/CoderRahul01/unideploy/releases/latest/download/UniDeploy-x64.dmg"
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 8,
-                      background: C.surfaceCard,
-                      color: C.text,
-                      border: `1px solid ${C.borderHover}`,
-                      padding: "12px 22px",
-                      borderRadius: 8,
-                      fontSize: 14,
-                      fontWeight: 600,
-                      textDecoration: "none",
-                    }}
-                  >
-                    <Download size={16} />
-                    <span>Intel Mac (.dmg)</span>
-                  </a>
-                </div>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: C.mono, color: C.greenLight, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
+                <Terminal size={13} />
+                <span>Prefer the Terminal?</span>
               </div>
-
-              {/* Terminal One-liner */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: C.textSecondary }}>
-                  Or install via Terminal one-liner:
-                </span>
-              </div>
-
-              <div
-                style={{
-                  position: "relative",
-                  background: C.surfaceInput,
-                  borderRadius: 10,
-                  border: `1px solid ${C.border}`,
-                  padding: "16px 20px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <code
-                  style={{
-                    fontFamily: C.mono,
-                    fontSize: 13,
-                    color: "#DDF4CE",
-                    userSelect: "all",
-                  }}
-                >
-                  {macCurlCommand}
-                </code>
-
-                <button
-                  onClick={() => handleCopy(macCurlCommand, "mac")}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "7px 14px",
-                    borderRadius: 6,
-                    background: C.surfaceCard,
-                    border: `1px solid ${C.borderHover}`,
-                    color: copiedScript === "mac" ? C.greenBright : C.text,
-                    fontSize: 12,
-                    fontFamily: C.mono,
-                    cursor: "pointer",
-                  }}
-                >
-                  {copiedScript === "mac" ? (
-                    <>
-                      <Check size={14} color={C.greenBright} />
-                      <span>Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy size={14} />
-                      <span>Copy</span>
-                    </>
-                  )}
-                </button>
-              </div>
+              <h3 style={{ fontFamily: C.display, fontSize: 22, fontWeight: 700, color: "#FFFFFF", margin: 0 }}>
+                Run Remote Cloud Sandboxes from Your Local CLI
+              </h3>
             </div>
-          )}
+            <span style={{ fontSize: 12, fontFamily: C.mono, color: C.textMuted, background: C.surfaceInput, padding: "5px 12px", borderRadius: 6, border: `1px solid ${C.border}` }}>
+              No local Python or Docker needed
+            </span>
+          </div>
 
-          {/* WINDOWS TAB CONTENT */}
-          {selectedOS === "windows" && (
-            <div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#FFFFFF" }}>
-                  Run in PowerShell (Run as Administrator not required)
-                </span>
-                <span style={{ fontSize: 11, fontFamily: C.mono, color: C.greenLight }}>
-                  Recommended for Windows
-                </span>
-              </div>
+          <p style={{ margin: 0, fontSize: 14, color: C.textSecondary, lineHeight: 1.6 }}>
+            Install the UniDeploy CLI via npm. Code executes directly in isolated cloud microVMs while streaming stdout, stderr, and chart outputs back to your terminal window.
+          </p>
 
-              <div
-                style={{
-                  position: "relative",
-                  background: C.surfaceInput,
-                  borderRadius: 10,
-                  border: `1px solid ${C.border}`,
-                  padding: "16px 20px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <code
-                  style={{
-                    fontFamily: C.mono,
-                    fontSize: 13,
-                    color: "#DDF4CE",
-                    userSelect: "all",
-                  }}
-                >
-                  {winPsCommand}
-                </code>
-
-                <button
-                  onClick={() => handleCopy(winPsCommand, "win")}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "7px 14px",
-                    borderRadius: 6,
-                    background: C.surfaceCard,
-                    border: `1px solid ${C.borderHover}`,
-                    color: copiedScript === "win" ? C.greenBright : C.text,
-                    fontSize: 12,
-                    fontFamily: C.mono,
-                    cursor: "pointer",
-                  }}
-                >
-                  {copiedScript === "win" ? (
-                    <>
-                      <Check size={14} color={C.greenBright} />
-                      <span>Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy size={14} />
-                      <span>Copy</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              <div
-                style={{
-                  marginTop: 20,
-                  display: "flex",
-                  gap: 12,
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                  fontSize: 13,
-                  color: C.textMuted,
-                }}
-              >
-                <span>Or download executable directly:</span>
-                <a
-                  href="https://github.com/CoderRahul01/unideploy/releases/latest/download/unideploy-windows-x64.exe"
-                  style={{
-                    color: C.greenLight,
-                    textDecoration: "none",
-                    fontFamily: C.mono,
-                    fontSize: 12,
-                  }}
-                >
-                  unideploy-windows-x64.exe ↓
-                </a>
-              </div>
-            </div>
-          )}
-
-          {/* NPM TAB CONTENT */}
-          {selectedOS === "npm" && (
-            <div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#FFFFFF" }}>
-                  Global Node.js Package (Linux, macOS, Windows)
-                </span>
-                <span style={{ fontSize: 11, fontFamily: C.mono, color: C.greenLight }}>
-                  All Platforms
-                </span>
-              </div>
-
-              <div
-                style={{
-                  position: "relative",
-                  background: C.surfaceInput,
-                  borderRadius: 10,
-                  border: `1px solid ${C.border}`,
-                  padding: "16px 20px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <code
-                  style={{
-                    fontFamily: C.mono,
-                    fontSize: 13,
-                    color: "#DDF4CE",
-                    userSelect: "all",
-                  }}
-                >
-                  {npmCommand}
-                </code>
-
-                <button
-                  onClick={() => handleCopy(npmCommand, "npm")}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "7px 14px",
-                    borderRadius: 6,
-                    background: C.surfaceCard,
-                    border: `1px solid ${C.borderHover}`,
-                    color: copiedScript === "npm" ? C.greenBright : C.text,
-                    fontSize: 12,
-                    fontFamily: C.mono,
-                    cursor: "pointer",
-                  }}
-                >
-                  {copiedScript === "npm" ? (
-                    <>
-                      <Check size={14} color={C.greenBright} />
-                      <span>Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy size={14} />
-                      <span>Copy</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              <div style={{ marginTop: 16, fontSize: 12, color: C.textMuted }}>
-                Or run without installing: <code>npx unideploy scan</code>
-              </div>
-            </div>
-          )}
+          <div
+            style={{
+              background: C.surfaceInput,
+              borderRadius: 10,
+              padding: "16px 20px",
+              border: `1px solid ${C.border}`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              fontFamily: C.mono,
+              fontSize: 13,
+              color: C.greenLight,
+            }}
+          >
+            <code>npm install -g unideploy &amp;&amp; unideploy run script.py</code>
+            <button
+              onClick={() => handleCopy("npm install -g unideploy && unideploy run script.py", "cli-cmd")}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                background: C.surfaceCard,
+                border: `1px solid ${C.borderHover}`,
+                color: C.textSecondary,
+                padding: "6px 12px",
+                borderRadius: 6,
+                cursor: "pointer",
+                fontSize: 12,
+                fontFamily: C.font,
+              }}
+            >
+              {copiedCmd === "cli-cmd" ? <Check size={13} color={C.greenBright} /> : <Copy size={13} />}
+              <span>{copiedCmd === "cli-cmd" ? "Copied" : "Copy"}</span>
+            </button>
+          </div>
         </div>
       </section>
 
-      {/* ── How It Connects to Cloudflare Section ────────────────────── */}
+      {/* ── Paid Conversion Upgrade Banner ────────────────────────────── */}
       <section
         style={{
-          maxWidth: 860,
-          margin: "48px auto 0",
+          maxWidth: 1140,
+          margin: "0 auto",
           padding: "0 24px",
         }}
       >
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div
-            style={{
-              fontSize: 11,
-              fontFamily: C.mono,
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
-              color: C.greenLight,
-              marginBottom: 8,
-            }}
-          >
-            Seamless Machine Pairing
-          </div>
-          <h2
-            style={{
-              fontFamily: C.display,
-              fontSize: 24,
-              fontWeight: 800,
-              color: "#FFFFFF",
-              margin: 0,
-            }}
-          >
-            How Your Machine Connects to the Cloudflare Server
-          </h2>
-        </div>
-
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-            gap: 16,
+            background: "linear-gradient(135deg, rgba(20, 33, 22, 0.9) 0%, rgba(13, 20, 14, 0.9) 100%)",
+            border: `1.5px solid ${C.borderActive}`,
+            borderRadius: 16,
+            padding: "36px 36px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 24,
+            boxShadow: "0 16px 36px rgba(109, 184, 74, 0.12)",
           }}
         >
-          <div
-            style={{
-              background: C.surface,
-              borderRadius: 12,
-              border: `1px solid ${C.border}`,
-              padding: 20,
-            }}
-          >
-            <div
+          <div style={{ maxWidth: 640 }}>
+            <span
               style={{
+                fontSize: 11,
                 fontFamily: C.mono,
-                fontSize: 12,
                 fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
                 color: C.greenLight,
-                marginBottom: 8,
+                background: "rgba(109, 184, 74, 0.2)",
+                padding: "4px 10px",
+                borderRadius: 6,
+                display: "inline-block",
+                marginBottom: 10,
               }}
             >
-              01 · Authenticate
-            </div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#FFFFFF", marginBottom: 6 }}>
-              Run <code>unideploy auth</code>
-            </div>
-            <div style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.5 }}>
-              Your terminal generates a secure 6-digit session code and registers it on Cloudflare KV.
-            </div>
-          </div>
-
-          <div
-            style={{
-              background: C.surface,
-              borderRadius: 12,
-              border: `1px solid ${C.border}`,
-              padding: 20,
-            }}
-          >
-            <div
+              UNLOCK PERSISTENT CLOUD COMPUTE
+            </span>
+            <h3
               style={{
-                fontFamily: C.mono,
-                fontSize: 12,
-                fontWeight: 700,
-                color: C.greenLight,
-                marginBottom: 8,
+                fontFamily: C.display,
+                fontSize: 24,
+                fontWeight: 800,
+                color: "#FFFFFF",
+                margin: "0 0 10px",
               }}
             >
-              02 · Pair in Browser
-            </div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#FFFFFF", marginBottom: 6 }}>
-              Visit unideploy.in/connect
-            </div>
-            <div style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.5 }}>
-              Enter the 6-digit code in the dashboard. Cloudflare pairs your machine identity securely.
-            </div>
+              Save Custom Models, Persist Storage &amp; Deploy 24/7 APIs
+            </h3>
+            <p style={{ margin: 0, fontSize: 14, color: C.textSecondary, lineHeight: 1.6 }}>
+              Free users enjoy 3 daily microVM sessions and browser workspace saving. Upgrade to <strong>Starter (₹499/mo)</strong> for 20 compute hours and persistent filesystems, or <strong>Pro (₹1,499/mo)</strong> for 3 live deployed HTTPS endpoints with custom API keys. Instant checkout via UPI, RuPay, and Cards.
+            </p>
           </div>
 
-          <div
-            style={{
-              background: C.surface,
-              borderRadius: 12,
-              border: `1px solid ${C.border}`,
-              padding: 20,
-            }}
-          >
-            <div
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <Link
+              href="/pricing"
               style={{
-                fontFamily: C.mono,
-                fontSize: 12,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "12px 24px",
+                borderRadius: 10,
+                background: C.greenBright,
+                color: "#06230C",
+                fontSize: 14,
                 fontWeight: 700,
-                color: C.greenLight,
-                marginBottom: 8,
+                textDecoration: "none",
+                boxShadow: "0 4px 14px rgba(34, 197, 94, 0.3)",
               }}
             >
-              03 · Cloud Sandbox Ready
-            </div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#FFFFFF", marginBottom: 6 }}>
-              Deploy &amp; Execute
-            </div>
-            <div style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.5 }}>
-              Run scans, trigger E2B sandboxes, and apply auto-fixes orchestrated by Cloudflare Workers.
-            </div>
+              <span>View Plans from ₹499/mo</span>
+              <ArrowRight size={15} />
+            </Link>
+            <Link
+              href="/sandbox"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "12px 20px",
+                borderRadius: 10,
+                background: C.surfaceCard,
+                border: `1px solid ${C.borderHover}`,
+                color: "#FFFFFF",
+                fontSize: 14,
+                fontWeight: 600,
+                textDecoration: "none",
+              }}
+            >
+              <span>Try Web Sandbox</span>
+            </Link>
           </div>
-        </div>
-
-        {/* Action Link */}
-        <div style={{ textAlign: "center", marginTop: 40 }}>
-          <Link
-            href="/connect"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "12px 28px",
-              borderRadius: 999,
-              background: C.greenBright,
-              color: "#06230C",
-              fontSize: 14,
-              fontWeight: 700,
-              textDecoration: "none",
-              boxShadow: `0 4px 16px rgba(34, 197, 94, 0.3)`,
-            }}
-          >
-            <span>Ready to Pair? Go to Connect Page</span>
-            <ArrowRight size={16} />
-          </Link>
         </div>
       </section>
     </div>

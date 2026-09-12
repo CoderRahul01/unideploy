@@ -754,7 +754,8 @@ function DashboardContent() {
   const params = useSearchParams();
   const sessionId = params.get("session_id");
   const scanId = params.get("scan_id");
-  const paymentSuccess = params.get("payment") === "success";
+  const upgradedTier = params.get("upgraded");
+  const paymentSuccess = params.get("payment") === "success" || Boolean(upgradedTier);
   const paymentCancelled = params.get("payment") === "cancelled";
 
   const [user, setUser] = useState<AuthResponse | null>(null);
@@ -763,8 +764,7 @@ function DashboardContent() {
     getCurrentUser().then(setUser).catch(() => {});
   }, []);
 
-  // After a successful payment the DODO webhook may take a few seconds to fire.
-  // Poll up to 5× (every 2 s) until the plan tier upgrades away from Free.
+  // After a successful payment or upgrade param, update user state
   useEffect(() => {
     if (!paymentSuccess) return;
     let attempts = 0;
@@ -783,30 +783,48 @@ function DashboardContent() {
     return () => clearInterval(id);
   }, [paymentSuccess]);
 
+  const displayedTokens = user?.tokens_remaining ?? (
+    user?.plan_tier === "Starter" ? 500000 :
+    user?.plan_tier === "Pro" ? 2500000 :
+    user?.plan_tier === "Team" ? 10000000 : 50000
+  );
+
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text }}>
       {/* Top Bar */}
       {user && (
-        <div style={{ background: C.surface, padding: "10px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, fontFamily: C.mono }}>
-          <div>
-            <span style={{ color: C.muted }}>User: </span>
-            <span style={{ color: C.text }}>{user.email}</span>
-          </div>
+        <div style={{ background: C.surface, padding: "10px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, fontSize: 13, fontFamily: C.mono }}>
           <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+            <div>
+              <span style={{ color: C.muted }}>User: </span>
+              <span style={{ color: C.text }}>{user.email}</span>
+            </div>
             <div>
               <span style={{ color: C.muted }}>Tier: </span>
               <span style={{ color: C.green, fontWeight: 700, padding: "2px 8px", background: `${C.green}11`, borderRadius: 4, border: `1px solid ${C.green}33` }}>{user.plan_tier}</span>
             </div>
+          </div>
+          <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
             <div>
-              <span style={{ color: C.muted }}>Scans Left: </span>
-              <span style={{ color: C.text, fontWeight: 700 }}>{user.scans_remaining}</span>
+              <span style={{ color: C.muted }}>Compute Tokens: </span>
+              <span style={{ color: "#86EFAC", fontWeight: 700 }}>{displayedTokens.toLocaleString()}</span>
             </div>
+            <Link
+              href="/sandbox"
+              style={{
+                background: "#22C55E", color: "#0B0F0C", padding: "5px 14px",
+                borderRadius: 6, fontSize: 12, fontWeight: 700,
+                textDecoration: "none", fontFamily: C.font, letterSpacing: "0.02em",
+              }}
+            >
+              Open Web Sandbox →
+            </Link>
             {user.plan_tier === "Free" && (
               <Link
                 href="/pricing"
                 style={{
-                  background: "#1D9E75", color: "#fff", padding: "5px 14px",
-                  borderRadius: 6, fontSize: 12, fontWeight: 700,
+                  background: "transparent", color: "#86EFAC", padding: "5px 14px",
+                  borderRadius: 6, fontSize: 12, fontWeight: 700, border: "1px solid rgba(109, 184, 74, 0.4)",
                   textDecoration: "none", fontFamily: C.font, letterSpacing: "0.02em",
                 }}
               >
@@ -824,24 +842,24 @@ function DashboardContent() {
           padding: "10px 24px", display: "flex", justifyContent: "space-between", alignItems: "center",
           flexWrap: "wrap", gap: 8,
         }}>
-          <span style={{ fontSize: 13, color: "#4a7a5a" }}>
-            Free plan · auto-fixes, unlimited projects and priority scans are on paid plans
+          <span style={{ fontSize: 13, color: "#86EFAC" }}>
+            Free trial active · 50,000 compute tokens. Persistent microVM filesystems and model API endpoints unlock on Starter (₹499/mo) and Pro (₹1,499/mo).
           </span>
-          <Link href="/pricing" style={{ fontSize: 12, color: "#1D9E75", textDecoration: "none", fontWeight: 600, fontFamily: C.mono }}>
-            View plans →
+          <Link href="/pricing" style={{ fontSize: 12, color: "#22C55E", textDecoration: "none", fontWeight: 700, fontFamily: C.mono }}>
+            View Plans &amp; Pricing →
           </Link>
         </div>
       )}
 
       {paymentSuccess && (
-        <div style={{ background: `${C.green}1A`, color: C.green, textAlign: "center", padding: "12px", fontSize: 14, fontWeight: 600, borderBottom: `1px solid ${C.green}33` }}>
-          ✓ Payment successful — your plan has been upgraded. Scans remaining updated.
+        <div style={{ background: "rgba(34, 197, 94, 0.12)", color: "#86EFAC", textAlign: "center", padding: "12px 24px", fontSize: 14, fontWeight: 600, borderBottom: "1px solid rgba(34, 197, 94, 0.3)" }}>
+          ✓ Payment successful! Your account has been upgraded to {upgradedTier || user?.plan_tier || "paid plan"}. Compute credits and isolated microVM hours have been credited.
         </div>
       )}
 
       {paymentCancelled && (
         <div style={{ background: `${C.red}1A`, color: C.red, textAlign: "center", padding: "12px", fontSize: 14, fontWeight: 600, borderBottom: `1px solid ${C.red}33`, display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
-          <span>Payment was not completed. You remain on the Free plan.</span>
+          <span>Payment was not completed. You remain on the Free trial tier.</span>
           <Link href="/pricing" style={{ color: C.red, fontSize: 13, textDecoration: "underline" }}>Try again →</Link>
         </div>
       )}

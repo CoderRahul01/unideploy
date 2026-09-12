@@ -34,27 +34,24 @@ export default function AnnouncementBar() {
           letterSpacing: "0.01em",
         }}
       >
-        UniDeploy Cloud is live · Managed Cloud Sandboxes & Zero-Config Deployments · Claim your free tier
+        ⚡ Instant Python &amp; AI Cloud Sandboxes in &lt; 2s · 50,000 Free Trial Tokens · Zero Local Setup
       </span>
-      <button
-        data-cal-link="rahulpandey187/unideploy-demo"
-        data-cal-namespace="unideploy-demo"
-        data-cal-config='{"layout":"month_view"}'
+      <a
+        href="/sandbox"
         style={{
           background: "#1D9E75",
           color: "#fff",
-          border: "none",
           borderRadius: 4,
           padding: "3px 12px",
           fontSize: 12,
           fontWeight: 500,
-          cursor: "pointer",
+          textDecoration: "none",
           fontFamily: "var(--font-body), DM Sans, sans-serif",
           flexShrink: 0,
         }}
       >
-        Book now
-      </button>
+        Try Sandbox
+      </a>
       <button
         onClick={() => {
           setVisible(false);

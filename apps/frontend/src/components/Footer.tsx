@@ -117,7 +117,7 @@ export default function Footer() {
               maxWidth: 200,
             }}
           >
-            UniDeploy · unideploy.in · E2B Cloud Sandboxes & Open Source SaaS.
+            UniDeploy · unideploy.in · Cloud MicroVM Sandboxes & Open Source SaaS.
           </p>
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
             <a

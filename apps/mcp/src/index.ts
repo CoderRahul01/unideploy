@@ -152,7 +152,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "run_sandbox_code",
       description:
-        "Execute Python or JavaScript code inside an isolated E2B cloud microVM sandbox. Returns stdout, stderr, execution duration, and image artifacts if charts were generated.",
+        "Execute Python or JavaScript code inside an isolated UniDeploy cloud microVM sandbox. Returns stdout, stderr, execution duration, and image artifacts if charts were generated.",
       inputSchema: {
         type: "object",
         properties: {

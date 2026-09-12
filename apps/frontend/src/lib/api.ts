@@ -191,6 +191,7 @@ export interface AuthResponse {
   email?: string;
   plan_tier: string;
   scans_remaining: number;
+  tokens_remaining?: number;
 }
 
 export async function loginUser(email: string, password: string): Promise<AuthResponse> {

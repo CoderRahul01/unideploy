@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     "Google Colab alternative",
     "AI model deployment",
     "microVM sandboxes",
-    "E2B Firecracker",
+    "Firecracker microVMs",
     "Python data science",
     "serverless AI endpoints",
     "developer marketplace",
