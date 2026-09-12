@@ -21,19 +21,19 @@ export interface SandboxTemplate {
 export const TEMPLATES: SandboxTemplate[] = [
   {
     id: "colab-python",
-    name: "Google Colab Alternative (Python 3.11)",
+    name: "Google Colab Alternative (Python Data Science)",
     badge: "Persistent MicroVM",
     category: "data",
     language: "python",
     description:
-      "Persistent Python 3.11 data science stack with NumPy, Pandas, and Matplotlib. Never randomly disconnects or drops kernel state. Renders high-DPI charts directly in your browser.",
+      "Persistent Python data science stack with NumPy, Pandas, and Matplotlib. Never randomly disconnects or drops kernel state. Renders high-DPI charts directly in your browser.",
     specs: { cpu: "2 vCPUs", ram: "2 GB", os: "Debian 13 Firecracker" },
     outputType: "chart",
     starterCode: `import matplotlib.pyplot as plt
 import numpy as np
 
-# UniDeploy Cloud Sandbox - Persistent Python 3.11 Data Science Kernel
-# Unlike Google Colab, your execution state never disconnects unexpectedly.
+# UniDeploy Cloud Sandbox — Persistent Python Data Science Kernel
+# Unlike Google Colab, your execution state never disconnects unexpectedly mid-analysis.
 
 time_steps = np.linspace(0, 10, 100)
 signal = np.sin(time_steps) * np.exp(-0.1 * time_steps)
@@ -60,13 +60,90 @@ print("Status: Kernel session active and persistent across re-runs.")
 `,
   },
   {
+    id: "agent-code-interpreter",
+    name: "AI Agent Code Interpreter (Tool Execution)",
+    badge: "OpenAI / Claude Tool",
+    category: "automation",
+    language: "python",
+    description:
+      "Safe sandboxed code execution for AI agents built with LangChain, CrewAI, AutoGen, or OpenAI function calling. Executes arbitrary LLM code with 0 security risk to host servers.",
+    specs: { cpu: "2 vCPUs", ram: "2 GB", os: "Debian 13 Firecracker" },
+    outputType: "json",
+    starterCode: `import json
+import math
+
+# AI Agent Code Interpreter Simulation
+# Safe execution harness for LLM function calling and autonomous agents
+
+def execute_agent_task(query: str, raw_data: list):
+    """
+    Computes statistical indicators and forecasts from dynamic agent queries.
+    Safely executed inside an isolated UniDeploy microVM.
+    """
+    n = len(raw_data)
+    mean_val = sum(raw_data) / n
+    variance = sum((x - mean_val) ** 2 for x in raw_data) / n
+    std_dev = math.sqrt(variance)
+    
+    # 3-period moving average forecast
+    moving_avg = [sum(raw_data[i:i+3])/3 for i in range(len(raw_data)-2)]
+    
+    return {
+        "query": query,
+        "sample_size": n,
+        "mean": round(mean_val, 2),
+        "std_dev": round(std_dev, 2),
+        "latest_forecast": round(moving_avg[-1], 2),
+        "execution_status": "COMPLETED_ISOLATED",
+        "sandbox_isolation": "MicroVM (Zero Host Access)"
+    }
+
+# Agent receives unstructured numbers from user prompt
+sample_dataset = [1240, 1380, 1420, 1590, 1720, 1680, 1850, 1990, 2150]
+result = execute_agent_task("Analyze Q3 token usage surge and project Q4 baseline", sample_dataset)
+
+print(json.dumps(result, indent=2))
+`,
+  },
+  {
+    id: "agent-scraper",
+    name: "Headless Web Scraper & RAG Ingestion",
+    badge: "ETL / RAG Pipeline",
+    category: "automation",
+    language: "python",
+    description:
+      "Overcomes Vercel and Cloudflare Worker serverless timeouts. Scrapes dynamic web endpoints, parses meta tags, and outputs clean markdown for LLM ingestion.",
+    specs: { cpu: "2 vCPUs", ram: "2 GB", os: "Debian 13 Firecracker" },
+    outputType: "text",
+    starterCode: `import urllib.request
+import re
+
+url = "https://news.ycombinator.com"
+req = urllib.request.Request(url, headers={'User-Agent': 'UniDeploySandbox/1.0'})
+
+with urllib.request.urlopen(req) as response:
+    html = response.read().decode('utf-8')
+    headers = dict(response.info())
+
+# Extract titles from Hacker News frontpage
+titles = re.findall(r'<span class="titleline"><a [^>]*>([^<]+)</a>', html)
+
+print(f"Target: {url}")
+print(f"HTTP Status: 200 OK | Content Length: {len(html):,} bytes")
+print(f"Server: {headers.get('Server', 'Unknown')}")
+print("\\nTop 5 Stories:")
+for i, title in enumerate(titles[:5], 1):
+    print(f" {i}. {title}")
+`,
+  },
+  {
     id: "model-deploy",
-    name: "AI Model & Agent Serverless Deployment",
+    name: "1-Click Script-to-API Microservice Deployment",
     badge: "Instant API Key",
     category: "automation",
     language: "python",
     description:
-      "Deploy custom AI agents, pipelines, or inference logic into an isolated microVM. Exposes a live HTTP endpoint with bearer API key authentication.",
+      "Turn any Python script or model inference logic into a live HTTPS microservice. Returns a production URL and authenticated API key in under 5 seconds.",
     specs: { cpu: "2 vCPUs", ram: "2 GB", os: "Debian 13 Firecracker" },
     outputType: "json",
     starterCode: `import json
@@ -98,47 +175,13 @@ print(json.dumps(deployment, indent=2))
 `,
   },
   {
-    id: "node-runtime",
-    name: "Node.js 20 & High-Concurrency Backend",
-    badge: "Fastest Sub-Second",
-    category: "fullstack",
-    language: "js",
-    description:
-      "Modern JavaScript engine with async/await, crypto, and ES modules for microservices, webhooks, and backend algorithms.",
-    specs: { cpu: "2 vCPUs", ram: "2 GB", os: "Debian 13 Firecracker" },
-    outputType: "text",
-    starterCode: `// High-performance token and signature generation
-const crypto = require('crypto');
-
-function generateSecureSession(tenantId) {
-  const nonce = crypto.randomBytes(16).toString('hex');
-  const timestamp = Date.now();
-  const hash = crypto.createHmac('sha256', 'unideploy_e2b_secret')
-                     .update(\`\${tenantId}:\${nonce}:\${timestamp}\`)
-                     .digest('hex');
-
-  return {
-    tenantId,
-    token: \`uni_sbx_\${hash.slice(0, 24)}\`,
-    issuedAt: new Date(timestamp).toISOString(),
-    sandboxRegion: 'in-mumbai-firecracker',
-    status: 'allocated'
-  };
-}
-
-const sessions = ['acme-corp', 'fintech-agent', 'model-service'].map(generateSecureSession);
-console.log('Allocated MicroVM Sessions:');
-console.table(sessions);
-`,
-  },
-  {
     id: "cloud-terminal",
-    name: "Linux Cloud Terminal (Bash)",
-    badge: "Root Shell",
+    name: "Linux Cloud Terminal (Root Bash)",
+    badge: "Disposable Shell",
     category: "terminal",
     language: "bash",
     description:
-      "Disposable Ubuntu/Debian microVM bash terminal with curl, git, python, and node pre-installed.",
+      "Disposable Ubuntu/Debian microVM bash terminal with curl, git, python, and node. Completely isolated for testing untrusted scripts and curls.",
     specs: { cpu: "2 vCPUs", ram: "2 GB", os: "Debian 13 Firecracker" },
     outputType: "text",
     starterCode: `# Inspect the microVM environment
@@ -156,44 +199,13 @@ git --version
 curl --version | head -n 1
 `,
   },
-  {
-    id: "agent-scraper",
-    name: "Autonomous Web Scraper & Ingestion Pipeline",
-    badge: "ETL / RAG",
-    category: "automation",
-    language: "python",
-    description:
-      "Scrapes remote web endpoints, parses meta tags, open graph metadata, and extracts clean markdown for LLM ingestion.",
-    specs: { cpu: "2 vCPUs", ram: "2 GB", os: "Debian 13 Firecracker" },
-    outputType: "text",
-    starterCode: `import urllib.request
-import re
-
-url = "https://news.ycombinator.com"
-req = urllib.request.Request(url, headers={'User-Agent': 'UniDeploySandbox/1.0'})
-
-with urllib.request.urlopen(req) as response:
-    html = response.read().decode('utf-8')
-    headers = dict(response.info())
-
-# Extract titles from Hacker News frontpage
-titles = re.findall(r'<span class="titleline"><a [^>]*>([^<]+)</a>', html)
-
-print(f"Target: {url}")
-print(f"HTTP Status: 200 OK | Content Length: {len(html):,} bytes")
-print(f"Server: {headers.get('Server', 'Unknown')}")
-print("\\nTop 5 Stories:")
-for i, title in enumerate(titles[:5], 1):
-    print(f" {i}. {title}")
-`,
-  },
 ];
 
 export async function GET() {
   return NextResponse.json(
     {
       service: "UniDeploy Sandbox Marketplace",
-      provider: "E2B Firecracker microVMs",
+      provider: "UniDeploy Isolated MicroVMs",
       templates: TEMPLATES,
     },
     {

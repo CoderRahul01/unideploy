@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Play,
   RotateCcw,
@@ -22,7 +23,10 @@ import {
   Zap,
   Globe,
   Lock,
-  Boxes
+  Boxes,
+  X,
+  CreditCard,
+  CheckCircle2,
 } from "lucide-react";
 import { TEMPLATES, SandboxTemplate } from "@/app/api/sandbox/templates/route";
 
@@ -54,6 +58,7 @@ const C = {
 };
 
 export default function SandboxPage() {
+  const router = useRouter();
   const [selectedTemplate, setSelectedTemplate] = useState<SandboxTemplate>(TEMPLATES[0]);
   const [code, setCode] = useState<string>(TEMPLATES[0].starterCode);
   const [language, setLanguage] = useState<"python" | "js" | "bash">(TEMPLATES[0].language);
@@ -62,6 +67,36 @@ export default function SandboxPage() {
   const [activeTab, setActiveTab] = useState<"console" | "visuals" | "export">("console");
   const [exportLang, setExportLang] = useState<"curl" | "python" | "ts" | "mcp">("curl");
   const [copied, setCopied] = useState<boolean>(false);
+
+  // Daily Free Quota Tracking (3 runs / day)
+  const [runsLeft, setRunsLeft] = useState<number>(3);
+
+  // Upgrade Modal State
+  const [upgradeModal, setUpgradeModal] = useState<{
+    open: boolean;
+    title: string;
+    subtitle: string;
+    highlightTier: "starter" | "pro";
+  } | null>(null);
+
+  // Initialize quota from localStorage
+  useEffect(() => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const stored = localStorage.getItem("unideploy_sbx_quota");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.date === today && typeof parsed.runsLeft === "number") {
+          setRunsLeft(parsed.runsLeft);
+          return;
+        }
+      }
+      localStorage.setItem("unideploy_sbx_quota", JSON.stringify({ date: today, runsLeft: 3 }));
+      setRunsLeft(3);
+    } catch {
+      setRunsLeft(3);
+    }
+  }, []);
 
   // Execution Result State
   const [executionResult, setExecutionResult] = useState<{
@@ -97,6 +132,19 @@ export default function SandboxPage() {
 
   const handleRunSandbox = async () => {
     if (isRunning) return;
+
+    // Check daily quota
+    if (runsLeft <= 0) {
+      setUpgradeModal({
+        open: true,
+        title: "Daily Free MicroVM Quota Reached",
+        subtitle:
+          "You have used your 3 free cloud sessions today. Unlock 20 hours of persistent compute on the Starter plan for ₹499/month (~$6) with instant UPI or card checkout.",
+        highlightTier: "starter",
+      });
+      return;
+    }
+
     setIsRunning(true);
     setExecutionResult(null);
 
@@ -115,6 +163,16 @@ export default function SandboxPage() {
 
       const data = await res.json();
       setExecutionResult(data);
+
+      // Decrement daily quota on run
+      setRunsLeft((prev) => {
+        const next = Math.max(0, prev - 1);
+        try {
+          const today = new Date().toISOString().slice(0, 10);
+          localStorage.setItem("unideploy_sbx_quota", JSON.stringify({ date: today, runsLeft: next }));
+        } catch {}
+        return next;
+      });
 
       if (data.results && data.results.some((r: any) => r.type.startsWith("image/"))) {
         setActiveTab("visuals");
@@ -278,7 +336,7 @@ console.log(result.stdout);`;
             </span>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div
               style={{
                 display: "inline-flex",
@@ -303,8 +361,39 @@ console.log(result.stdout);`;
                   display: "inline-block",
                 }}
               />
-              <span>$20,000 E2B Sandbox Pool Active</span>
+              <span>Dedicated MicroVM Compute Pool Active</span>
             </div>
+
+            {/* Daily Free Runs Badge & Upgrade Trigger */}
+            <button
+              onClick={() =>
+                setUpgradeModal({
+                  open: true,
+                  title: "Unlock Unlimited MicroVM Compute",
+                  subtitle:
+                    "Starter includes 20 compute hours, persistent files, and 5-minute timeouts with instant UPI or Card checkout.",
+                  highlightTier: "starter",
+                })
+              }
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "5px 12px",
+                borderRadius: 999,
+                background: runsLeft > 0 ? "rgba(109, 184, 74, 0.12)" : "rgba(255, 107, 107, 0.15)",
+                border: `1px solid ${runsLeft > 0 ? "rgba(109, 184, 74, 0.3)" : "rgba(255, 107, 107, 0.3)"}`,
+                fontSize: 12,
+                color: runsLeft > 0 ? C.greenLight : C.red,
+                fontFamily: C.mono,
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+              title="Click to upgrade quota"
+            >
+              <Zap size={13} color={runsLeft > 0 ? C.greenLight : C.red} />
+              <span>{runsLeft}/3 Free Daily Runs</span>
+            </button>
 
             <Link
               href="/download"
@@ -376,7 +465,7 @@ console.log(result.stdout);`;
               }}
             >
               <Sparkles size={14} color={C.greenLight} />
-              <span>Firecracker MicroVMs · Zero Setup Compute</span>
+              <span>Isolated MicroVMs · Zero Local Setup</span>
             </div>
             <h1
               style={{
@@ -389,7 +478,7 @@ console.log(result.stdout);`;
                 margin: 0,
               }}
             >
-              Agent Environment Marketplace &amp; Sandbox
+              Cloud MicroVM Sandbox &amp; Python Runner
             </h1>
             <p
               style={{
@@ -400,8 +489,8 @@ console.log(result.stdout);`;
                 lineHeight: 1.6,
               }}
             >
-              Run Python, Node.js, and Linux Bash commands in sub-second disposable microVMs.
-              Render Matplotlib charts directly, run AI agent workflows, or integrate via REST API and MCP.
+              Run Python, data science scripts, and AI code in isolated cloud microVMs booting in under 2 seconds.
+              Renders high-DPI charts directly in your browser, stays persistent without random disconnects, and exports to live APIs with 1 click.
             </p>
           </div>
 
@@ -616,6 +705,39 @@ console.log(result.stdout);`;
               </div>
 
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button
+                  onClick={() =>
+                    setUpgradeModal({
+                      open: true,
+                      title: "Persistent MicroVM State & Memory",
+                      subtitle:
+                        "Keep installed pip/npm packages, cached datasets, and Python memory alive across re-runs. Available on the Starter tier (₹499/mo) with instant UPI checkout.",
+                      highlightTier: "starter",
+                    })
+                  }
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                    padding: "4px 10px",
+                    borderRadius: 6,
+                    background: "rgba(109, 184, 74, 0.08)",
+                    border: `1px solid rgba(109, 184, 74, 0.25)`,
+                    color: C.greenLight,
+                    fontSize: 11,
+                    fontFamily: C.mono,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                  title="Persist memory and filesystem state across re-runs"
+                >
+                  <Lock size={12} color={C.greenLight} />
+                  <span>Persist State</span>
+                  <span style={{ fontSize: 9, opacity: 0.75, background: "rgba(109, 184, 74, 0.2)", padding: "1px 4px", borderRadius: 3 }}>
+                    ₹499
+                  </span>
+                </button>
+
                 <select
                   value={language}
                   onChange={(e) => setLanguage(e.target.value as any)}
@@ -734,53 +856,122 @@ console.log(result.stdout);`;
                   <span>2 vCPUs · 2GB RAM</span>
                 </span>
                 <span style={{ color: C.border }}>|</span>
-                <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <button
+                  onClick={() =>
+                    setUpgradeModal({
+                      open: true,
+                      title: "Extended Execution Timeouts",
+                      subtitle:
+                        "Free sandboxes have a 30-second ceiling. Upgrade to Starter (₹499/mo) or Pro for 5-minute to 1-hour sustained microVM execution.",
+                      highlightTier: "starter",
+                    })
+                  }
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    color: C.textMuted,
+                    fontFamily: C.mono,
+                    fontSize: 12,
+                    cursor: "pointer",
+                  }}
+                  title="Click to unlock 5-minute to 1-hour timeouts"
+                >
                   <Timer size={14} color={C.amber} />
-                  <span>30s Timeout Ceiling</span>
-                </span>
+                  <span style={{ textDecoration: "underline", textDecorationStyle: "dotted" }}>
+                    30s Timeout Ceiling
+                  </span>
+                </button>
               </div>
 
-              <button
-                onClick={handleRunSandbox}
-                disabled={isRunning}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "10px 22px",
-                  borderRadius: 10,
-                  background: isRunning ? "#273822" : C.greenBright,
-                  color: isRunning ? C.greenLight : "#06230C",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  border: "none",
-                  cursor: isRunning ? "not-allowed" : "pointer",
-                  boxShadow: isRunning ? "none" : `0 4px 16px rgba(34, 197, 94, 0.35)`,
-                  transition: "all 0.15s ease",
-                }}
-              >
-                {isRunning ? (
-                  <>
-                    <span
-                      style={{
-                        width: 14,
-                        height: 14,
-                        border: "2px solid #86EFAC",
-                        borderTopColor: "transparent",
-                        borderRadius: "50%",
-                        display: "inline-block",
-                        animation: "spin 0.8s linear infinite",
-                      }}
-                    />
-                    <span>Running ({Math.round(elapsedTime / 100) / 10}s)...</span>
-                  </>
-                ) : (
-                  <>
-                    <Play size={14} fill="#06230C" />
-                    <span>Run in Cloud Sandbox</span>
-                  </>
-                )}
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button
+                  onClick={() =>
+                    setUpgradeModal({
+                      open: true,
+                      title: "Deploy Live HTTPS Endpoint",
+                      subtitle:
+                        "Turn this script into an authenticated production HTTP microservice with dedicated bearer API keys, auto-scaling, and uptime monitoring on the Pro plan (₹1,499/mo).",
+                      highlightTier: "pro",
+                    })
+                  }
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "10px 16px",
+                    borderRadius: 10,
+                    background: C.surface,
+                    border: `1px solid ${C.borderHover}`,
+                    color: C.text,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                  title="Deploy as permanent live API"
+                >
+                  <Globe size={14} color={C.greenLight} />
+                  <span>Deploy as Live API</span>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      background: "rgba(109, 184, 74, 0.2)",
+                      color: C.greenLight,
+                      padding: "2px 6px",
+                      borderRadius: 4,
+                      fontFamily: C.mono,
+                    }}
+                  >
+                    PRO
+                  </span>
+                </button>
+
+                <button
+                  onClick={handleRunSandbox}
+                  disabled={isRunning}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "10px 22px",
+                    borderRadius: 10,
+                    background: isRunning ? "#273822" : C.greenBright,
+                    color: isRunning ? C.greenLight : "#06230C",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    border: "none",
+                    cursor: isRunning ? "not-allowed" : "pointer",
+                    boxShadow: isRunning ? "none" : `0 4px 16px rgba(34, 197, 94, 0.35)`,
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {isRunning ? (
+                    <>
+                      <span
+                        style={{
+                          width: 14,
+                          height: 14,
+                          border: "2px solid #86EFAC",
+                          borderTopColor: "transparent",
+                          borderRadius: "50%",
+                          display: "inline-block",
+                          animation: "spin 0.8s linear infinite",
+                        }}
+                      />
+                      <span>Running ({Math.round(elapsedTime / 100) / 10}s)...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play size={14} fill="#06230C" />
+                      <span>Run in Cloud Sandbox</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1321,10 +1512,107 @@ console.log(result.stdout);`;
           </div>
         </div>
 
+        {/* ── High-Converting Subscription Banner ────────────────────── */}
+        <div
+          style={{
+            marginTop: 40,
+            padding: "28px 32px",
+            borderRadius: 14,
+            background: "linear-gradient(135deg, rgba(18, 28, 19, 0.95) 0%, rgba(13, 20, 14, 0.95) 100%)",
+            border: `1px solid ${C.borderHover}`,
+            boxShadow: "0 12px 32px rgba(0, 0, 0, 0.35)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 24,
+          }}
+        >
+          <div style={{ maxWidth: 640 }}>
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 11,
+                fontFamily: C.mono,
+                fontWeight: 700,
+                color: C.greenLight,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                marginBottom: 8,
+              }}
+            >
+              <Zap size={13} color={C.greenLight} />
+              <span>Upgrade to Production Compute</span>
+            </div>
+            <h3
+              style={{
+                fontFamily: C.display,
+                fontSize: 22,
+                fontWeight: 800,
+                color: "#FFFFFF",
+                margin: "0 0 8px",
+                letterSpacing: "-0.02em",
+              }}
+            >
+              Need Persistent Files, Custom Packages &amp; Live API Endpoints?
+            </h3>
+            <p style={{ margin: 0, fontSize: 14, color: C.textSecondary, lineHeight: 1.6 }}>
+              Unlock 20 compute hours, persistent kernels that never wipe your memory, and 1-click model API deployments.
+              Tailored for Indian and global developers with instant UPI, RuPay &amp; Card checkout via Dodo Payments.
+            </p>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <button
+              onClick={() =>
+                setUpgradeModal({
+                  open: true,
+                  title: "Upgrade to Starter MicroVM Compute",
+                  subtitle:
+                    "Get 20 hours of persistent microVM compute, 500k tokens, and live endpoints for ₹499/month (~$6). Instant UPI & Card checkout.",
+                  highlightTier: "starter",
+                })
+              }
+              style={{
+                padding: "12px 24px",
+                borderRadius: 10,
+                background: C.greenBright,
+                color: "#06230C",
+                fontSize: 14,
+                fontWeight: 700,
+                border: "none",
+                cursor: "pointer",
+                boxShadow: "0 4px 16px rgba(34, 197, 94, 0.3)",
+                transition: "all 0.15s ease",
+              }}
+            >
+              Get Starter for ₹499/mo
+            </button>
+            <Link
+              href="/pricing"
+              style={{
+                padding: "12px 20px",
+                borderRadius: 10,
+                background: C.surfaceCard,
+                border: `1px solid ${C.border}`,
+                color: C.textSecondary,
+                fontSize: 14,
+                fontWeight: 600,
+                textDecoration: "none",
+                transition: "all 0.15s ease",
+              }}
+            >
+              Compare All Plans
+            </Link>
+          </div>
+        </div>
+
         {/* ── Value Proposition Cards at the Bottom ─────────────────── */}
         <div
           style={{
-            marginTop: 48,
+            marginTop: 32,
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
             gap: 16,
@@ -1421,6 +1709,293 @@ console.log(result.stdout);`;
           </div>
         </div>
       </main>
+
+      {/* ── Interactive Upgrade Modal (Dodo Payments / Pricing) ──────── */}
+      {upgradeModal?.open && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 100,
+            background: "rgba(0, 0, 0, 0.75)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+          onClick={() => setUpgradeModal(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: 680,
+              background: C.surface,
+              borderRadius: 16,
+              border: `1px solid ${C.borderHover}`,
+              boxShadow: "0 24px 64px rgba(0, 0, 0, 0.8), 0 0 32px rgba(109, 184, 74, 0.15)",
+              overflow: "hidden",
+            }}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: "20px 24px",
+                borderBottom: `1px solid ${C.border}`,
+                background: C.surfaceCard,
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+                gap: 16,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontSize: 11,
+                    fontFamily: C.mono,
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    color: C.greenLight,
+                    marginBottom: 6,
+                  }}
+                >
+                  <Sparkles size={13} color={C.greenLight} />
+                  <span>Production Cloud MicroVMs</span>
+                </div>
+                <h3
+                  style={{
+                    fontFamily: C.display,
+                    fontSize: 20,
+                    fontWeight: 800,
+                    color: "#FFFFFF",
+                    margin: 0,
+                    letterSpacing: "-0.02em",
+                  }}
+                >
+                  {upgradeModal.title}
+                </h3>
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: C.textSecondary,
+                    margin: "6px 0 0",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {upgradeModal.subtitle}
+                </p>
+              </div>
+
+              <button
+                onClick={() => setUpgradeModal(null)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: C.textMuted,
+                  cursor: "pointer",
+                  padding: 6,
+                  borderRadius: 6,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                aria-label="Close modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body: Side-by-Side Tier Selection */}
+            <div
+              style={{
+                padding: 24,
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                gap: 16,
+              }}
+            >
+              {/* Starter Tier Card */}
+              <div
+                style={{
+                  padding: 20,
+                  borderRadius: 12,
+                  background: upgradeModal.highlightTier === "starter" ? "rgba(22, 33, 22, 0.9)" : C.surfaceCard,
+                  border: upgradeModal.highlightTier === "starter" ? `1.5px solid ${C.greenBright}` : `1px solid ${C.border}`,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#FFFFFF" }}>Starter Tier</span>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontFamily: C.mono,
+                        fontWeight: 700,
+                        color: C.greenLight,
+                        background: "rgba(109, 184, 74, 0.15)",
+                        padding: "2px 8px",
+                        borderRadius: 4,
+                      }}
+                    >
+                      POPULAR
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 12 }}>
+                    <span style={{ fontSize: 26, fontWeight: 800, color: "#FFFFFF", fontFamily: C.display }}>₹499</span>
+                    <span style={{ fontSize: 13, color: C.textMuted }}>/ month (~$6)</span>
+                  </div>
+                  <ul style={{ margin: "0 0 16px", paddingLeft: 0, listStyle: "none", fontSize: 12, color: C.textSecondary, lineHeight: 2 }}>
+                    <li style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <CheckCircle2 size={13} color={C.greenBright} /> 20 Compute Hours on MicroVMs
+                    </li>
+                    <li style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <CheckCircle2 size={13} color={C.greenBright} /> Persistent memory &amp; file storage
+                    </li>
+                    <li style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <CheckCircle2 size={13} color={C.greenBright} /> 5-minute sustained execution timeout
+                    </li>
+                    <li style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <CheckCircle2 size={13} color={C.greenBright} /> 1 deployed model API endpoint
+                    </li>
+                    <li style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <CheckCircle2 size={13} color={C.greenBright} /> Instant UPI, RuPay &amp; Card checkout
+                    </li>
+                  </ul>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setUpgradeModal(null);
+                    router.push("/pricing");
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "10px 16px",
+                    borderRadius: 8,
+                    background: C.greenBright,
+                    color: "#06230C",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    border: "none",
+                    cursor: "pointer",
+                    boxShadow: "0 2px 8px rgba(34, 197, 94, 0.25)",
+                  }}
+                >
+                  Upgrade to Starter — ₹499
+                </button>
+              </div>
+
+              {/* Pro Tier Card */}
+              <div
+                style={{
+                  padding: 20,
+                  borderRadius: 12,
+                  background: upgradeModal.highlightTier === "pro" ? "rgba(22, 33, 22, 0.9)" : C.surfaceCard,
+                  border: upgradeModal.highlightTier === "pro" ? `1.5px solid ${C.greenBright}` : `1px solid ${C.border}`,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#FFFFFF" }}>Pro Tier</span>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontFamily: C.mono,
+                        fontWeight: 700,
+                        color: C.amber,
+                        background: "rgba(240, 168, 48, 0.15)",
+                        padding: "2px 8px",
+                        borderRadius: 4,
+                      }}
+                    >
+                      AGENTS &amp; APIS
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 12 }}>
+                    <span style={{ fontSize: 26, fontWeight: 800, color: "#FFFFFF", fontFamily: C.display }}>₹1,499</span>
+                    <span style={{ fontSize: 13, color: C.textMuted }}>/ month (~$18)</span>
+                  </div>
+                  <ul style={{ margin: "0 0 16px", paddingLeft: 0, listStyle: "none", fontSize: 12, color: C.textSecondary, lineHeight: 2 }}>
+                    <li style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <CheckCircle2 size={13} color={C.greenBright} /> 80 Compute Hours on MicroVMs
+                    </li>
+                    <li style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <CheckCircle2 size={13} color={C.greenBright} /> 3 live deployed API endpoints + keys
+                    </li>
+                    <li style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <CheckCircle2 size={13} color={C.greenBright} /> Unlimited disposable sandboxes
+                    </li>
+                    <li style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <CheckCircle2 size={13} color={C.greenBright} /> Priority compute queue (&lt; 1.2s boot)
+                    </li>
+                    <li style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <CheckCircle2 size={13} color={C.greenBright} /> Full MCP agent tools integration
+                    </li>
+                  </ul>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setUpgradeModal(null);
+                    router.push("/pricing");
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "10px 16px",
+                    borderRadius: 8,
+                    background: C.surface,
+                    border: `1px solid ${C.borderHover}`,
+                    color: "#FFFFFF",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Get Pro — ₹1,499
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div
+              style={{
+                padding: "12px 24px",
+                borderTop: `1px solid ${C.border}`,
+                background: C.surfaceInput,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                fontSize: 12,
+                color: C.textMuted,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <CreditCard size={14} color={C.greenLight} />
+                <span>Instant UPI, RuPay, Visa, Mastercard via Dodo Payments</span>
+              </div>
+              <Link
+                href="/pricing"
+                onClick={() => setUpgradeModal(null)}
+                style={{ color: C.greenLight, textDecoration: "none", fontWeight: 600 }}
+              >
+                View all plans &rarr;
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes spin {

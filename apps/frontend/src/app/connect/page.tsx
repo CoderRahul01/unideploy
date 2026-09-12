@@ -188,13 +188,13 @@ function ConnectPageContent() {
             fontSize: "clamp(24px, 5vw, 36px)", fontWeight: 800,
             letterSpacing: "-0.03em", marginBottom: 16, color: C.text,
           }}>
-            {pageState === "complete" ? "Scan complete" : "Scanning your project"}
+            {pageState === "complete" ? "Device Connected" : "Pairing Your Device"}
           </h2>
 
           <p style={{ fontSize: 14, color: C.muted, lineHeight: 1.6, marginBottom: 40 }}>
             {pageState === "complete"
-              ? "Opening your security report..."
-              : "Your CLI is running local security heuristics. Results will appear in your dashboard when complete."}
+              ? "Opening your dashboard & sandboxes..."
+              : "Authenticating CLI session with Cloudflare KV edge and linking your microVM compute credentials."}
           </p>
 
           {/* Progress bar */}
@@ -231,8 +231,8 @@ function ConnectPageContent() {
               fontFamily: C.mono, fontSize: 12, color: C.muted,
             }}>
               <div style={{ color: "#6DB84A", marginBottom: 4 }}>$ unideploy auth</div>
-              <div>● UniDeploy agent running</div>
-              <div style={{ color: C.muted }}>  Scanning local files...</div>
+              <div>● UniDeploy daemon connected</div>
+              <div style={{ color: C.muted }}>  Syncing cloud microVM environment...</div>
             </div>
           )}
         </div>
@@ -383,7 +383,7 @@ function ConnectPageContent() {
           gap: 24, fontSize: 13, color: "var(--text-secondary)", marginBottom: 60,
         }}
       >
-        {["Local scan", "No upload", "Instant results", "Free forever"].map((badge) => (
+        {["Isolated microVMs", "Instant device pairing", "Cloud Python & Shell", "50,000 Free Tokens"].map((badge) => (
           <span key={badge}>✓ {badge}</span>
         ))}
       </div>

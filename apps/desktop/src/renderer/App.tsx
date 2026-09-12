@@ -357,7 +357,7 @@ export default function App() {
           }}
         >
           <div style={{ fontSize: 12, fontFamily: C.mono, color: C.textSecondary }}>
-            Region: <span style={{ color: C.greenBright }}>in-mumbai-firecracker</span> · E2B MicroVMs
+            Region: <span style={{ color: C.greenBright }}>in-mumbai-firecracker</span> · Isolated MicroVMs
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <button

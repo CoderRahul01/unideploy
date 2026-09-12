@@ -186,7 +186,7 @@ export default function DownloadPage() {
           }}
         >
           <Sparkles size={13} color={C.greenLight} />
-          <span>Cloudflare Edge · E2B MicroVM Sandboxes</span>
+          <span>Cloudflare Edge · Isolated MicroVM Sandboxes</span>
         </div>
 
         <h1
@@ -605,7 +605,7 @@ export default function DownloadPage() {
               </div>
 
               <div style={{ marginTop: 16, fontSize: 12, color: C.textMuted }}>
-                Or run without installing: <code>npx unideploy scan</code>
+                Or run without installing: <code>npx unideploy run script.py</code>
               </div>
             </div>
           )}
@@ -728,10 +728,10 @@ export default function DownloadPage() {
               03 · Cloud Sandbox Ready
             </div>
             <div style={{ fontSize: 14, fontWeight: 700, color: "#FFFFFF", marginBottom: 6 }}>
-              Deploy &amp; Execute
+              Instant Cloud Execution
             </div>
             <div style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.5 }}>
-              Run scans, trigger E2B sandboxes, and apply auto-fixes orchestrated by Cloudflare Workers.
+              Launch disposable or persistent microVMs, run Python data science code, and deploy model endpoints.
             </div>
           </div>
         </div>

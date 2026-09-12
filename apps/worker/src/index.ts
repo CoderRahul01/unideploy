@@ -10,6 +10,9 @@ interface Env {
   AI_MODEL: string;
   AI_API_KEY?: string;
   E2B_API_KEY?: string;
+  DODO_PAYMENTS_API_KEY?: string;
+  DODO_API_KEY?: string;
+  DODO_WEBHOOK_SECRET?: string;
 }
 
 const app = new Hono<{ Bindings: Env }>()
@@ -115,7 +118,7 @@ const BLOCKED_PATTERNS = [
 app.get('/api/sandbox/templates', (c) => {
   return c.json({
     service: "UniDeploy Sandbox Marketplace (Cloudflare Worker)",
-    provider: "E2B Firecracker microVMs",
+    provider: "UniDeploy Isolated MicroVMs",
     templates: [
       {
         id: "colab-python",
@@ -723,10 +726,76 @@ app.get('/auth/session/:code', async (c) => {
 
 app.post('/payments/checkout', async (c) => {
   const body = await c.req.json().catch(() => ({}))
-  const tier = body.tier || "indie"
+  const tier = (body.tier as string) || "Starter"
+  const billing = (body.billing as string) || "monthly"
+
+  // Token grant map based on platform tier:
+  // Starter: 500,000 tokens
+  // Pro: 2,500,000 tokens
+  // Team: 10,000,000 tokens
+  let tokenGrant = 500000;
+  if (tier.toLowerCase().includes("pro")) tokenGrant = 2500000;
+  else if (tier.toLowerCase().includes("team")) tokenGrant = 10000000;
+
+  // Extract auth token if provided to update user plan tier in DB
+  const authHeader = c.req.header("authorization") || ""
+  const token = authHeader.replace("Bearer ", "").trim()
+
+  if (token && c.env.DB) {
+    try {
+      const sessionData = await c.env.SESSIONS?.get(`user:${token}`);
+      let userId: string | null = null;
+      if (sessionData) {
+        const parsed = JSON.parse(sessionData);
+        userId = parsed.id;
+      }
+      if (userId) {
+        await c.env.DB.prepare(
+          "UPDATE app_users SET plan_tier = ?, tokens_remaining = tokens_remaining + ? WHERE id = ?"
+        ).bind(tier, tokenGrant, userId).run();
+
+        if (sessionData) {
+          const parsed = JSON.parse(sessionData);
+          parsed.plan_tier = tier;
+          parsed.tokens_remaining = (parsed.tokens_remaining || 0) + tokenGrant;
+          await c.env.SESSIONS.put(`user:${token}`, JSON.stringify(parsed), { expirationTtl: 86400 * 30 });
+        }
+      }
+    } catch (e) {
+      console.error("Failed to update user tier in DB:", e);
+    }
+  }
+
+  // If Dodo Payments API key is configured, create live checkout session
+  const dodoKey = c.env.DODO_PAYMENTS_API_KEY || c.env.DODO_API_KEY;
+  if (dodoKey) {
+    try {
+      const dodoRes = await fetch("https://api.dodopayments.com/checkouts", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${dodoKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          billing_currency: "INR",
+          metadata: { tier, billing },
+          return_url: `${c.req.header("origin") || "https://unideploy.in"}/dashboard?payment=success&upgraded=${encodeURIComponent(tier)}`,
+        }),
+      });
+      if (dodoRes.ok) {
+        const dodoData = await dodoRes.json() as { checkout_url?: string };
+        if (dodoData.checkout_url) {
+          return c.json({ checkout_url: dodoData.checkout_url, message: "Dodo checkout session created" });
+        }
+      }
+    } catch (e) {
+      console.error("Dodo API call error, falling back:", e);
+    }
+  }
+
   return c.json({
-    checkout_url: `/dashboard?upgraded=${tier}`,
-    message: "Checkout session generated"
+    checkout_url: `/dashboard?payment=success&upgraded=${encodeURIComponent(tier)}`,
+    message: "Checkout session generated",
   })
 })
 

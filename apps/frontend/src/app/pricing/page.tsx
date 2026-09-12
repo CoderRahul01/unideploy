@@ -24,15 +24,15 @@ const TIERS: Tier[] = [
     monthly: 0,
     annual: 0,
     annualTotal: null,
-    description: "50,000 free tokens for students, indie builders & AI tinkerers. No credit card required.",
+    description: "50,000 free compute tokens for students and developers. Test in browser. No credit card required.",
     cta: "Start free trial",
-    ctaHref: "/auth",
+    ctaHref: "/sandbox",
     features: [
       "50,000 free compute & AI tokens",
-      "3 concurrent cloud microVMs",
+      "3 daily cloud microVM sessions",
       "Google Colab-alternative Python runner",
       "Native Mac Desktop App (.dmg) access",
-      "Community Discord support",
+      "Community Discord & GitHub support",
     ],
   },
   {
@@ -40,14 +40,15 @@ const TIERS: Tier[] = [
     monthly: 499,
     annual: 4790,
     annualTotal: 4790,
-    description: "For active builders and students running data notebooks, AI agents, and scripts.",
+    description: "For active builders, researchers, and students running data notebooks, AI agents, and daily scripts.",
     cta: "Subscribe for ₹499",
     features: [
-      "500,000 tokens / month",
-      "20 compute hours on Firecracker microVMs",
-      "5 concurrent sandboxes with persistent storage",
-      "1 deployed model endpoint with API key",
-      "Fast UPI, RuPay & Card checkout via Dodo",
+      "500,000 compute tokens / month",
+      "20 compute hours on isolated microVMs",
+      "Persistent filesystem (files & memory saved across runs)",
+      "5-minute sustained execution timeouts",
+      "1 deployed model API endpoint with custom key",
+      "Fast UPI, RuPay & Card checkout via Dodo Payments",
     ],
   },
   {
@@ -55,16 +56,16 @@ const TIERS: Tier[] = [
     monthly: 1499,
     annual: 14390,
     annualTotal: 14390,
-    description: "For AI engineers, freelancers, and startups deploying production models and autonomous agents.",
+    description: "For AI engineers, freelancers, and startups deploying production endpoints and autonomous agents.",
     cta: "Upgrade to Pro",
     highlight: true,
     features: [
-      "2,500,000 tokens / month",
+      "2,500,000 compute tokens / month",
       "80 compute hours on high-speed microVMs",
       "Unlimited disposable sandboxes",
-      "3 deployed model endpoints with dedicated API keys",
-      "Priority runner queue (4 vCPU, 8 GB RAM)",
-      "Priority chat & email support",
+      "3 live deployed model endpoints with dedicated API keys",
+      "Priority compute queue (< 1.2s boot time)",
+      "Full MCP agent tools integration (Cursor, Claude)",
     ],
   },
   {
@@ -72,13 +73,13 @@ const TIERS: Tier[] = [
     monthly: 4999,
     annual: 47990,
     annualTotal: 47990,
-    description: "For agencies, research labs, and teams needing pooled compute credits and multi-seat access.",
+    description: "For research labs, agencies, and teams needing pooled compute credits and multi-seat access.",
     cta: "Get Team Plan",
     features: [
-      "10,000,000 tokens / month",
+      "10,000,000 compute tokens / month",
       "300 compute hours pooled across team",
       "Unlimited deployed model endpoints",
-      "Multi-seat workspace & shared API keys",
+      "Multi-seat workspace & shared team API keys",
       "Dedicated runner instances",
       "Direct priority WhatsApp / Slack channel",
     ],
@@ -97,7 +98,7 @@ export default function PricingPage() {
 
   const handleCheckout = async (tierName: string) => {
     if (!isLoggedIn) {
-      router.push("/login");
+      router.push(`/login?redirect=${encodeURIComponent("/pricing")}`);
       return;
     }
 
@@ -152,7 +153,7 @@ export default function PricingPage() {
             Instant Cloud Sandboxes & AI Model Deployments.
           </h1>
           <p style={{ fontSize: 15, color: "#6a7a5a", lineHeight: 1.6, maxWidth: 540, margin: "0 auto 28px" }}>
-            High-speed E2B Firecracker microVMs with zero configuration. Get 50,000 free tokens on signup, with simple UPI & Card billing.
+            High-speed isolated Firecracker microVMs with zero configuration. Get 50,000 free tokens on signup, with simple UPI & Card billing.
           </p>
 
           {/* Toggle */}
