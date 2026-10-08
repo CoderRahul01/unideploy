@@ -23,7 +23,7 @@
     "next": "16.1.1",
     "postgres": "^3.4.8",
     "posthog-js": "^1.372.10",
-    "posthog-node": "^5.33.4",
+    "posthog-node": "^5.55.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "tailwind-merge": "^3.4.0"
