@@ -19,8 +19,9 @@ export default function OTPInput({
 }: OTPInputProps) {
   const [values, setValues] = useState<string[]>(Array(6).fill(""));
 
-  // Sync value prop to internal state
-  useEffect(() => {
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
     if (value) {
       const clean = value.replace(/[-\s]/g, "").slice(0, 6);
       const next = clean.split("");
@@ -29,7 +30,7 @@ export default function OTPInput({
       }
       setValues(next);
     }
-  }, [value]);
+  }
   const inputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
   // Focus first input on mount

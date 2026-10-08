@@ -89,11 +89,12 @@ export async function POST(req: NextRequest) {
         },
       }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : "Internal server error executing sandbox.";
     return NextResponse.json(
       {
         success: false,
-        error: error?.message || "Internal server error executing sandbox.",
+        error: errorMessage,
       },
       { status: 500, headers: { "Access-Control-Allow-Origin": "*" } }
     );

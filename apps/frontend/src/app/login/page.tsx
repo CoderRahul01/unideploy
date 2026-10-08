@@ -42,8 +42,8 @@ function LoginPageContent() {
       }
       // Redirect back to original route (or pricing/dashboard)
       router.push(redirectTarget);
-    } catch (err: any) {
-      setError(err.message || "Something went wrong");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setLoading(false);
     }

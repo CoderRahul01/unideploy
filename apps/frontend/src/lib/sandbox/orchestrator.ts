@@ -213,14 +213,15 @@ export async function runInSandbox(options: ExecuteOptions): Promise<SandboxExec
         sandboxId,
       };
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     const durationMs = Date.now() - startTime;
+    const msg = err instanceof Error ? err.message : String(err);
     return {
       success: false,
       stdout: "",
-      stderr: err?.message || String(err),
+      stderr: msg,
       durationMs,
-      error: err?.message || "Execution failed",
+      error: msg || "Execution failed",
     };
   } finally {
     // CRITICAL: Guaranteed cleanup to prevent credit drain

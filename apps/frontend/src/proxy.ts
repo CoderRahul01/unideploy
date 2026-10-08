@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 
 /**
  * Pass-through middleware — no auth gating.
  * The CLI session-code flow handles authentication.
  */
-export default function middleware(_req: NextRequest) {
+export default function middleware() {
   return NextResponse.next();
 }
 

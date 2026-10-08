@@ -25,12 +25,30 @@ export default function Terminal({
   style = {},
 }: TerminalProps) {
   const [visibleLines, setVisibleLines] = useState<number>(animated ? 0 : lines.length);
-  const [currentCharIndex, setCurrentCharIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const hasStarted = useRef(false);
 
   useEffect(() => {
     if (!animated || hasStarted.current) return;
+
+    const startAnimation = () => {
+      let lineIndex = 0;
+
+      const showNextLine = () => {
+        if (lineIndex >= lines.length) return;
+
+        const line = lines[lineIndex];
+        const delay = line.delay ?? 400;
+        lineIndex++;
+
+        setTimeout(() => {
+          setVisibleLines(lineIndex);
+          showNextLine();
+        }, delay);
+      };
+
+      showNextLine();
+    };
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -47,26 +65,7 @@ export default function Terminal({
     }
 
     return () => observer.disconnect();
-  }, [animated]);
-
-  const startAnimation = () => {
-    let lineIndex = 0;
-
-    const showNextLine = () => {
-      if (lineIndex >= lines.length) return;
-
-      const line = lines[lineIndex];
-      const delay = line.delay ?? 400;
-      lineIndex++;
-
-      setTimeout(() => {
-        setVisibleLines(lineIndex);
-        showNextLine();
-      }, delay);
-    };
-
-    showNextLine();
-  };
+  }, [animated, lines]);
 
   return (
     <div

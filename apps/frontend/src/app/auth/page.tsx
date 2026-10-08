@@ -51,8 +51,8 @@ function AuthPageContent() {
         await registerUser(email, password);
       }
       setStep("verify");
-    } catch (err: any) {
-      setErrorMsg(err.message || "Login failed");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Login failed");
     } finally {
       setLoading(false);
     }
@@ -69,8 +69,8 @@ function AuthPageContent() {
     try {
       await verifySession(sessionCode);
       setStep("done");
-    } catch (err: any) {
-      setErrorMsg(err.message || "Verification failed");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Verification failed");
     } finally {
       setLoading(false);
     }

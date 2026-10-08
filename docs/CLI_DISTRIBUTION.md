@@ -1,81 +1,54 @@
 # UniDeploy CLI Global Distribution Guide
 
-To make the UniDeploy CLI globally available, we use a two-pronged approach: NPM for the JavaScript ecosystem and Homebrew for native OS-level installation.
+To make the UniDeploy CLI globally available, we use a multi-pronged approach: NPM for the JavaScript/Node ecosystem, native `.dmg` packages for macOS users, and standalone binaries.
 
-## 1. NPM Distribution (Standard)
+---
 
-The CLI is already structured as an NPM package in `apps/cli`.
+## 1. NPM Distribution (Primary)
 
-### Publishing Steps:
-1.  **Login to NPM:** `npm login`
-2.  **Version Bump:** `npm version patch` (or minor/major)
-3.  **Publish:** `npm publish --access public`
+The CLI source code lives in `packages/cli` and is distributed as `unideploy` on npm.
+
+### Publishing to npm:
+1. Ensure the workspace builds cleanly:
+   ```bash
+   npm run build --workspace=packages/cli
+   npm run typecheck:cli
+   ```
+2. Version tag and trigger the GitHub Actions workflow (`.github/workflows/publish-cli.yml`):
+   ```bash
+   git tag cli/v0.2.5
+   git push origin cli/v0.2.5
+   ```
+3. Or publish directly with an npm authentication token:
+   ```bash
+   npm publish --workspace=packages/cli --access public
+   ```
 
 ### User Installation:
-Users can run it without permanent installation:
+Users can run without installation:
 ```bash
-npx unideploy init
+npx unideploy --help
 ```
-Or install it globally:
+Or install globally:
 ```bash
 npm install -g unideploy
 ```
 
 ---
 
-## 2. Homebrew Distribution (Standalone Binary)
+## 2. Native macOS Distribution (`.dmg`)
 
-For users who prefer a native binary or don't use Node.js globally.
-
-### Packaging:
-We use `pkg` or `bun build --compile` to create standalone binaries for macOS (x64/arm64) and Linux.
-
-```bash
-# Example using pkg
-npm install -g pkg
-pkg . --targets node18-macos-x64,node18-macos-arm64,node18-linux-x64 --out-path ./dist
-```
-
-### Homebrew Tap:
-1. Create a GitHub repo named `homebrew-tap`.
-2. Add a formula `Formula/unideploy.rb`:
-
-```ruby
-class Unideploy < Formula
-  desc "Security hardening for vibe-coded apps"
-  homepage "https://unideploy.in"
-  url "https://github.com/unideploy/unideploy/releases/download/v0.1.0/unideploy-macos-arm64.tar.gz"
-  sha256 "..." # SHA of the release binary
-
-  def install
-    bin.install "unideploy"
-  end
-
-  test do
-    system "#{bin}/unideploy", "--version"
-  end
-end
-```
-
-### User Installation:
-```bash
-brew tap unideploy/tap
-brew install unideploy
-```
+For macOS developers who prefer a visual dock application:
+- Built via Electron and Vite in `apps/desktop`
+- Generates `UniDeploy-arm64.dmg` for Apple Silicon (M1/M2/M3/M4)
+- Generates `UniDeploy-x64.dmg` for Intel Macs
+- Available directly from [unideploy.in/download](https://www.unideploy.in/download)
 
 ---
 
-## 3. Global Availability & Plan Enforcement
+## 3. Global Availability & Token Metering
 
-While the CLI is globally downloadable via NPM and Homebrew, access to the advanced scanning and auto-fix capabilities is gated by the UniDeploy backend.
-
-### How it works:
-1.  **Authentication:** Users run `unideploy init`, which uses Composio to link their GitHub account and generates a UniDeploy API key.
-2.  **API Key Verification:** Every command (`scan`, `fix`) sends the API key in the `Authorization` header to our FastAPI backend.
-3.  **Subscription Check:** The backend queries **Dodo Payments** (via the user's `clerk_id` or `email`) to check their active subscription tier (Free, Indie, Pro, Team).
-4.  **Quota Management:** 
-    - **Free Tier:** Limited to 5 scans/month. `POST /api/v1/scan` will return a `402 Payment Required` if the quota is exceeded.
-    - **Indie/Pro:** Unlimited scans.
-    - **Fixes:** `POST /api/v1/fix` is restricted to paid tiers.
-5.  **Global CDN:** By publishing to NPM, the package is automatically distributed across the global NPM mirror network (jsDelivr, UNPKG, etc.), ensuring low latency for `npx unideploy` anywhere in the world.
-
+1. **Authentication**: Users run `unideploy auth`, which uses 6-character device code pairing to link with `unideploy.in/auth`.
+2. **Token Verification**: Every execution (`unideploy run`, `unideploy deploy`) sends the stored bearer token to the Cloudflare Worker edge API (`unideploy-api.rahulpandey-creates.workers.dev`).
+3. **Plan Tier Enforcement**: The edge API queries Cloudflare D1 to verify remaining compute tokens and active plan tiers (`Free Trial`, `Starter`, `Pro`, `Team`).
+4. **Edge CDN Distribution**: By publishing to npm, the package is distributed automatically across the global npm mirror network (jsDelivr, UNPKG, Cloudflare), ensuring ultra-low latency worldwide.
