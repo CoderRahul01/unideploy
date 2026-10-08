@@ -1,36 +1,90 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# UniDeploy Web Platform (`apps/frontend`)
 
-## Getting Started
+**Next.js 16 Web Platform, Cloud Sandbox Studio, Template Marketplace & Dashboard**
 
-First, run the development server:
+The web client for [unideploy.in](https://www.unideploy.in), deployed on Vercel.
+
+---
+
+## 🚀 Features
+
+- **Instant Sandbox Studio (`/sandbox`)**: Browser-based interactive Python and AI code execution powered by E2B Firecracker microVMs.
+- **Template Marketplace**: Launch pre-configured environments (`colab-python`, `agent-code-interpreter`, `agent-scraper`, `model-deploy`, `cloud-terminal`).
+- **macOS Desktop App Downloads (`/download`)**: Direct download links for `UniDeploy-arm64.dmg` (Apple Silicon) and `UniDeploy-x64.dmg` (Intel).
+- **Pricing & Subscription Funnel (`/pricing`)**: Seamless INR checkout via Dodo Payments (UPI, RuPay, Netbanking, International Cards).
+- **Device Pairing & Auth (`/auth`, `/connect`)**: Instant 6-digit device code pairing linking the desktop app and CLI to the user's dashboard account.
+- **Dashboard (`/dashboard`)**: Token quota inspection, active microVM management, and deployed model endpoints.
+- **Observability**: Client/server telemetry with PostHog analytics and Sentry error monitoring.
+
+---
+
+## 🛠️ Tech Stack
+
+- **Framework**: Next.js 16 (App Router with Turbopack)
+- **Language**: TypeScript (strict mode)
+- **Styling**: Vanilla CSS Variables & modern responsive design
+- **Icons**: Lucide React
+- **Payments**: Dodo Payments Merchant of Record (INR & USD)
+- **Analytics & Errors**: PostHog & Sentry Next.js SDK
+
+---
+
+## 📂 App Routes Overview
+
+| Route | Description |
+|---|---|
+| `/` | Public landing page explaining UniDeploy's value proposition |
+| `/sandbox` | Interactive cloud sandbox runner and marketplace templates |
+| `/download` | Native macOS desktop application (.dmg) download center |
+| `/pricing` | Tier comparison and checkout (Free Trial, Starter, Pro, Team) |
+| `/auth` | Device code pairing and user login screen |
+| `/dashboard` | User dashboard for compute tokens, microVMs, and models |
+| `/getting-started` | Interactive onboarding and getting started guide |
+| `/changelog` | Product updates and platform release notes |
+| `/terms` & `/privacy` | Legal policies and data privacy guarantees |
+
+---
+
+## 💻 Local Development
 
 ```bash
+# From repository root
+npm run dev:frontend
+
+# Or from apps/frontend directly
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to view the application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🌐 Environment Configuration
 
-## Learn More
+Create a `.env.local` file in `apps/frontend/`:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+# Cloudflare Worker Edge Gateway
+NEXT_PUBLIC_UNIDEPLOY_API_URL=https://unideploy-api.rahulpandey-creates.workers.dev
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Platform Domain
+NEXT_PUBLIC_APP_URL=https://unideploy.in
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# PostHog Analytics
+NEXT_PUBLIC_POSTHOG_KEY=phc_...
+NEXT_PUBLIC_POSTHOG_HOST=https://app.posthog.com
 
-## Deploy on Vercel
+# Sentry Error Monitoring
+SENTRY_AUTH_TOKEN=sntrys_...
+NEXT_PUBLIC_SENTRY_DSN=https://...@sentry.io/...
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🚢 Deployment
+
+Deployed continuously on **Vercel** with automatic preview deployments on pull requests. Build verification is performed locally with:
+
+```bash
+npm run typecheck --workspace=apps/frontend
+```

@@ -2,9 +2,9 @@
 
 ## Purpose
 
-UniDeploy is a production-readiness platform for applications built quickly with AI coding tools and modern full-stack frameworks. It helps a developer move from prototype to shippable software by scanning a project for security, reliability, and deployment gaps, explaining the risks, and generating fixes or deployment configuration where the platform can do so safely.
+UniDeploy is an **AI Cloud Sandbox & Model Deployment Platform** purpose-built for modern developers, data scientists, and autonomous AI agents. It provides instant, disposable or persistent cloud microVMs (powered by E2B Firecracker technology) and a native macOS desktop application (`.dmg`) to run Python/data science codebases, test AI agents, and deploy AI models with instant API keys — all without infrastructure overhead, Google Colab disconnects, or local GPU throttling.
 
-The core product promise is simple: run one command, connect the CLI to the dashboard, get a graded production-readiness report, and use UniDeploy to fix or prepare the app for deployment.
+Additionally, UniDeploy includes comprehensive production-readiness scanning and automated remediation for fast-built full-stack applications.
 
 ## Primary Audiences
 
@@ -344,21 +344,14 @@ Important caveat: current auth code uses custom password hashing and token sessi
 
 ## Plans And Monetization
 
-The current payment code defines these paid tiers:
+The platform offers subscription tiers tailored for Indian and international developers via Dodo Payments:
 
-- **Builder**
-  - 50 monthly scans or 600 annual scans.
-- **Pro**
-  - 200 monthly scans or 2,400 annual scans.
-- **Enterprise**
-  - 1,000 monthly scans or 12,000 annual scans.
+- **Free Trial**: ₹0 / first month — 50,000 compute tokens, 3 cloud microVM sessions.
+- **Starter**: ₹499 / month (~$6) — 500k tokens, 20 compute hours.
+- **Pro**: ₹1,499 / month (~$18) — 2.5M tokens, 80 compute hours, 3 deployed model endpoints with API keys.
+- **Team**: ₹4,999 / month (~$59) — 10M tokens, dedicated compute pool, team collaboration.
 
-Free users are created with:
-
-- Plan tier: `Free`.
-- Default scan allowance: 10 scans.
-
-Dodo checkout uses environment-configured payment link IDs and sends metadata for user ID, tier, billing interval, and scan allocation.
+Checkout supports UPI (Google Pay, PhonePe, Paytm), RuPay debit cards, Indian credit cards, netbanking, and international cards.
 
 ## Deployment And Runtime Paths
 
@@ -423,5 +416,5 @@ Near-term roadmap items implied by the repository context and docs:
 
 ## One-Sentence Platform Description
 
-UniDeploy is a CLI, dashboard, API, and MCP platform that scans AI-generated or fast-built apps for production-readiness risks, grades the project, explains and fixes issues, and generates deployment configuration using a mix of local heuristics, cloud agents, sandboxed analysis, and integrated payment/observability infrastructure.
+UniDeploy is an AI cloud sandbox and model deployment platform providing instant E2B Firecracker microVMs, a native macOS desktop app, CLI, and MCP integrations to execute Python and data science code reliably, test AI agents in quarantined sandboxes, and deploy scripts as live HTTPS REST APIs with instant API keys.
 

@@ -19,7 +19,7 @@ import {
   Bot,
   Play,
 } from "lucide-react";
-import { TEMPLATES } from "@/app/api/sandbox/templates/route";
+import { TEMPLATES } from "@/lib/sandbox/templates";
 
 const C = {
   bg: "#0B0F0C",

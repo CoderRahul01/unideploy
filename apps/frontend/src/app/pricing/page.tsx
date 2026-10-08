@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Check, Zap } from "lucide-react";
 import posthog from "posthog-js";
-import { createCheckoutSession, getCurrentUser } from "@/lib/api";
+import { createCheckoutSession } from "@/lib/api";
 
 type Tier = {
   name: string;
@@ -87,27 +86,53 @@ const TIERS: Tier[] = [
 ];
 
 export default function PricingPage() {
-  const router = useRouter();
   const [annual, setAnnual] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
 
-  useEffect(() => {
-    getCurrentUser().then(() => setIsLoggedIn(true)).catch(() => setIsLoggedIn(false));
-  }, []);
-
   const handleCheckout = async (tierName: string) => {
-    if (!isLoggedIn) {
-      router.push(`/login?redirect=${encodeURIComponent("/pricing")}`);
-      return;
-    }
-
     try {
       setLoadingTier(tierName);
-      const res = await createCheckoutSession(tierName, annual);
-      if (res.checkout_url) {
-        window.location.href = res.checkout_url;
+      posthog.capture("checkout_initiated", { tier: tierName, annual });
+
+      // Direct live Dodo Payments product map verified with Dodo catalog
+      const DODO_PRODUCT_MAP: Record<string, { monthly: string; annual: string }> = {
+        starter: {
+          monthly: "pdt_0NfRPIDZgIPVGLL45EiGe",
+          annual: "pdt_0NfRPVE7owS0NJwLO3LUl",
+        },
+        pro: {
+          monthly: "pdt_0NfRPxJ2x8CUfGx9IzZT9",
+          annual: "pdt_0NfRQIl15TvH6p5pQpoKv",
+        },
+        team: {
+          monthly: "pdt_0NfRR1eES9t51E5OLG7j9",
+          annual: "pdt_0NfRR1eES9t51E5OLG7j9",
+        },
+      };
+
+      const key = tierName.toLowerCase();
+      let targetTier = "starter";
+      if (key.includes("pro")) targetTier = "pro";
+      else if (key.includes("team") || key.includes("enterprise")) targetTier = "team";
+
+      const prodConfig = DODO_PRODUCT_MAP[targetTier] || DODO_PRODUCT_MAP.starter;
+      const directProductId = annual ? prodConfig.annual : prodConfig.monthly;
+      const origin = typeof window !== "undefined" ? window.location.origin : "https://unideploy.in";
+      const returnUrl = `${origin}/dashboard?payment=success&upgraded=${encodeURIComponent(tierName)}`;
+      const directDodoUrl = `https://checkout.dodopayments.com/buy/${directProductId}?redirect_url=${encodeURIComponent(returnUrl)}`;
+
+      try {
+        const res = await createCheckoutSession(tierName, annual);
+        if (res.checkout_url && res.checkout_url.startsWith("https://checkout.dodopayments.com")) {
+          window.location.href = res.checkout_url;
+          return;
+        }
+      } catch (e) {
+        console.warn("Worker checkout fallback to direct Dodo link:", e);
       }
+
+      // Seamless redirect to verified Dodo Payments checkout
+      window.location.href = directDodoUrl;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "An unexpected error occurred";
       alert("Checkout failed: " + message);

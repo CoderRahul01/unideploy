@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef, Suspense } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import OTPInput from "@/components/OTPInput";
 import { verifySession, getScanReport } from "@/lib/api";
@@ -280,7 +281,7 @@ function ConnectPageContent() {
             background: "rgba(255,255,255,0.5)",
           }}
         >
-          <a
+          <Link
             href="/"
             style={{
               fontFamily: C.mono,
@@ -292,13 +293,13 @@ function ConnectPageContent() {
             }}
           >
             unideploy
-          </a>
-          <a
+          </Link>
+          <Link
             href="/"
             style={{ fontSize: 13, color: "var(--text-secondary)", textDecoration: "none", padding: "6px 12px" }}
           >
             Home
-          </a>
+          </Link>
           <span
             style={{
               fontSize: 13,

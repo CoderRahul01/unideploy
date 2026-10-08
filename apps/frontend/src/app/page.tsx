@@ -11,6 +11,11 @@ import {
   Play,
   Sparkles,
   Code2,
+  Shield,
+  Zap,
+  RefreshCw,
+  Sliders,
+  Copy,
 } from "lucide-react";
 import Terminal from "@/components/Terminal";
 import posthog from "posthog-js";
@@ -23,6 +28,42 @@ import posthog from "posthog-js";
 
 export default function LandingPage() {
   const [annualBilling, setAnnualBilling] = useState(false);
+  const [codeTab, setCodeTab] = useState<"curl" | "python" | "ts" | "composio">("curl");
+  const [copiedCode, setCopiedCode] = useState(false);
+
+  const handleCheckout = (tierName: string) => {
+    posthog.capture("checkout_initiated", { tier: tierName, annual: annualBilling, source: "landing" });
+    const DODO_PRODUCT_MAP: Record<string, { monthly: string; annual: string }> = {
+      starter: {
+        monthly: "pdt_0NfRPIDZgIPVGLL45EiGe",
+        annual: "pdt_0NfRPVE7owS0NJwLO3LUl",
+      },
+      pro: {
+        monthly: "pdt_0NfRPxJ2x8CUfGx9IzZT9",
+        annual: "pdt_0NfRQIl15TvH6p5pQpoKv",
+      },
+      team: {
+        monthly: "pdt_0NfRR1eES9t51E5OLG7j9",
+        annual: "pdt_0NfRR1eES9t51E5OLG7j9",
+      },
+    };
+    const key = tierName.toLowerCase();
+    let targetTier = "starter";
+    if (key.includes("pro")) targetTier = "pro";
+    else if (key.includes("team") || key.includes("enterprise")) targetTier = "team";
+
+    const prodConfig = DODO_PRODUCT_MAP[targetTier] || DODO_PRODUCT_MAP.starter;
+    const directProductId = annualBilling ? prodConfig.annual : prodConfig.monthly;
+    const origin = typeof window !== "undefined" ? window.location.origin : "https://unideploy.in";
+    const returnUrl = `${origin}/dashboard?payment=success&upgraded=${encodeURIComponent(tierName)}`;
+    window.location.href = `https://checkout.dodopayments.com/buy/${directProductId}?redirect_url=${encodeURIComponent(returnUrl)}`;
+  };
+
+  const copyCode = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
 
   return (
     <div
@@ -89,6 +130,17 @@ export default function LandingPage() {
             }}
           >
             How It Works
+          </a>
+          <a
+            href="#architecture"
+            style={{
+              fontSize: 13,
+              color: "var(--text-secondary)",
+              textDecoration: "none",
+              padding: "6px 12px",
+            }}
+          >
+            Architecture
           </a>
           <a
             href="#pricing"
@@ -530,10 +582,10 @@ export default function LandingPage() {
                 marginBottom: 10,
               }}
             >
-              4. Turn any Python script into an API in 5 seconds
+              4. Deploy AI Models &amp; Microservices with Zero Downtime
             </h3>
             <p style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.65, margin: 0 }}>
-              You wrote a useful Python function for financial math, image resizing, or text analysis. Don&apos;t spend half a day on Docker, FastAPI, Nginx, SSL, and AWS. Click &quot;Deploy as API&quot; and get a live HTTPS URL with authentication keys immediately.
+              Deploy small AI models (PyTorch, ONNX, Scikit-Learn, GGUF) and Python inference scripts into live, isolated microVMs in seconds. Get an authenticated HTTPS URL, edge token-bucket rate limits, zero-downtime hot swapping, and effortless multi-platform action management via Composio.
             </p>
           </div>
         </div>
@@ -569,18 +621,18 @@ export default function LandingPage() {
           {[
             {
               step: "01",
-              title: "Open Sandbox or Mac App",
-              desc: "Jump straight into the web sandbox at unideploy.in/sandbox, or launch microVMs from your Mac dock.",
+              title: "Launch in Browser or Terminal",
+              desc: "Jump straight into the web studio at unideploy.in/sandbox with zero install, or run directly from your terminal using npx unideploy.",
             },
             {
               step: "02",
-              title: "Write, Paste, or Choose Template",
-              desc: "Pre-loaded with Python 3.13, NumPy, Pandas, Matplotlib, SciPy, and Node.js. Ready to execute in under 2s.",
+              title: "Write, Test, or Fine-Tune Your Model",
+              desc: "Pre-loaded with Python, NumPy, Pandas, Matplotlib, and AI runtimes. Test models, adjust weights, and inspect plots in isolated Firecracker microVMs.",
             },
             {
               step: "03",
-              title: "Run, View Charts, or Deploy API",
-              desc: "Get stdout and high-DPI rendered plots instantly, or click Deploy to expose an authenticated HTTPS endpoint.",
+              title: "Deploy 24/7 REST API with Composio",
+              desc: "Get an authenticated HTTPS endpoint with smart rate limits, zero downtime, and tool actions to GitHub, Slack, and Vercel via Composio.",
             },
           ].map(({ step, title, desc }) => (
             <div
@@ -619,6 +671,304 @@ export default function LandingPage() {
               </p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ── Section: AI Model Deployment & Private Sandbox Architecture ── */}
+      <section id="architecture" style={{ marginBottom: 90 }}>
+        <div style={{ textAlign: "center", marginBottom: 40 }}>
+          <span
+            style={{
+              fontSize: 11,
+              fontFamily: "var(--font-mono), JetBrains Mono, monospace",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+              color: "var(--accent-green)",
+              marginBottom: 8,
+              display: "inline-block",
+            }}
+          >
+            Architecture &amp; Private Sandboxes
+          </span>
+          <h2
+            style={{
+              fontFamily: "var(--font-display), Sora, sans-serif",
+              fontSize: 32,
+              fontWeight: 800,
+              color: "var(--text-primary)",
+              letterSpacing: "-0.02em",
+              margin: 0,
+            }}
+          >
+            How developers deploy models without downtime or cloud headaches
+          </h2>
+          <p style={{ fontSize: 16, color: "var(--text-secondary)", marginTop: 8, maxWidth: 680, margin: "8px auto 0" }}>
+            Kernel-level microVM isolation protects your models and datasets. Edge rate limiting shields your compute, and Composio connects your model to 250+ platforms.
+          </p>
+        </div>
+
+        {/* 4 Architectural Pillars Grid */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gap: 16,
+            marginBottom: 36,
+          }}
+        >
+          <div
+            style={{
+              padding: 24,
+              borderRadius: 14,
+              background: "rgba(255,255,255,0.02)",
+              border: "1px solid var(--border)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(109, 184, 74, 0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Shield size={16} color="var(--accent-green)" />
+              </div>
+              <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>Private Sandbox Isolation</h4>
+            </div>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+              Each run executes inside a dedicated Debian 13 Firecracker microVM with its own virtualized kernel. No noisy neighbours, no memory leaks between tenants, and zero risk to host infrastructure.
+            </p>
+          </div>
+
+          <div
+            style={{
+              padding: 24,
+              borderRadius: 14,
+              background: "rgba(255,255,255,0.02)",
+              border: "1px solid var(--border)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(109, 184, 74, 0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <RefreshCw size={16} color="var(--accent-green)" />
+              </div>
+              <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>Zero-Downtime Hot Swap</h4>
+            </div>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+              Fine-tune models and adjust weights directly inside the sandbox. When updating inference code, warm standby microVMs handle traffic instantly without dropped sockets or downtime.
+            </p>
+          </div>
+
+          <div
+            style={{
+              padding: 24,
+              borderRadius: 14,
+              background: "rgba(255,255,255,0.02)",
+              border: "1px solid var(--border)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(109, 184, 74, 0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Sliders size={16} color="var(--accent-green)" />
+              </div>
+              <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>Awesome Rate Limiting</h4>
+            </div>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+              Edge gateway enforces token-bucket rate limits per API key with DDoS protection and transparent HTTP 429 Retry-After headers to prevent runaway billing and compute exhaustion.
+            </p>
+          </div>
+
+          <div
+            style={{
+              padding: 24,
+              borderRadius: 14,
+              background: "rgba(255,255,255,0.02)",
+              border: "1px solid var(--border)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(109, 184, 74, 0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Zap size={16} color="var(--accent-green)" />
+              </div>
+              <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>Composio Multi-Platform</h4>
+            </div>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+              Connect your deployed model or autonomous agent directly to 250+ platforms (GitHub, Slack, Discord, Linear, Notion) through Composio with zero OAuth setup friction.
+            </p>
+          </div>
+        </div>
+
+        {/* Interactive "How to Include in Your Project" Code Box */}
+        <div
+          style={{
+            border: "1px solid var(--border)",
+            borderRadius: 14,
+            background: "#0E140F",
+            overflow: "hidden",
+            marginBottom: 36,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "12px 18px",
+              borderBottom: "1px solid var(--border)",
+              background: "rgba(255,255,255,0.02)",
+              flexWrap: "wrap",
+              gap: 10,
+            }}
+          >
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <span style={{ fontSize: 12, fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--text-muted)", marginRight: 8 }}>
+                INCLUDE IN YOUR PROJECT:
+              </span>
+              {[
+                { id: "curl", label: "cURL" },
+                { id: "python", label: "Python SDK" },
+                { id: "ts", label: "TypeScript / Next.js" },
+                { id: "composio", label: "Composio Action Hook" },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setCodeTab(tab.id as "curl" | "python" | "ts" | "composio")}
+                  style={{
+                    background: codeTab === tab.id ? "rgba(109, 184, 74, 0.18)" : "transparent",
+                    color: codeTab === tab.id ? "var(--accent-green)" : "var(--text-secondary)",
+                    border: codeTab === tab.id ? "1px solid rgba(109, 184, 74, 0.4)" : "1px solid transparent",
+                    padding: "4px 12px",
+                    borderRadius: 6,
+                    fontSize: 12,
+                    fontFamily: "var(--font-mono)",
+                    cursor: "pointer",
+                    fontWeight: codeTab === tab.id ? 600 : 400,
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => {
+                const codeSnippets: Record<string, string> = {
+                  curl: `curl -X POST https://api.unideploy.in/v1/models/mod_8f21/invoke \\\n  -H "Authorization: Bearer uni_live_9a72e8140f" \\\n  -H "Content-Type: application/json" \\\n  -d '{"prompt": "Classify incoming customer feedback", "temperature": 0.2}'`,
+                  python: `import requests\n\n# Call your live UniDeploy model endpoint from any Python app\nres = requests.post(\n    "https://api.unideploy.in/v1/models/mod_8f21/invoke",\n    headers={"Authorization": "Bearer uni_live_9a72e8140f"},\n    json={"prompt": "Classify incoming customer feedback", "temperature": 0.2}\n)\n\nprint(res.json())  # {'prediction': 'positive', 'confidence': 0.98, 'latency_ms': 34}`,
+                  ts: `// Seamlessly invoke your model inside Next.js server actions or Node API\nconst res = await fetch("https://api.unideploy.in/v1/models/mod_8f21/invoke", {\n  method: "POST",\n  headers: {\n    "Authorization": \`Bearer \${process.env.UNIDEPLOY_API_KEY}\`,\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({ prompt: "Classify incoming customer feedback" }),\n});\nconst data = await res.json();\nconsole.log(data.prediction);`,
+                  composio: `# Trigger multi-platform actions via Composio when model makes a prediction\nfrom composio import ComposioToolSet, Action\n\ntoolset = ComposioToolSet(api_key="comp_live_demo")\nprediction = model.predict(input_data)\n\nif prediction["flag_urgent"]:\n    # Automatically create GitHub Issue or alert Slack without auth friction\n    toolset.execute_action(\n        action=Action.SLACK_CHAT_POST_MESSAGE,\n        params={"channel": "#triage", "text": f"Urgent issue detected: {prediction['summary']}"}\n    )`,
+                };
+                copyCode(codeSnippets[codeTab] || "");
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid var(--border)",
+                color: "var(--text-secondary)",
+                padding: "4px 10px",
+                borderRadius: 6,
+                fontSize: 12,
+                fontFamily: "var(--font-mono)",
+                cursor: "pointer",
+              }}
+            >
+              {copiedCode ? <Check size={12} color="var(--accent-green)" /> : <Copy size={12} />}
+              <span>{copiedCode ? "Copied" : "Copy"}</span>
+            </button>
+          </div>
+
+          <div style={{ padding: "18px 20px", margin: 0, overflowX: "auto" }}>
+            <pre style={{ margin: 0, fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.6, color: "#C8D8B0" }}>
+              {codeTab === "curl" && `# Invoke model endpoint via cURL with Bearer API Key
+curl -X POST https://api.unideploy.in/v1/models/mod_8f21/invoke \\
+  -H "Authorization: Bearer uni_live_9a72e8140f" \\
+  -H "Content-Type: application/json" \\
+  -d '{"prompt": "Classify incoming customer feedback", "temperature": 0.2}'`}
+
+              {codeTab === "python" && `# Call your live UniDeploy model endpoint from any Python app
+import requests
+
+res = requests.post(
+    "https://api.unideploy.in/v1/models/mod_8f21/invoke",
+    headers={"Authorization": "Bearer uni_live_9a72e8140f"},
+    json={"prompt": "Classify incoming customer feedback", "temperature": 0.2}
+)
+
+print(res.json())
+# Output: {"prediction": "positive", "confidence": 0.98, "latency_ms": 34}`}
+
+              {codeTab === "ts" && `// Seamlessly invoke your model inside Next.js server actions or Node API
+const res = await fetch("https://api.unideploy.in/v1/models/mod_8f21/invoke", {
+  method: "POST",
+  headers: {
+    "Authorization": \`Bearer \${process.env.UNIDEPLOY_API_KEY}\`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ prompt: "Classify incoming customer feedback" }),
+});
+
+const data = await res.json();
+console.log(data.prediction);`}
+
+              {codeTab === "composio" && `# Trigger multi-platform actions via Composio when model makes a prediction
+from composio import ComposioToolSet, Action
+
+toolset = ComposioToolSet(api_key="comp_live_demo")
+prediction = model.predict(input_data)
+
+if prediction["flag_urgent"]:
+    # Automatically create GitHub Issue or alert Slack without auth friction
+    toolset.execute_action(
+        action=Action.SLACK_CHAT_POST_MESSAGE,
+        params={"channel": "#triage", "text": f"Urgent issue detected: {prediction['summary']}"}
+    )`}
+            </pre>
+          </div>
+        </div>
+
+        {/* ── v1 Launch vs v2 Roadmap Clear Callout ──────────────────────── */}
+        <div
+          style={{
+            border: "1px solid rgba(109, 184, 74, 0.3)",
+            borderRadius: 14,
+            padding: "24px 28px",
+            background: "linear-gradient(135deg, rgba(109, 184, 74, 0.06) 0%, rgba(15, 20, 15, 0.4) 100%)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 20,
+          }}
+        >
+          <div style={{ maxWidth: 660 }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--accent-green)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
+              <Sparkles size={13} />
+              <span>Release Architecture: v1 Production Launch vs v2 Roadmap</span>
+            </div>
+            <h4 style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 700, color: "var(--text-primary)" }}>
+              v1 is 100% Cloud-Native: Browser Studio, CLI &amp; Edge APIs
+            </h4>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+              Zero battery drain or heavy Docker installations. Launch directly in the browser (<Link href="/sandbox" style={{ color: "var(--accent-green)", textDecoration: "underline" }}>unideploy.in/sandbox</Link>) or terminal (<code style={{ color: "var(--accent-green)" }}>npx unideploy</code>). The desktop companion app (.dmg / .exe) is on the v2 roadmap for local offline caching and hardware acceleration.
+            </p>
+          </div>
+
+          <Link
+            href="/sandbox"
+            style={{
+              padding: "10px 20px",
+              borderRadius: "var(--radius-pill)",
+              background: "var(--accent-green)",
+              color: "#06230C",
+              fontSize: 13,
+              fontWeight: 700,
+              textDecoration: "none",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <span>Try v1 Sandbox Free</span>
+            <ArrowRight size={14} />
+          </Link>
         </div>
       </section>
 
@@ -830,8 +1180,8 @@ export default function LandingPage() {
               </ul>
             </div>
 
-            <Link
-              href="/pricing"
+            <button
+              onClick={() => handleCheckout("Starter")}
               style={{
                 width: "100%",
                 padding: "11px 16px",
@@ -841,13 +1191,14 @@ export default function LandingPage() {
                 fontSize: 13,
                 fontWeight: 700,
                 textAlign: "center",
-                textDecoration: "none",
+                border: "none",
+                cursor: "pointer",
                 display: "block",
                 boxShadow: "0 2px 10px rgba(109, 184, 74, 0.3)",
               }}
             >
-              Subscribe for ₹499/mo
-            </Link>
+              Subscribe for {annualBilling ? "₹399" : "₹499"}/mo
+            </button>
           </div>
 
           {/* Card 3: Pro Plan */}
@@ -897,24 +1248,24 @@ export default function LandingPage() {
               </ul>
             </div>
 
-            <Link
-              href="/pricing"
+            <button
+              onClick={() => handleCheckout("Pro")}
               style={{
                 width: "100%",
                 padding: "11px 16px",
                 borderRadius: 8,
                 border: "1px solid var(--border)",
-                background: "transparent",
+                background: "rgba(255,255,255,0.06)",
                 color: "var(--text-primary)",
                 fontSize: 13,
                 fontWeight: 600,
                 textAlign: "center",
-                textDecoration: "none",
+                cursor: "pointer",
                 display: "block",
               }}
             >
-              Upgrade to Pro
-            </Link>
+              Upgrade to Pro ({annualBilling ? "₹1,199" : "₹1,499"}/mo)
+            </button>
           </div>
 
           {/* Card 4: Team Plan */}
@@ -961,24 +1312,24 @@ export default function LandingPage() {
               </ul>
             </div>
 
-            <Link
-              href="/pricing"
+            <button
+              onClick={() => handleCheckout("Team")}
               style={{
                 width: "100%",
                 padding: "11px 16px",
                 borderRadius: 8,
                 border: "1px solid var(--border)",
-                background: "transparent",
+                background: "rgba(255,255,255,0.06)",
                 color: "var(--text-primary)",
                 fontSize: 13,
                 fontWeight: 600,
                 textAlign: "center",
-                textDecoration: "none",
+                cursor: "pointer",
                 display: "block",
               }}
             >
-              Get Team Plan
-            </Link>
+              Get Team Plan ({annualBilling ? "₹3,999" : "₹4,999"}/mo)
+            </button>
           </div>
         </div>
       </section>

@@ -29,7 +29,16 @@ import {
   Trash2,
   Folder,
 } from "lucide-react";
-import { TEMPLATES, SandboxTemplate } from "@/app/api/sandbox/templates/route";
+import { TEMPLATES, SandboxTemplate } from "@/lib/sandbox/templates";
+
+export interface SavedSandbox {
+  id: string;
+  name: string;
+  code: string;
+  language: "python" | "js" | "bash";
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface SavedSandbox {
   id: string;
@@ -1745,6 +1754,7 @@ console.log(result.stdout);`;
                                 padding: 8,
                               }}
                             >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={src}
                                 alt={`Rendered Plot ${idx + 1}`}

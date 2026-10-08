@@ -38,8 +38,6 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules",
-    "src/components/Login.tsx",
-    "src/lib/auth.ts"
+    "node_modules"
   ]
 }

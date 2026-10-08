@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: UniDeploy Community & Support
+    url: https://unideploy.in/getting-started
+    about: Read our onboarding guides, documentation, and troubleshooting tips.
+  - name: Account & Billing Support
+    url: mailto:support@unideploy.in
+    about: For plan upgrades, Dodo payment queries, or enterprise compute allocations.

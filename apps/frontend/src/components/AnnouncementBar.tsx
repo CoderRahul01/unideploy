@@ -7,7 +7,12 @@ export default function AnnouncementBar() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (!localStorage.getItem(STORAGE_KEY)) setVisible(true);
+    const timer = setTimeout(() => {
+      if (!localStorage.getItem(STORAGE_KEY)) {
+        setVisible(true);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   if (!visible) return null;

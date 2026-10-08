@@ -1,5 +1,5 @@
 "use client";
-import { Calendar, Play, CheckCircle2 } from "lucide-react";
+import { Calendar, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 
 export default function DemoPage() {
